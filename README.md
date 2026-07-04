@@ -8,7 +8,7 @@ Basado en [sphaira](https://github.com/ITotalJustice/sphaira) de [ITotalJustice]
 
 ## Qué es
 
-GooniesInstaller es un fork de sphaira con una interfaz propia pensada para los usuarios de The Goonies OS. Simplifica la experiencia con un menú directo en español (con opción de inglés) que da acceso rápido a las funciones más usadas:
+GooniesInstaller es un fork de sphaira con una interfaz propia pensada para los usuarios de The Goonies OS. Simplifica la experiencia con un menú directo en español (con opción de inglés) que da acceso rápido a las funciones más usadas, eliminando opciones avanzadas:
 
 - **Instalar por MTP** — Conecta el cable USB al PC y transfiere archivos directamente.
 - **Juegos Instalados** — Gestiona y elimina títulos instalados en la consola.
