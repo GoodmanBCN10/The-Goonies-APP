@@ -13,7 +13,6 @@ The Goonies Installer es una aplicación homebrew para Nintendo Switch con inter
 *   **Juegos Instalados:** Visualiza, gestiona y elimina títulos instalados en la consola.
 *   **Partidas Guardadas:** Administra las saves de tus juegos.
 *   **Explorar microSD:** Navegador de archivos de la tarjeta SD.
-*   **Ajustes:** Idioma, información del sistema y capacidad de la SD.
 
 ## Componentes de terceros
 
