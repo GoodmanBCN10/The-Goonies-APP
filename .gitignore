@@ -1,0 +1,12 @@
+build/
+out/
+*.o
+*.d
+*.elf
+*.nacp
+*.nro
+*.tar.bz2
+*.tar.gz
+*.zip
+.vscode/
+task.md

@@ -1,0 +1,26 @@
+<brls:Box
+    width="auto"
+    height="auto"
+    axis="row"
+    paddingTop="15"
+    paddingBottom="15"
+    paddingLeft="20"
+    paddingRight="20">
+
+    <brls:Label
+        id="checkbox"
+        width="auto"
+        height="auto"
+        marginRight="20"
+        fontSize="24"
+        text="[ ]" />
+
+    <brls:Label
+        id="label"
+        width="auto"
+        height="auto"
+        grow="1"
+        fontSize="24"
+        text="File Name" />
+
+</brls:Box>

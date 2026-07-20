@@ -1,0 +1,113 @@
+#pragma once
+
+#include <atomic>
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include <borealis.hpp>
+
+#include "app/game_metadata_service.hpp"
+
+namespace pipensx::ui {
+
+struct ImageRequestState {
+    std::atomic<uint64_t> generation {0};
+    std::atomic<bool> pending {false};
+};
+
+class AsyncRgbaImage;
+
+struct AsyncImageLifetime {
+    std::mutex mutex;
+    AsyncRgbaImage* image = nullptr;
+};
+
+class AsyncRgbaImage : public brls::Image {
+public:
+    AsyncRgbaImage() : lifetime_(std::make_shared<AsyncImageLifetime>()) {
+        lifetime_->image = this;
+    }
+
+    ~AsyncRgbaImage() override {
+        std::lock_guard<std::mutex> lock(lifetime_->mutex);
+        lifetime_->image = nullptr;
+    }
+
+    // UI_PLAN F6: synchronous upload for memory-cache hits. UI thread only
+    // (needs the live NVG context) — the cover paints in the same frame,
+    // so catalog re-entry shows no placeholder flash.
+    void setRgbaNow(const uint8_t* pixels, int width, int height) {
+        if (!pixels || width <= 0 || height <= 0)
+            return;
+        NVGcontext* vg = brls::Application::getNVGContext();
+        innerSetImage(nvgCreateImageRGBA(vg, width, height, 0, pixels));
+    }
+
+    std::shared_ptr<AsyncImageLifetime> getLifetime() const { return lifetime_; }
+
+private:
+    std::shared_ptr<AsyncImageLifetime> lifetime_;
+};
+
+inline void loadImageInto(AsyncRgbaImage* image, GameMetadataService* service,
+                   const std::string& url,
+                   const std::shared_ptr<ImageRequestState>& state,
+                   uint64_t generation) {
+    if (!image)
+        return;
+    if (!service || url.empty()) {
+        image->clear();
+        state->pending = false;
+        return;
+    }
+    // UI_PLAN F6: memory-cache hit → texture in the first frame, skipping
+    // the worker queue (disk read + decode) and the placeholder flash.
+    if (GameMetadataService::ImageData cached = service->cachedImage(url)) {
+        state->pending = false;
+        image->setRgbaNow(cached->pixels.data(), cached->width,
+                          cached->height);
+        return;
+    }
+    image->clear();
+    state->pending = true;
+    std::weak_ptr<AsyncImageLifetime> weakLifetime = image->getLifetime();
+    service->requestImage(url, [weakLifetime, state, generation](
+        GameMetadataService::ImageData bytes) {
+        brls::sync([weakLifetime, state, generation, bytes]() {
+            if (state->generation.load() != generation) {
+                state->pending = false;
+                return;
+            }
+            state->pending = false;
+            auto lifetime = weakLifetime.lock();
+            if (!lifetime) return;
+            std::lock_guard<std::mutex> lock(lifetime->mutex);
+            if (!lifetime->image) return;
+            if (!bytes || bytes->pixels.empty()) return;
+            NVGcontext* vg = brls::Application::getNVGContext();
+            lifetime->image->innerSetImage(nvgCreateImageRGBA(
+                vg, bytes->width, bytes->height, 0, bytes->pixels.data()));
+        });
+    });
+}
+
+inline void loadImageInto(AsyncRgbaImage* image, GameMetadataService* service,
+                   const std::string& url) {
+    auto state = std::make_shared<ImageRequestState>();
+    uint64_t generation = ++state->generation;
+    loadImageInto(image, service, url, state, generation);
+}
+
+inline void setArtworkUrl(AsyncRgbaImage* image, GameMetadataService* service,
+                   const std::string& url, std::string& currentUrl,
+                   const std::shared_ptr<ImageRequestState>& state) {
+    if (currentUrl == url &&
+        (image->getTexture() != 0 || state->pending.load()))
+        return;
+    currentUrl = url;
+    uint64_t generation = ++state->generation;
+    loadImageInto(image, service, url, state, generation);
+}
+
+}  // namespace pipensx::ui
