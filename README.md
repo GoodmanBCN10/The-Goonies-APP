@@ -1,12 +1,12 @@
-# The Goonies Installer
+# The Goonies App
 
-Instalador de contenido para Nintendo Switch, desarrollado para la comunidad Switch ES — The Goonies OS.
+Instalador y gestor de contenido para Nintendo Switch, desarrollado para la comunidad Switch ES — The Goonies OS.
 
 ---
 
 ## Qué es
 
-The Goonies Installer es una aplicación homebrew para Nintendo Switch con interfaz propia, diseñada para simplificar la gestión de contenido en consolas con CFW. Todo desde una interfaz en español (con opción de inglés).
+The Goonies App es una aplicación homebrew para Nintendo Switch con interfaz propia, diseñada para simplificar la gestión de contenido en consolas con CFW. Todo desde una interfaz en español (con opción de inglés).
 
 *   **¡Novedad V2.0! Descarga de Juegos:** Soporte integrado para descargar contenido a través de red (Torrents y enlaces Magnet) directamente desde la consola.
 *   **Instalar por MTP:** Conecta el cable USB al PC y transfiere archivos directamente, sin necesidad de software adicional en el PC.
