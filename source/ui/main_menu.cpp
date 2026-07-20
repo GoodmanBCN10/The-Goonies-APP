@@ -10,6 +10,7 @@
 #include "ui/installed/install_browser.hpp"
 #include "ui/saves/saves_view.hpp"
 #include "ui/forwarders/forwarders_view.hpp"
+#include "ui/updater/updater_view.hpp"
 #include <usbhsfs.h>
 
 // Forward declaration from main.cpp
@@ -244,6 +245,11 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
     
     this->registerAction("Salir", brls::BUTTON_START, [this](brls::View* view) {
         brls::Application::quit();
+        return true;
+    }, false);
+
+    this->registerAction("Actualizar CFW", brls::BUTTON_Y, [this](brls::View* view) {
+        brls::Application::pushActivity(new brls::Activity(new goonies::ui::UpdaterView()));
         return true;
     }, false);
 }

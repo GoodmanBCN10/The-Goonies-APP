@@ -51,6 +51,8 @@ public:
     void updateStatus();
     void buildHistoryUI();
     std::string formatSize(u64 size);
+
+    brls::Event<>::Subscription runLoopSubscription_;
 };
 
 } // namespace goonies::ui

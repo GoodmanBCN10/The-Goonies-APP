@@ -19,6 +19,8 @@ extern "C" {
 #include "app/catalog_service.hpp"
 #include "app/download_manager.hpp"
 #include "app/game_metadata_service.hpp"
+#include "installer/installer_core.hpp"
+#include "mtp/haze_helper.hpp"
 #include "app/installed_title_service.hpp"
 #include "app/homebrew_service.hpp"
 
@@ -182,6 +184,9 @@ int main(int argc, char* argv[]) {
             }
         }
         writeLog("Main loop EXITED. Application closing normally.");
+
+        // Gracefully shutdown background threads before local services are destroyed
+        MTP::Exit();
 
     } catch (const std::exception& e) {
         brls::Logger::error("Fatal error: %s", e.what());

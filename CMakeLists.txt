@@ -120,6 +120,7 @@ target_link_libraries(TheGooniesInstaller PRIVATE
     curl
     mbedtls mbedcrypto mbedx509
     z
+    minizip
     miniupnpc
 )
 

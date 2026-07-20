@@ -173,12 +173,13 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
         return true;
     });
 
-    brls::Application::getRunLoopEvent()->subscribe([this]() {
+    runLoopSubscription_ = brls::Application::getRunLoopEvent()->subscribe([this]() {
         this->updateStatus();
     });
 }
 
 MTPView::~MTPView() {
+    brls::Application::getRunLoopEvent()->unsubscribe(runLoopSubscription_);
     MTP::DisableInstallMode();
     if (g_mtpInstallerCore) {
         delete g_mtpInstallerCore;

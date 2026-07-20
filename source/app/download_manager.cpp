@@ -11,6 +11,7 @@ extern "C" {
 #include "../core/util.h"
 }
 
+#include <switch.h>
 #include <algorithm>
 #include <cerrno>
 #include <cctype>
@@ -1817,6 +1818,7 @@ void DownloadManager::workerMain() {
                 static_cast<uint32_t>(initialPeers.size() / 6));
         }
 
+        appletSetMediaPlaybackState(true);
         bool finished = false;
         while (!stopping_) {
             {
@@ -1900,6 +1902,8 @@ void DownloadManager::workerMain() {
                 break;
             }
         }
+        
+        appletSetMediaPlaybackState(false);
 
         torrent_destroy(torrent);
         log_msg("[manager] torrent destroyed %s\n", activeId.c_str());

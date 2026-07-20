@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <unistd.h>
+#include <filesystem>
 namespace MTP {
 namespace {
 
@@ -535,9 +536,12 @@ struct FsProxySdCard : FsProxyBase {
     }
 
     Result DeleteDirectoryRecursively(const char* path) override {
-        // Implement recursive delete if needed, but rmdir is usually enough for basic MTP proxy
-        if (rmdir(GetSdPath(path).c_str()) != 0) return 0x202;
-        return 0;
+        try {
+            std::filesystem::remove_all(GetSdPath(path));
+            return 0;
+        } catch (...) {
+            return 0x202;
+        }
     }
 
     Result RenameDirectory(const char *old_path, const char *new_path) override {
