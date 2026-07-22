@@ -241,15 +241,19 @@ int main(int argc, char* argv[]) {
             langDialog->open();
         }
 
-        std::string err;
-        writeLog("Loading catalog_service...");
-        catalog_service.load(err);
+        // Offload heavy service initialization (title icons extraction) to background thread for 0.1s instant UI startup!
+        std::thread([&catalog_service, &metadata_service, &installed_service, writeLog]() {
+            std::string err;
+            writeLog("Background thread: loading catalog_service...");
+            catalog_service.load(err);
 
-        writeLog("Loading metadata_service...");
-        metadata_service.load(err);
+            writeLog("Background thread: loading metadata_service...");
+            metadata_service.load(err);
 
-        writeLog("Refreshing installed_service...");
-        installed_service.refresh(err);
+            writeLog("Background thread: refreshing installed_service...");
+            installed_service.refresh(err);
+            writeLog("Background thread: services initialization COMPLETE.");
+        }).detach();
 
         // Run the main loop
         int frameCount = 0;
