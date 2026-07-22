@@ -86,8 +86,12 @@ int main(int argc, char* argv[]) {
 
     writeLog("Starting app");
 
-    usbHsFsInitialize(0);
-    writeLog("usbHsFsInitialize OK");
+    Result usbRc = usbHsFsInitialize(0);
+    if (R_SUCCEEDED(usbRc)) {
+        writeLog("usbHsFsInitialize OK");
+    } else {
+        writeLog("usbHsFsInitialize FAILED (non-fatal)");
+    }
 
     if (R_SUCCEEDED(romfsInit())) {
         writeLog("romfsInit OK");
@@ -100,6 +104,15 @@ int main(int argc, char* argv[]) {
         writeLog("socketInitialize OK");
     } else {
         writeLog("socketInitialize FAILED");
+    }
+
+    bool nvReady = false;
+    Result nvRc = nvInitialize();
+    if (R_SUCCEEDED(nvRc)) {
+        nvReady = true;
+        writeLog("nvInitialize OK");
+    } else {
+        writeLog("nvInitialize FAILED (non-fatal)");
     }
 
     std::FILE* borealisLogFile = std::fopen("sdmc:/switch/thegoonies/borealis_log.txt", "w");
@@ -296,6 +309,7 @@ int main(int argc, char* argv[]) {
     } 
 
     // Cleanup
+    if (nvReady) nvExit();
     usbHsFsExit();
     if (nsReady) nsExit();
     if (ncmReady) ncmExit();
