@@ -13,8 +13,6 @@
 #include <usbhsfs.h>
 extern "C" {
 #include <ipcext/es.h>
-    u32 __nx_applet_type = AppletType_None;
-    u32 __nx_applet_ext_variant = 0;
 }
 #include "app/catalog_service.hpp"
 #include "app/download_manager.hpp"
@@ -37,23 +35,31 @@ using pipensx::InstalledTitleService;
 using pipensx::HomebrewService;
 using namespace pipensx::ui;
 
-
-
-
 int main(int argc, char* argv[]) {
-    // A library applet must only terminate after qlaunch asks it to close.
-    if (appletGetAppletType() != AppletType_Application && appletGetAppletType() != AppletType_SystemApplication) {
+    // Check if launched in Library Applet Mode (Album mode without Title Override)
+    AppletType at = appletGetAppletType();
+    if (at == AppletType_LibraryApplet || at == AppletType_OverlayApplet) {
         consoleInit(NULL);
-        printf("\nThe Goonies Installer requiere acceso total a la memoria.\n");
-        printf("The Goonies Installer requires full memory access.\n\n");
-        printf("Por favor, abre un juego manteniendo pulsado 'R' para abrir el Homebrew Menu,\n");
-        printf("Please launch a game while holding 'R' to open the Homebrew Menu,\n");
-        printf("o instala un NSP de acceso directo.\n");
-        printf("or install a forwarder NSP.\n\n");
-        printf("Pulsa HOME para salir. / Press HOME to exit.\n");
+        printf("\n====================================================\n");
+        printf(" THE GOONIES APP REQUIERE ACCESO TOTAL A LA MEMORIA\n");
+        printf(" THE GOONIES APP REQUIRES FULL MEMORY ACCESS\n");
+        printf("====================================================\n\n");
+        printf(" Por favor, abre cualquier juego manteniendo pulsado 'R'\n");
+        printf(" para abrir el Homebrew Menu en modo Acceso Total.\n\n");
+        printf(" Please launch any game while holding 'R' to open\n");
+        printf(" the Homebrew Menu with full memory access.\n\n");
+        printf(" Pulsa + o HOME para salir / Press + or HOME to exit.\n");
+        printf("====================================================\n");
         consoleUpdate(NULL);
+        
+        PadState pad;
+        padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+        padInitializeDefault(&pad);
         while (appletMainLoop()) {
-            svcSleepThread(100000000ULL);
+            padUpdate(&pad);
+            u64 kDown = padGetButtonsDown(&pad);
+            if (kDown & HidNpadButton_Plus) break;
+            svcSleepThread(50000000ULL);
         }
         consoleExit(NULL);
         return 0;
@@ -124,9 +130,12 @@ int main(int argc, char* argv[]) {
         writeLog("nsInitialize OK");
 
         rc = esInitialize();
-        if (R_FAILED(rc)) throw std::runtime_error("esInitialize failed");
-        esReady = true;
-        writeLog("esInitialize OK");
+        if (R_SUCCEEDED(rc)) {
+            esReady = true;
+            writeLog("esInitialize OK");
+        } else {
+            writeLog("esInitialize FAILED (non-fatal)");
+        }
 
         rc = accountInitialize(AccountServiceType_System);
         if (R_FAILED(rc)) {
