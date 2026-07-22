@@ -378,6 +378,9 @@ void UpdaterView::PerformUpdate() {
             closedir(dir);
         }
 
+        // Explicitly clean legacy sysmodules/themes to prevent 010041544D530000 ams_mitm crash on new HOS firmware
+        remove_recursive("sdmc:/atmosphere/contents");
+
         brls::sync([this]() { status_label->setText(t("Extrayendo archivos...", "Extracting files...")); });
         ExtractZip(temp_zip, status_label, progress_bar_fill);
 
