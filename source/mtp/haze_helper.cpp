@@ -620,12 +620,17 @@ void haze_callback(const haze::CallbackData *data) {
 
 } // namespace
 
-bool Init() {
+bool Init(bool explorerOnly) {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_is_running) return false;
 
-    g_fs_entries.emplace_back(std::make_shared<FsInstallProxy>("1. SD Card Install [NSP, NSZ, XCI]", "1. SD Card Install [NSP, NSZ, XCI]"));
-    g_fs_entries.emplace_back(std::make_shared<FsProxySdCard>("2. SD Card Explorer", "2. SD Card Explorer"));
+    g_fs_entries.clear();
+    if (explorerOnly) {
+        g_fs_entries.emplace_back(std::make_shared<FsProxySdCard>("SD Card Explorer", "SD Card Explorer"));
+    } else {
+        g_fs_entries.emplace_back(std::make_shared<FsInstallProxy>("1. SD Card Install [NSP, NSZ, XCI]", "1. SD Card Install [NSP, NSZ, XCI]"));
+        g_fs_entries.emplace_back(std::make_shared<FsProxySdCard>("2. SD Card Explorer", "2. SD Card Explorer"));
+    }
 
     g_should_exit = false;
     // Standard Nintendo VID/PID
@@ -640,6 +645,14 @@ bool Init() {
 bool IsInit() {
     std::lock_guard<std::mutex> lock(g_mutex);
     return g_is_running;
+}
+
+bool IsConnected() {
+    UsbState state = UsbState_Detached;
+    if (R_SUCCEEDED(usbDsGetState(&state))) {
+        return state == UsbState_Configured;
+    }
+    return false;
 }
 
 void Exit() {

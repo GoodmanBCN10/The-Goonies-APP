@@ -9,9 +9,10 @@ using OnInstallStart = std::function<bool(const char*, size_t)>;
 using OnInstallWrite = std::function<bool(const void*, size_t)>;
 using OnInstallClose = std::function<void()>;
 
-bool Init();
+bool Init(bool explorerOnly = false);
 void Exit();
 bool IsInit();
+bool IsConnected();
 
 void InitInstallMode(const OnInstallStart& on_start, const OnInstallWrite& on_write, const OnInstallClose& on_close);
 void DisableInstallMode();

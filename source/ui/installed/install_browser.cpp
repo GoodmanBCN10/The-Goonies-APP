@@ -1,4 +1,5 @@
 #include "ui/installed/install_browser.hpp"
+#include "ui/common/ui_helpers.hpp"
 #include <borealis/views/bottom_bar.hpp>
 #include <fmt/core.h>
 #include <algorithm>
@@ -12,7 +13,7 @@ InstallFileCell::InstallFileCell(InstallBrowserView* owner) : owner_(owner) {
     this->setFocusable(true);
     this->inflateFromXMLRes("xml/install_file_cell.xml");
     
-    this->registerAction("Marcar", brls::BUTTON_Y, [this](brls::View* view) {
+    this->registerAction(t("Marcar", "Mark"), brls::BUTTON_Y, [this](brls::View* view) {
         if (owner_ && cellIndex_ != (size_t)-1) {
             owner_->toggleSelection(cellIndex_);
             // Update this specific cell's UI directly to avoid reloadData() killing focus
@@ -23,7 +24,7 @@ InstallFileCell::InstallFileCell(InstallBrowserView* owner) : owner_(owner) {
         return true;
     });
 
-    this->registerAction("Instalar Marcados", brls::BUTTON_X, [this](brls::View* view) {
+    this->registerAction(t("Instalar Marcados", "Install Marked"), brls::BUTTON_X, [this](brls::View* view) {
         if (owner_) {
             owner_->startInstallQueue("");
         }
@@ -72,7 +73,7 @@ InstallBrowserView::InstallBrowserView(const std::string& startPath) : brls::Box
     centerBox->setGrow(1.0f);
 
     titleLabel_ = new brls::Label();
-    titleLabel_->setText("Explorador de Archivos");
+    titleLabel_->setText(t("Explorador de Archivos", "File Browser"));
     titleLabel_->setFontSize(45);
     titleLabel_->setTextColor(brls::Application::getTheme().getColor("brls/accent"));
     titleLabel_->setMarginBottom(20);
@@ -93,12 +94,12 @@ InstallBrowserView::InstallBrowserView(const std::string& startPath) : brls::Box
     // Y button action is now handled by the cell directly.
 
     // X button to install all selected
-    this->registerAction("Instalar Marcados", brls::BUTTON_X, [this](brls::View* view) {
+    this->registerAction(t("Instalar Marcados", "Install Marked"), brls::BUTTON_X, [this](brls::View* view) {
         startInstallQueue("");
         return true;
     });
 
-    this->registerAction("Volver", brls::BUTTON_B, [](brls::View* view) {
+    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View* view) {
         brls::Application::popActivity();
         return true;
     });
@@ -111,12 +112,12 @@ void InstallBrowserView::loadDirectory(const std::string& path) {
     currentPath_ = path;
 
     InstallFileEntry loadingEntry;
-    loadingEntry.name = "Cargando contenido del USB...";
+    loadingEntry.name = t("Cargando contenido del USB...", "Loading USB content...");
     loadingEntry.directory = false;
     loadingEntry.path = "";
     entries_.push_back(loadingEntry);
     
-    titleLabel_->setText("Explorador - " + path);
+    titleLabel_->setText(std::string(t("Explorador - ", "Browser - ")) + path);
 
     std::vector<InstallFileEntry> newEntries;
 
@@ -204,14 +205,14 @@ void InstallBrowserView::select(size_t index) {
 
     // It's a file. If it's selected via A button, we should ask to install.
     // Wait, let's just add an action in the cell, or just pop a dialog
-    auto* dialog = new brls::Dialog(fmt::format("¿Instalar {}?", entry.name));
-    dialog->addButton("Instalar", [this, path = entry.path]() {
+    auto* dialog = new brls::Dialog(fmt::format("{} {}?", t("¿Instalar", "Install"), entry.name));
+    dialog->addButton(t("Instalar", "Install"), [this, path = entry.path]() {
         startInstallQueue(path);
     });
-    dialog->addButton("Marcar/Desmarcar", [this, index]() {
+    dialog->addButton(t("Marcar/Desmarcar", "Mark/Unmark"), [this, index]() {
         toggleSelection(index);
     });
-    dialog->addButton("Cancelar", []() {});
+    dialog->addButton(t("Cancelar", "Cancel"), []() {});
     dialog->open();
 }
 
@@ -235,7 +236,7 @@ void InstallBrowserView::startInstallQueue(const std::string& singleClickedPath)
     }
 
     if (queue.empty()) {
-        brls::Application::notify("No hay archivos marcados para instalar.");
+        brls::Application::notify(t("No hay archivos marcados para instalar.", "No marked files to install."));
         return;
     }
 

@@ -18,6 +18,10 @@ extern "C" {
 #include "platform/switch_crashlog.h"
 #include "ui/theme.hpp"
 
+inline const char* t(const char* es, const char* en) {
+    return brls::Platform::APP_LOCALE_DEFAULT == brls::LOCALE_EN_US ? en : es;
+}
+
 namespace pipensx::ui {
 
 inline pipensx::install::InstallStorageTarget installTargetFor(InstallLocation value) {

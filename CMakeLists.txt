@@ -55,6 +55,9 @@ list(APPEND GOONIES_SOURCES
 
 add_executable(TheGooniesInstaller
     source/main.cpp
+    source/app/download_manager.cpp
+    source/app/cleanup_helper.cpp
+    source/app/game_metadata_service.cpp
     source/catalog.cpp
     source/torrent_engine.cpp
     source/fs.cpp

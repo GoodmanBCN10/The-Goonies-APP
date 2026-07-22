@@ -44,10 +44,13 @@ int main(int argc, char* argv[]) {
     // A library applet must only terminate after qlaunch asks it to close.
     if (appletGetAppletType() != AppletType_Application && appletGetAppletType() != AppletType_SystemApplication) {
         consoleInit(NULL);
-        printf("\nThe Goonies Installer requires full memory access.\n\n");
+        printf("\nThe Goonies Installer requiere acceso total a la memoria.\n");
+        printf("The Goonies Installer requires full memory access.\n\n");
+        printf("Por favor, abre un juego manteniendo pulsado 'R' para abrir el Homebrew Menu,\n");
         printf("Please launch a game while holding 'R' to open the Homebrew Menu,\n");
+        printf("o instala un NSP de acceso directo.\n");
         printf("or install a forwarder NSP.\n\n");
-        printf("Press HOME to exit.\n");
+        printf("Pulsa HOME para salir. / Press HOME to exit.\n");
         consoleUpdate(NULL);
         while (appletMainLoop()) {
             svcSleepThread(100000000ULL);
@@ -64,6 +67,7 @@ int main(int argc, char* argv[]) {
     bool nsReady = false;
     bool esReady = false;
     bool socketReady = false;
+    bool setsysReady = false;
 
     std::ofstream logOut("sdmc:/switch/thegoonies/debug_log.txt", std::ios::out | std::ios::trunc);
     std::mutex logMutex;
@@ -132,6 +136,11 @@ int main(int argc, char* argv[]) {
         if (accountReady) writeLog("accountInitialize OK");
         else writeLog("accountInitialize FAILED");
 
+        rc = setsysInitialize();
+        setsysReady = R_SUCCEEDED(rc);
+        if (setsysReady) writeLog("setsysInitialize OK");
+        else writeLog("setsysInitialize FAILED");
+
         // Init application
         brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
         if (!brls::Application::init()) {
@@ -148,10 +157,18 @@ int main(int argc, char* argv[]) {
 
         // Init Pipensx Services
         const char* BundledCatalogPath = "romfs:/catalog/switch_games.json";
-        AppSettings settings("sdmc:/switch/thegoonies", BundledCatalogPath);
+        AppSettings settings("sdmc:/switch/thegoonies/settings.json", BundledCatalogPath);
         std::string loadError;
         settings.load(loadError);
         writeLog("settings.load OK");
+        
+        if (settings.get().language == 1) {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+        } else if (settings.get().language == 2) {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
+        } else {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES; // Default to ES initially
+        }
         
         DownloadManager download_manager("sdmc:/switch/thegoonies");
         CatalogService catalog_service("sdmc:/switch/thegoonies", BundledCatalogPath);
@@ -164,6 +181,28 @@ int main(int argc, char* argv[]) {
         goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(&download_manager, &catalog_service, &metadata_service, &installed_service, &settings, &homebrew_service);
         brls::Application::pushActivity(new brls::Activity(rootFrame));
         writeLog("pushActivity OK");
+        
+        // Show language selection dialog on first run
+        if (settings.get().language == 0) {
+            brls::Dialog* langDialog = new brls::Dialog("Selecciona tu idioma / Select your language");
+            langDialog->addButton("Español", [&settings]() {
+                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+                auto vals = settings.get();
+                vals.language = 1;
+                std::string err;
+                settings.update(vals, err);
+                brls::Application::notify("Idioma guardado: Español. Reinicia la app para aplicar.");
+            });
+            langDialog->addButton("English", [&settings]() {
+                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
+                auto vals = settings.get();
+                vals.language = 2;
+                std::string err;
+                settings.update(vals, err);
+                brls::Application::notify("Language saved: English. Restart the app to apply.");
+            });
+            langDialog->open();
+        }
 
         writeLog("Loading catalog_service...");
         std::string err;
@@ -200,6 +239,7 @@ int main(int argc, char* argv[]) {
     if (ncmReady) ncmExit();
     if (esReady) esExit();
     accountExit();
+    if (setsysReady) setsysExit();
     if (curlReady) curl_global_cleanup();
     if (socketReady) socketExit();
     romfsExit();

@@ -6,7 +6,7 @@
 #include <vector>
 
 #include <borealis.hpp>
-
+#include <borealis/views/bottom_bar.hpp>
 #include "app/app_settings.hpp"
 #include "app/download_manager.hpp"
 #include "app/game_metadata_service.hpp"
@@ -48,6 +48,7 @@ public:
         centerBox->addView(scrollFrame_);
         
         addView(centerBox);
+        addView(new brls::BottomBar());
         
         refresh();
         timer_.setCallback([this] {

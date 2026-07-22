@@ -261,7 +261,7 @@ public:
         count_->setMarginTop(12);
         count_->setShrink(0.0f);
         header_->addView(count_);
-        clearSearch_ = makeChip("Clear", [this] {
+        clearSearch_ = makeChip(t("Limpiar", "Clear"), [this] {
             if (query_.empty() && !shelfDrilldown_)
                 return;
             query_.clear();
@@ -285,7 +285,7 @@ public:
 
         auto* openDownloadsBtn = new brls::Button();
         openDownloadsBtn->setStyle(&brls::BUTTONSTYLE_PRIMARY);
-        openDownloadsBtn->setText("Cola Descargas");
+        openDownloadsBtn->setText(t("Cola Descargas", "Downloads Queue"));
         openDownloadsBtn->setMarginLeft(8);
         openDownloadsBtn->setHeight(40);
         openDownloadsBtn->setShrink(0.0f);
@@ -322,7 +322,7 @@ public:
         selectVisible->setGrow(1);
         selectVisible->setHeight(44);
         selectVisible->setMarginRight(8);
-        selectVisible->setText("Select visible");
+        selectVisible->setText(t("Selecc. visible", "Select visible"));
         selectVisible->registerClickAction([this](brls::View*) {
             selectVisibleEntries();
             return true;
@@ -333,7 +333,7 @@ public:
         clearSelection->setGrow(1);
         clearSelection->setHeight(44);
         clearSelection->setMarginRight(8);
-        clearSelection->setText("Clear");
+        clearSelection->setText(t("Limpiar", "Clear"));
         clearSelection->registerClickAction([this](brls::View*) {
             selectedHashes_.clear();
             rebuildEntries();
@@ -344,7 +344,7 @@ public:
         prepareBatch_->setStyle(&brls::BUTTONSTYLE_PRIMARY);
         prepareBatch_->setGrow(1);
         prepareBatch_->setHeight(44);
-        prepareBatch_->setText("Prepare");
+        prepareBatch_->setText(t("Preparar", "Prepare"));
         prepareBatch_->registerClickAction([this](brls::View*) {
             prepareSelectedEntries();
             return true;

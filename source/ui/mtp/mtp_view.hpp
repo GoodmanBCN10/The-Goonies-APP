@@ -55,4 +55,18 @@ public:
     brls::Event<>::Subscription runLoopSubscription_;
 };
 
+class MTPExplorerView : public brls::Box {
+public:
+    MTPExplorerView();
+    ~MTPExplorerView() override;
+
+    void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) override;
+
+private:
+    brls::Label* titleLabel_ = nullptr;
+    brls::Label* statusLabel_ = nullptr;
+    bool lastConnected_ = false;
+    brls::Event<>::Subscription runLoopSubscription_;
+};
+
 } // namespace goonies::ui

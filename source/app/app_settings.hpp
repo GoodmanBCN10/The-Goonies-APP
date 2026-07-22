@@ -35,6 +35,7 @@ struct AppSettingsData {
     // First-run disclaimer: the catalog is a third-party RuTracker dump. Shown
     // once, then this is set so later launches skip it.
     bool catalogDisclaimerAcknowledged = false;
+    int language = 0; // 0=unset, 1=es, 2=en
 
     bool operator==(const AppSettingsData& other) const;
     bool operator!=(const AppSettingsData& other) const {

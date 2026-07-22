@@ -99,6 +99,12 @@ bool parseSettings(const std::string& text, AppSettingsData& values,
         return false;
     }
 
+    if (root.contains("language") && root["language"].is_number()) {
+        values.language = root["language"].get<int>();
+    } else {
+        values.language = 0;
+    }
+
     if (catalog == "all")
         values.catalogFilter = CatalogFilter::All;
     else if (catalog == "games")
@@ -139,6 +145,7 @@ std::string serializeSettings(const AppSettingsData& values) {
     root["extended_telemetry"] = values.extendedTelemetry;
     root["check_for_updates_on_launch"] = values.checkForUpdatesOnLaunch;
     root["catalog_disclaimer_ack"] = values.catalogDisclaimerAcknowledged;
+    root["language"] = values.language;
     return root.dump(2) + "\n";
 }
 

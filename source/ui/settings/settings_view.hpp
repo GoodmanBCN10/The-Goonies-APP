@@ -5,11 +5,15 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <thread>
+#include <chrono>
 
 #include <borealis.hpp>
 #ifdef __SWITCH__
 #include <switch.h>
 #endif
+
+#include <filesystem>
 
 #include "app/app_settings.hpp"
 #include "app/catalog_service.hpp"
@@ -17,8 +21,9 @@
 #include "app/game_metadata_service.hpp"
 #include "app/installed_title_service.hpp"
 #include "app/update_service.hpp"
+#include "ui/common/message_cells.hpp"
 #include "ui/common/ui_helpers.hpp"
-#include "ui/theme.hpp"
+#include "app/cleanup_helper.hpp"
 
 namespace pipensx::ui {
 
@@ -30,158 +35,93 @@ public:
         : brls::Box(brls::Axis::COLUMN), settings_(settings), manager_(manager),
           catalog_(catalog), metadata_(metadata), installed_(installed), updater_(updater),
           alive_(std::make_shared<std::atomic<bool>>(true)) {
+          
         auto* content = new brls::Box(brls::Axis::COLUMN);
         content->setPadding(24, 34, 24, 34);
 
-        addSection(content, "Catalog");
-        catalogFilter_ = new brls::SelectorCell();
-        catalogFilter_->init("Visible releases", {"All", "Games"},
-            settings_->get().catalogFilter == CatalogFilter::Games ? 1 : 0,
-            [this](int selected) {
-                AppSettingsData values = settings_->get();
-                CatalogFilter previous = values.catalogFilter;
-                values.catalogFilter = selected == 1
-                    ? CatalogFilter::Games : CatalogFilter::All;
-                if (!persist(values, "catalog_filter"))
-                    catalogFilter_->setSelection(
-                        previous == CatalogFilter::Games ? 1 : 0, true);
+        addSection(content, t("Consola", "Console"));
+        
+        auto* langToggle = new brls::SelectorCell();
+        langToggle->init(t("Idioma / Language", "Language / Idioma"), {"Español", "English"},
+            brls::Platform::APP_LOCALE_DEFAULT == brls::LOCALE_EN_US ? 1 : 0,
+            [settings](int selected) {
+                brls::Platform::APP_LOCALE_DEFAULT = selected == 1 ? brls::LOCALE_EN_US : brls::LOCALE_ES;
+                auto vals = settings->get();
+                vals.language = (selected == 1) ? 2 : 1;
+                std::string err;
+                settings->update(vals, err);
+                brls::Application::notify(t("Reinicia la app para aplicar el idioma.", "Restart the app to apply language."));
             });
-        content->addView(catalogFilter_);
+        content->addView(langToggle);
 
-        refreshCatalog_ = new brls::BooleanCell();
-        refreshCatalog_->init("Auto-refresh daily",
-            settings_->get().refreshCatalogOnLaunch,
-            [this](bool enabled) {
-                AppSettingsData values = settings_->get();
-                bool previous = values.refreshCatalogOnLaunch;
-                values.refreshCatalogOnLaunch = enabled;
-                if (!persist(values, "catalog_refresh"))
-                    refreshCatalog_->setOn(previous, false);
-            });
-        content->addView(refreshCatalog_);
+        // System Firmware Version
+        SetSysFirmwareVersion fw;
+        std::string fwStr = "Unknown";
+        if (R_SUCCEEDED(setsysGetFirmwareVersion(&fw))) {
+            char fw_buf[128];
+            snprintf(fw_buf, sizeof(fw_buf), "Firmware: %d.%d.%d", fw.major, fw.minor, fw.micro);
+            fwStr = fw_buf;
+        }
+        auto* fwLabel = new brls::Label();
+        fwLabel->setText(fwStr);
+        fwLabel->setFontSize(18);
+        fwLabel->setMarginTop(15);
+        fwLabel->setMarginBottom(10);
+        content->addView(fwLabel);
 
-        content->addView(actionCell("Update catalog", "Langegen",
-            [this] { refreshCatalogNow(); }));
-        content->addView(actionCell("Update artwork", "pipensx-metadata",
-            [this] { refreshMetadataNow(); }));
+        addSection(content, t("Almacenamiento (microSD)", "Storage (microSD)"));
 
-        addSection(content, "Downloads");
-        streamSelection_ = new brls::SelectorCell();
-        streamSelection_->init("Default streaming file selection",
-            {"All files", "NSP/NSZ only"},
-            settings_->get().streamSelection == StreamSelection::PackagesOnly
-                ? 1 : 0,
-            [this](int selected) {
-                AppSettingsData values = settings_->get();
-                StreamSelection previous = values.streamSelection;
-                values.streamSelection = selected == 1
-                    ? StreamSelection::PackagesOnly
-                    : StreamSelection::AllFiles;
-                if (!persist(values, "stream_selection"))
-                    streamSelection_->setSelection(
-                        previous == StreamSelection::PackagesOnly ? 1 : 0,
-                        true);
-            });
-        content->addView(streamSelection_);
+        std::error_code ec;
+        auto spaceInfo = std::filesystem::space("sdmc:/", ec);
+        std::string sdStr = t("No se pudo leer la SD", "Could not read SD");
+        if (!ec) {
+            double totalGB = static_cast<double>(spaceInfo.capacity) / (1024.0 * 1024.0 * 1024.0);
+            double freeGB = static_cast<double>(spaceInfo.available) / (1024.0 * 1024.0 * 1024.0);
+            char sd_buf[256];
+            snprintf(sd_buf, sizeof(sd_buf), t("Capacidad: %.2f GB / Libre: %.2f GB", "Capacity: %.2f GB / Free: %.2f GB"), totalGB, freeGB);
+            sdStr = sd_buf;
+        }
+        
+        auto* sdLabel = new brls::Label();
+        sdLabel->setText(sdStr);
+        sdLabel->setFontSize(18);
+        sdLabel->setMarginBottom(20);
+        content->addView(sdLabel);
 
-        installLocation_ = new brls::SelectorCell();
-        installLocation_->init("Install location",
-            {"SD card", "System memory"},
-            settings_->get().installLocation == InstallLocation::SystemMemory
-                ? 1 : 0,
-            [this](int selected) {
-                AppSettingsData values = settings_->get();
-                InstallLocation previous = values.installLocation;
-                values.installLocation = selected == 1
-                    ? InstallLocation::SystemMemory
-                    : InstallLocation::SdCard;
-                if (!persist(values, "install_location")) {
-                    installLocation_->setSelection(
-                        previous == InstallLocation::SystemMemory ? 1 : 0,
-                        true);
-                    return;
+        addSection(content, t("Mantenimiento", "Maintenance"));
+
+        content->addView(actionCell(t("Limpiar archivos huérfanos", "Clean orphaned files"), "",
+            [] { 
+                try {
+                    u64 freedBytes = 0;
+                    int deletedTickets = 0;
+                    std::string errorOut;
+                    
+                    if (CleanupHelper::cleanSystem(errorOut, freedBytes, deletedTickets)) {
+                        double sizeMB = freedBytes / (1024.0 * 1024.0);
+                        char msg[256];
+                        snprintf(msg, sizeof(msg), t("Limpieza completada! Eliminados %d tickets huérfanos y liberados %.2f MB.", "Cleanup completed! Deleted %d orphan tickets and freed %.2f MB."), deletedTickets, sizeMB);
+                        brls::Application::notify(msg);
+                    } else {
+                        brls::Application::notify("Error: " + errorOut);
+                    }
+                } catch (...) {
+                    brls::Application::notify(t("Error al limpiar archivos.", "Error cleaning files."));
                 }
-                manager_->setInstallTarget(
-                    installTargetFor(values.installLocation));
-            });
-        content->addView(installLocation_);
-
-        showCompleted_ = new brls::BooleanCell();
-        showCompleted_->init("Show completed downloads",
-            settings_->get().showCompletedDownloads,
-            [this](bool enabled) {
-                AppSettingsData values = settings_->get();
-                bool previous = values.showCompletedDownloads;
-                values.showCompletedDownloads = enabled;
-                if (!persist(values, "show_completed"))
-                    showCompleted_->setOn(previous, false);
-            });
-        content->addView(showCompleted_);
-
-        addSection(content, "Updates");
-        checkForUpdates_ = new brls::BooleanCell();
-        checkForUpdates_->init("Check for updates at launch",
-            settings_->get().checkForUpdatesOnLaunch,
-            [this](bool enabled) {
-                AppSettingsData values = settings_->get();
-                bool previous = values.checkForUpdatesOnLaunch;
-                values.checkForUpdatesOnLaunch = enabled;
-                if (!persist(values, "update_check"))
-                    checkForUpdates_->setOn(previous, false);
-            });
-        content->addView(checkForUpdates_);
-        updateAction_ = actionCell("Check for pipensx update", "GitHub releases",
-            [this] { checkForUpdateNow(); });
-        content->addView(updateAction_);
-
-        addSection(content, "Diagnostics");
-        auto* description = new brls::Label();
-        description->setText(
-            "Errors are always recorded. Extended mode adds rate-limited "
-            "torrent, buffer, decoder, image and NCM metrics every 5 seconds.");
-        description->setFontSize(16);
-        description->setTextColor(theme::textSecondary());
-        description->setMarginBottom(10);
-        content->addView(description);
-
-        extendedTelemetry_ = new brls::BooleanCell();
-        extendedTelemetry_->init("Extended telemetry",
-            settings_->get().extendedTelemetry,
-            [this](bool enabled) {
-                AppSettingsData values = settings_->get();
-                bool previous = values.extendedTelemetry;
-                values.extendedTelemetry = enabled;
-                if (!persist(values, "extended_telemetry")) {
-                    extendedTelemetry_->setOn(previous, false);
-                    return;
-                }
-                telemetry_set_enabled(enabled ? 1 : 0);
-                brls::Application::notify(enabled
-                    ? "Extended telemetry enabled."
-                    : "Extended telemetry disabled.");
-            });
-        content->addView(extendedTelemetry_);
-
-        content->addView(actionCell("Capture diagnostic snapshot", "Write now",
-            [this] { captureSnapshot(); }));
-        content->addView(actionCell("Clear log", "32 MB rotation",
-            [this] { confirmClearLog(); }));
-        content->addView(actionCell("Clear artwork cache", "Downloaded images",
-            [this] { confirmClearArtwork(); }));
-        content->addView(actionCell("Reset settings", "Restore defaults",
-            [this] { confirmReset(); }));
-
-        auto* path = new brls::Label();
-        path->setText(std::string("Log: ") + LogPath);
-        path->setFontSize(15);
-        path->setTextColor(theme::textTertiary());
-        path->setMarginTop(18);
-        content->addView(path);
+            }));
 
         auto* scroll = new brls::ScrollingFrame();
         scroll->setGrow(1);
         scroll->setContentView(content);
         addView(scroll);
+        
+        addView(new brls::BottomBar());
+        
+        // Add bottom bar action
+        this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View*) { 
+            brls::Application::popActivity();
+            return true; 
+        });
     }
 
     ~SettingsView() override {

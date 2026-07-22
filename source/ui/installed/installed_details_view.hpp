@@ -12,7 +12,7 @@
 #include "app/game_metadata_service.hpp"
 #include "ui/theme.hpp"
 #include "ui/common/async_image.hpp"
-#include "ui/common/ui_helpers.hpp"
+#include "ui/saves/save_manager.hpp"
 
 namespace pipensx::ui {
 
@@ -251,6 +251,96 @@ public:
             
             listBox->addView(totalItem);
         }
+
+        // Save Management Section inside listBox so D-Pad navigation reaches the buttons
+        brls::Label* statusLabel = new brls::Label();
+        statusLabel->setText("");
+        statusLabel->setFontSize(16);
+        statusLabel->setTextColor(theme::textSecondary());
+        statusLabel->setMarginTop(15);
+        statusLabel->setMarginBottom(10);
+        listBox->addView(statusLabel);
+
+        brls::Box* saveButtonsBox = new brls::Box(brls::Axis::ROW);
+        saveButtonsBox->setFocusable(false);
+        saveButtonsBox->setAlignItems(brls::AlignItems::CENTER);
+        saveButtonsBox->setJustifyContent(brls::JustifyContent::SPACE_BETWEEN);
+        saveButtonsBox->setMarginTop(5);
+        saveButtonsBox->setMarginBottom(20);
+
+        brls::Button* backupBtn = new brls::Button();
+        backupBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
+        backupBtn->setText(t("Hacer Backup a SD", "Backup to SD"));
+        backupBtn->setHeight(50);
+        backupBtn->setGrow(1);
+        backupBtn->setMarginRight(8);
+        backupBtn->registerClickAction([title, statusLabel](brls::View*) {
+            std::string msg;
+            if (saves::SaveManager::BackupSave(title.applicationId, title.name, msg)) {
+                statusLabel->setText(msg);
+                statusLabel->setTextColor(theme::textPrimary());
+            } else {
+                statusLabel->setText(msg);
+                statusLabel->setTextColor(nvgRGB(255, 100, 100));
+            }
+            return true;
+        });
+
+        brls::Button* restoreBtn = new brls::Button();
+        restoreBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
+        restoreBtn->setText(t("Importar \"save\" desde SD", "Import save from SD"));
+        restoreBtn->setHeight(50);
+        restoreBtn->setGrow(1);
+        restoreBtn->setMarginRight(8);
+        restoreBtn->registerClickAction([title, statusLabel](brls::View*) {
+            brls::Dialog* dialog = new brls::Dialog(t("¿Deseas sobreescribir la partida de la consola con la copia de la SD?", "Overwrite console save with SD copy?"));
+            dialog->addButton(t("Si", "Yes"), [title, statusLabel, dialog]() {
+                std::string msg;
+                if (saves::SaveManager::RestoreSave(title.applicationId, title.name, msg)) {
+                    statusLabel->setText(msg);
+                    statusLabel->setTextColor(theme::textPrimary());
+                } else {
+                    statusLabel->setText(msg);
+                    statusLabel->setTextColor(nvgRGB(255, 100, 100));
+                }
+                dialog->dismiss();
+            });
+            dialog->addButton(t("No", "No"), [dialog]() {
+                dialog->dismiss();
+            });
+            dialog->open();
+            return true;
+        });
+
+        brls::Button* deleteBtn = new brls::Button();
+        deleteBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
+        deleteBtn->setText(t("Eliminar backup SD", "Delete SD backup"));
+        deleteBtn->setHeight(50);
+        deleteBtn->setGrow(1);
+        deleteBtn->registerClickAction([title, statusLabel](brls::View*) {
+            brls::Dialog* dialog = new brls::Dialog(t("¿Deseas eliminar la copia de seguridad de la SD?", "Delete SD backup?"));
+            dialog->addButton(t("Si", "Yes"), [title, statusLabel, dialog]() {
+                std::string msg;
+                if (saves::SaveManager::DeleteBackup(title.applicationId, title.name, msg)) {
+                    statusLabel->setText(msg);
+                    statusLabel->setTextColor(theme::textPrimary());
+                } else {
+                    statusLabel->setText(msg);
+                    statusLabel->setTextColor(nvgRGB(255, 100, 100));
+                }
+                dialog->dismiss();
+            });
+            dialog->addButton(t("No", "No"), [dialog]() {
+                dialog->dismiss();
+            });
+            dialog->open();
+            return true;
+        });
+
+        saveButtonsBox->addView(backupBtn);
+        saveButtonsBox->addView(restoreBtn);
+        saveButtonsBox->addView(deleteBtn);
+        listBox->addView(saveButtonsBox);
 
         list->setContentView(listBox);
 

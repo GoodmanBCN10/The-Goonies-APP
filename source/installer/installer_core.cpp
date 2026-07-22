@@ -4,8 +4,6 @@
 #include <algorithm>
 #include <mutex>
 #include <stdarg.h>
-#include <borealis.hpp>
-#include <borealis/core/logger.hpp>
 
 #include "yati/yati.hpp"
 #include <switch.h>
@@ -118,7 +116,7 @@ Result Core::MtpSource::ReadChunk(void* buf, s64 size, u64* bytes_read) {
 }
 
 void Core::InstallerThreadEntry() {
-    brls::Logger::info("InstallerThreadEntry started");
+    SafePrintf("InstallerThreadEntry started\n");
     while (!m_exit_requested) {
         std::string filename;
         {
@@ -132,7 +130,7 @@ void Core::InstallerThreadEntry() {
             m_file_queue.erase(m_file_queue.begin());
         }
         
-        brls::Logger::info("InstallerThreadEntry popping file: {}", filename);
+        SafePrintf("InstallerThreadEntry popping file: %s\n", filename.c_str());
         
         GooniesInstaller::yati::ConfigOverride config;
         config.sd_card_install = true;
@@ -142,17 +140,17 @@ void Core::InstallerThreadEntry() {
         config.convert_to_common_ticket = true;
         
         MtpSource source(this);
-        brls::Logger::info("InstallerThreadEntry calling InstallFromSource");
+        SafePrintf("InstallerThreadEntry calling InstallFromSource\n");
         Result rc = GooniesInstaller::yati::InstallFromSource(&source, fs::FsPath{filename.c_str()}, config, &m_freed_bytes);
-        brls::Logger::info("InstallerThreadEntry InstallFromSource finished with rc: 0x{:08x}", rc);
+        SafePrintf("InstallerThreadEntry InstallFromSource finished with rc: 0x%08x\n", rc);
         
         std::lock_guard<std::mutex> lock(m_mutex);
         if (R_FAILED(rc)) {
-            brls::Logger::error("InstallerThreadEntry Error: 0x{:08x}", rc);
+            SafePrintf("InstallerThreadEntry Error: 0x%08x\n", rc);
             m_error = true;
             m_last_error_code = rc;
         } else {
-            brls::Logger::info("InstallerThreadEntry Success!");
+            SafePrintf("InstallerThreadEntry Success!\n");
         }
         
         m_finished_files.push_back(filename);

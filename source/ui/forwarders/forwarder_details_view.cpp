@@ -1,4 +1,5 @@
 #include "forwarder_details_view.hpp"
+#include "ui/common/ui_helpers.hpp"
 #include "ui/theme.hpp"
 #include "owo.hpp"
 
@@ -42,14 +43,14 @@ ForwarderDetailsView::ForwarderDetailsView(const HomebrewTitle& title)
     rightColumn->addView(nameLabel_);
     
     authorLabel_ = new brls::Label();
-    authorLabel_->setText("Autor: " + title.author);
+    authorLabel_->setText(std::string(t("Autor: ", "Author: ")) + title.author);
     authorLabel_->setFontSize(24);
     authorLabel_->setMarginTop(10);
     authorLabel_->setMarginBottom(40);
     rightColumn->addView(authorLabel_);
     
     brls::Label* pathLabel = new brls::Label();
-    pathLabel->setText("Ruta: " + title.path);
+    pathLabel->setText(std::string(t("Ruta: ", "Path: ")) + title.path);
     pathLabel->setFontSize(18);
     pathLabel->setTextColor(nvgRGB(150, 150, 150));
     pathLabel->setMarginBottom(40);
@@ -57,7 +58,7 @@ ForwarderDetailsView::ForwarderDetailsView(const HomebrewTitle& title)
     
     launchButton_ = new brls::Button();
     launchButton_->setStyle(&brls::BUTTONSTYLE_BORDERED);
-    launchButton_->setText("Lanzar Aplicación");
+    launchButton_->setText(t("Lanzar Aplicación", "Launch Application"));
     launchButton_->setMarginBottom(20);
     launchButton_->registerClickAction([this](brls::View* view) {
         this->Launch();
@@ -67,7 +68,7 @@ ForwarderDetailsView::ForwarderDetailsView(const HomebrewTitle& title)
     
     forwarderButton_ = new brls::Button();
     forwarderButton_->setStyle(&brls::BUTTONSTYLE_BORDERED);
-    forwarderButton_->setText("Crear Acceso Directo (Forwarder)");
+    forwarderButton_->setText(t("Crear Acceso Directo (Forwarder)", "Create Forwarder"));
     forwarderButton_->setMarginBottom(20);
     forwarderButton_->registerClickAction([this](brls::View* view) {
         this->CreateForwarder();
@@ -80,7 +81,7 @@ ForwarderDetailsView::ForwarderDetailsView(const HomebrewTitle& title)
     this->addView(mainLayout);
     this->addView(new brls::BottomBar());
 
-    this->registerAction("Volver", brls::BUTTON_B, [](brls::View*) {
+    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View*) {
         brls::Application::popActivity();
         return true;
     }, false, false, brls::SOUND_BACK);
@@ -98,7 +99,7 @@ void ForwarderDetailsView::Launch() {
 }
 
 void ForwarderDetailsView::CreateForwarder() {
-    brls::Application::notify("Creando Forwarder... Espere por favor.");
+    brls::Application::notify(t("Creando Forwarder... Espere por favor.", "Creating forwarder... Please wait."));
     
     GooniesInstaller::OwoConfig owoCfg{};
     owoCfg.nro_path = title_.path;
@@ -110,9 +111,9 @@ void ForwarderDetailsView::CreateForwarder() {
     Result res = GooniesInstaller::install_forwarder(owoCfg, NcmStorageId_SdCard);
     
     if (R_SUCCEEDED(res)) {
-        brls::Application::notify("Acceso directo creado con exito!");
+        brls::Application::notify(t("Acceso directo creado con exito!", "Forwarder successfully created!"));
     } else {
-        brls::Application::notify("Error al crear el acceso directo.");
+        brls::Application::notify(t("Error al crear el acceso directo.", "Error creating forwarder."));
         brls::Logger::error("install_forwarder failed with: 0x%x", res);
     }
 }

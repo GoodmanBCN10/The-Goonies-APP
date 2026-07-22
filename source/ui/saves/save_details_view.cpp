@@ -14,7 +14,7 @@ SaveDetailsView::SaveDetailsView(const InstalledTitle& title, GameMetadataServic
 
     // Header (Title)
     brls::Label* header = new brls::Label();
-    header->setText("Gestor de Partidas Guardadas");
+    header->setText(t("Gestor de Partidas Guardadas", "Save Data Manager"));
     header->setFontSize(28);
     header->setTextColor(theme::accent());
     header->setMarginBottom(30);
@@ -66,7 +66,7 @@ SaveDetailsView::SaveDetailsView(const InstalledTitle& title, GameMetadataServic
 
     backupButton_ = new brls::Button();
     backupButton_->setStyle(&brls::BUTTONSTYLE_BORDERED);
-    backupButton_->setText("Hacer Backup a SD");
+    backupButton_->setText(t("Hacer Backup a SD", "Backup to SD"));
     backupButton_->setMarginBottom(15);
     backupButton_->setHeight(60);
     backupButton_->registerClickAction([this](brls::View* view) {
@@ -85,13 +85,13 @@ SaveDetailsView::SaveDetailsView(const InstalledTitle& title, GameMetadataServic
 
     restoreButton_ = new brls::Button();
     restoreButton_->setStyle(&brls::BUTTONSTYLE_BORDERED);
-    restoreButton_->setText("Restaurar desde SD");
+    restoreButton_->setText(t("Importar \"save\" desde SD", "Import save from SD"));
     restoreButton_->setMarginBottom(15);
     restoreButton_->setHeight(60);
     restoreButton_->registerClickAction([this](brls::View* view) {
         // Confirmation dialog
-        brls::Dialog* dialog = new brls::Dialog("¿Estas seguro de que quieres sobreescribir la partida actual de la consola con la copia de la SD?");
-        dialog->addButton("Si", [this, dialog]() {
+        brls::Dialog* dialog = new brls::Dialog(t("¿Estas seguro de que quieres sobreescribir la partida actual de la consola con la copia de la SD?", "Are you sure you want to overwrite the current console save data with the SD copy?"));
+        dialog->addButton(t("Si", "Yes"), [this, dialog]() {
             std::string message;
             if (saves::SaveManager::RestoreSave(title_.applicationId, title_.name, message)) {
                 statusLabel_->setText(message);
@@ -102,7 +102,7 @@ SaveDetailsView::SaveDetailsView(const InstalledTitle& title, GameMetadataServic
             }
             dialog->dismiss();
         });
-        dialog->addButton("No", [dialog]() {
+        dialog->addButton(t("No", "No"), [dialog]() {
             dialog->dismiss();
         });
         dialog->open();
@@ -112,12 +112,12 @@ SaveDetailsView::SaveDetailsView(const InstalledTitle& title, GameMetadataServic
 
     deleteButton_ = new brls::Button();
     deleteButton_->setStyle(&brls::BUTTONSTYLE_BORDERED);
-    deleteButton_->setText("Eliminar Backup de SD");
+    deleteButton_->setText(t("Eliminar Backup de SD", "Delete SD Backup"));
     deleteButton_->setMarginBottom(15);
     deleteButton_->setHeight(60);
     deleteButton_->registerClickAction([this](brls::View* view) {
-        brls::Dialog* dialog = new brls::Dialog("¿Estas seguro de que quieres eliminar la copia de seguridad de la SD?");
-        dialog->addButton("Si", [this, dialog]() {
+        brls::Dialog* dialog = new brls::Dialog(t("¿Estas seguro de que quieres eliminar la copia de seguridad de la SD?", "Are you sure you want to delete the SD backup?"));
+        dialog->addButton(t("Si", "Yes"), [this, dialog]() {
             std::string message;
             if (saves::SaveManager::DeleteBackup(title_.applicationId, title_.name, message)) {
                 statusLabel_->setText(message);
@@ -129,7 +129,7 @@ SaveDetailsView::SaveDetailsView(const InstalledTitle& title, GameMetadataServic
             UpdateButtons();
             dialog->dismiss();
         });
-        dialog->addButton("No", [dialog]() {
+        dialog->addButton(t("No", "No"), [dialog]() {
             dialog->dismiss();
         });
         dialog->open();
@@ -141,7 +141,7 @@ SaveDetailsView::SaveDetailsView(const InstalledTitle& title, GameMetadataServic
     this->addView(mainLayout);
     this->addView(new brls::BottomBar());
 
-    this->registerAction("Volver", brls::BUTTON_B, [](brls::View*) {
+    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View*) {
         brls::Application::popActivity();
         return true;
     }, false, false, brls::SOUND_BACK);

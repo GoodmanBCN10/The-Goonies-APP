@@ -15,7 +15,7 @@ SavesView::SavesView(InstalledTitleService* installedService, GameMetadataServic
     header->setPadding(40, 80, 20, 80);
     
     brls::Label* title = new brls::Label();
-    title->setText("Partidas Guardadas");
+    title->setText(t("Partidas Guardadas", "Save Data"));
     title->setFontSize(28);
     title->setTextColor(theme::accent());
     header->addView(title);
@@ -46,20 +46,20 @@ SavesView::SavesView(InstalledTitleService* installedService, GameMetadataServic
     dataSource_->setTitles(titles, "");
     recycler_->reloadData();
     
-    this->registerAction("Volver", brls::BUTTON_B, [](brls::View*) {
+    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View*) {
         brls::Application::popActivity();
         return true;
     }, false, false, brls::SOUND_BACK);
     
     // Vista toggle button was removed
 
-    this->registerAction("Buscar", brls::BUTTON_Y, [this](brls::View*) {
+    this->registerAction(t("Buscar", "Search"), brls::BUTTON_Y, [this](brls::View*) {
         brls::Application::getImeManager()->openForText([this](std::string text) {
             auto titles = installedService_->titles();
             dataSource_->setTitles(titles, text);
             recycler_->reloadData();
             brls::Application::giveFocus(this);
-        }, "Buscar partidas", "Introduce el nombre del juego", 100, "", 0);
+        }, t("Buscar partidas", "Search save data"), t("Introduce el nombre del juego", "Enter game name"), 100, "", 0);
         return true;
     });
 }

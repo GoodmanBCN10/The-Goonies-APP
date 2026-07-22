@@ -217,7 +217,8 @@ enum AppState {
     STATE_SUBMENU_DOWNLOAD,
     STATE_STORE_GOONIES,
     STATE_STORE_TORRENT,
-    STATE_TORRENT_DOWNLOAD
+    STATE_TORRENT_DOWNLOAD,
+    STATE_SUBMENU_MANAGE
 };
 
 AppState currentState = STATE_HOME;
@@ -265,6 +266,7 @@ std::map<std::string, std::vector<std::string>> langDict = {
     {"menu_mtp", {"Instalar juegos por MTP", "Install games via MTP"}},
     {"menu_usb", {"Instalar juegos desde USB o disco", "Install games from USB drive"}},
     {"menu_games", {"Juegos Instalados", "Installed Games"}},
+    {"menu_manage", {"Gestión de consola", "Console Management"}},
     {"menu_homebrew", {"APPs homebrew instaladas", "Installed Homebrew APPs"}},
     {"menu_saves", {"Partidas Guardadas (Saves)", "Save Data Manager"}},
     {"menu_explorer", {"Explorar microSD", "Explore microSD"}},
@@ -383,6 +385,7 @@ std::vector<MenuButton> mainButtons;
 int selectedMenuButton = 0;
 int selectedSubmenuInstallIndex = 0;
 int selectedSubmenuDownloadIndex = 0;
+int selectedSubmenuManageIndex = 0;
 
 std::vector<CatalogGame> storeGamesList;
 std::vector<CatalogGame> filteredStoreGamesList;
@@ -997,10 +1000,10 @@ int main(int argc, char *argv[]) {
     mainButtons = {
         {GetText("menu_install"), STATE_SUBMENU_INSTALL, {startX, startY, boxW, boxH}, iconMtp},
         {GetText("menu_download"), STATE_SUBMENU_DOWNLOAD, {startX + boxW + gapX, startY, boxW, boxH}, iconMtp},
-        {GetText("menu_games"), STATE_GAMES, {startX, startY + boxH + gapY, boxW, boxH}, iconGames},
-        {GetText("menu_saves"), STATE_SAVES, {startX + boxW + gapX, startY + boxH + gapY, boxW, boxH}, iconSaves},
+        {GetText("menu_manage"), STATE_SUBMENU_MANAGE, {startX, startY + boxH + gapY, boxW, boxH}, iconGames},
+        {GetText("menu_explorer"), STATE_EXPLORER, {startX + boxW + gapX, startY + boxH + gapY, boxW, boxH}, iconExplorer},
         {GetText("menu_homebrew"), STATE_HOMEBREW, {startX, startY + (boxH + gapY)*2, boxW, boxH}, iconHomebrew},
-        {GetText("menu_explorer"), STATE_EXPLORER, {startX + boxW + gapX, startY + (boxH + gapY)*2, boxW, boxH}, iconExplorer}
+        {GetText("menu_settings"), STATE_SETTINGS, {startX + boxW + gapX, startY + (boxH + gapY)*2, boxW, boxH}, iconSettings}
     };
 
     bool done = false;
@@ -1085,10 +1088,10 @@ int main(int argc, char *argv[]) {
                 // Actualizar textos del menú
                 mainButtons[0].text = GetText("menu_install");
                 mainButtons[1].text = GetText("menu_download");
-                mainButtons[2].text = GetText("menu_games");
-                mainButtons[3].text = GetText("menu_saves");
+                mainButtons[2].text = GetText("menu_manage");
+                mainButtons[3].text = GetText("menu_explorer");
                 mainButtons[4].text = GetText("menu_homebrew");
-                mainButtons[5].text = GetText("menu_explorer");
+                mainButtons[5].text = GetText("menu_settings");
             }
         }
         else if (currentState == STATE_HOME) {
@@ -1168,6 +1171,10 @@ int main(int argc, char *argv[]) {
                     LoadHomebrewList();
                 } else if (currentState == STATE_GAMES || currentState == STATE_SAVES) {
                     LoadGamesList();
+                } else if (currentState == STATE_SUBMENU_MANAGE) {
+                    selectedSubmenuManageIndex = 0;
+                } else if (currentState == STATE_SETTINGS) {
+                    selectedSettingIndex = 0;
                 }
             }
         }
@@ -1264,6 +1271,28 @@ int main(int argc, char *argv[]) {
                     explorerPath = "sdmc:/";
                     LoadDirectory(explorerPath);
                     selectedFileIndex = 0;
+                }
+            }
+        }
+        else if (currentState == STATE_SUBMENU_MANAGE) {
+            if (kDown & HidNpadButton_B) {
+                currentState = STATE_HOME;
+            }
+            if (kDown & HidNpadButton_AnyDown) {
+                selectedSubmenuManageIndex++;
+                if (selectedSubmenuManageIndex > 1) selectedSubmenuManageIndex = 0;
+            }
+            if (kDown & HidNpadButton_AnyUp) {
+                selectedSubmenuManageIndex--;
+                if (selectedSubmenuManageIndex < 0) selectedSubmenuManageIndex = 1;
+            }
+            if (kDown & HidNpadButton_A) {
+                if (selectedSubmenuManageIndex == 0) {
+                    currentState = STATE_GAMES;
+                    LoadGamesList();
+                } else if (selectedSubmenuManageIndex == 1) {
+                    currentState = STATE_SAVES;
+                    LoadGamesList();
                 }
             }
         }
@@ -1799,7 +1828,7 @@ int main(int argc, char *argv[]) {
                 }
             } else {
                 if (kDown & HidNpadButton_B) {
-                    currentState = STATE_HOME;
+                    currentState = STATE_SUBMENU_MANAGE;
                 }
                 if (kDown & HidNpadButton_X) {
                     isGridView = !isGridView;
@@ -2089,6 +2118,18 @@ int main(int argc, char *argv[]) {
                 int startY = 150 + (i * 80);
                 SDL_Color c = (i == selectedSubmenuDownloadIndex) ? colorAccent : colorTextMain;
                 if (i == selectedSubmenuDownloadIndex) {
+                    roundedBoxRGBA(renderer, 50, startY - 10, WINDOW_WIDTH - 50, startY + 50, 8, colorPanelBg.r, colorPanelBg.g, colorPanelBg.b, 200);
+                }
+                DrawText(renderer, fontButton, opts[i], 80, startY, c);
+            }
+        }
+        else if (currentState == STATE_SUBMENU_MANAGE) {
+            DrawText(renderer, fontTitle, GetText("menu_manage"), 50, 40, colorAccent);
+            std::vector<std::string> opts = {GetText("menu_games"), GetText("menu_saves")};
+            for (size_t i = 0; i < opts.size(); i++) {
+                int startY = 150 + (i * 80);
+                SDL_Color c = (i == selectedSubmenuManageIndex) ? colorAccent : colorTextMain;
+                if (i == selectedSubmenuManageIndex) {
                     roundedBoxRGBA(renderer, 50, startY - 10, WINDOW_WIDTH - 50, startY + 50, 8, colorPanelBg.r, colorPanelBg.g, colorPanelBg.b, 200);
                 }
                 DrawText(renderer, fontButton, opts[i], 80, startY, c);

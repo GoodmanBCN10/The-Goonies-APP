@@ -1,4 +1,5 @@
 #include "mtp_view.hpp"
+#include "ui/common/ui_helpers.hpp"
 #include <fmt/core.h>
 #include <borealis/views/bottom_bar.hpp>
 #include <fmt/core.h>
@@ -36,7 +37,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
 
     // Header Title
     brls::Label* title = new brls::Label();
-    title->setText("Instalar por MTP");
+    title->setText(t("Instalar por MTP", "MTP Installer"));
     title->setFontSize(45);
     title->setTextColor(brls::Application::getTheme().getColor("brls/accent")); // Goonies Yellow
     title->setMarginBottom(20);
@@ -52,7 +53,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
     activeTopRow->setMarginBottom(10);
     
     activeFilenameLabel_ = new brls::Label();
-    activeFilenameLabel_->setText("Esperando conexión o arrastra juegos...");
+    activeFilenameLabel_->setText(t("Esperando conexión o arrastra juegos...", "Waiting for connection or drag games..."));
     activeFilenameLabel_->setFontSize(22);
     activeFilenameLabel_->setTextColor(nvgRGB(255, 255, 255));
     activeTopRow->addView(activeFilenameLabel_);
@@ -85,7 +86,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
     historyBox_->setGrow(1.0f); // Fill remaining space
     
     historyTitleLabel_ = new brls::Label();
-    historyTitleLabel_->setText("Archivos recibidos en esta sesión (0)");
+    historyTitleLabel_->setText(t("Archivos recibidos en esta sesión (0)", "Files received in this session (0)"));
     historyTitleLabel_->setFontSize(22);
     historyTitleLabel_->setTextColor(nvgRGB(255, 255, 255));
     historyTitleLabel_->setMarginBottom(20);
@@ -130,7 +131,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
                     HistoryItem item;
                     item.name = fname;
                     item.size = size;
-                    item.status = "Instalando...";
+                    item.status = t("Instalando...", "Installing...");
                     item.statusColor = brls::Application::getTheme().getColor("brls/accent"); // Yellow
                     history_.insert(history_.begin(), item);
                     if (history_.size() > 5) history_.pop_back(); // Keep last 5 visually
@@ -152,10 +153,10 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
                 brls::sync([this]() {
                     if (!history_.empty()) {
                         if (g_mtpInstallerCore->HasError()) {
-                            history_[0].status = "Error";
+                            history_[0].status = t("Error", "Error");
                             history_[0].statusColor = nvgRGB(255, 50, 50);
                         } else {
-                            history_[0].status = "Completado";
+                            history_[0].status = t("Completado", "Completed");
                             history_[0].statusColor = nvgRGB(50, 255, 50);
                         }
                         buildHistoryUI();
@@ -165,7 +166,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
         }
     );
 
-    this->registerAction("Volver", brls::BUTTON_B, [this](brls::View* view) {
+    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [this](brls::View* view) {
         if (g_mtpInstallerCore && !g_mtpInstallerCore->IsFinished() && !g_mtpInstallerCore->HasError()) {
             g_mtpInstallerCore->AbortInstallation();
         }
@@ -192,7 +193,7 @@ brls::View* MTPView::create() {
 }
 
 void MTPView::buildHistoryUI() {
-    historyTitleLabel_->setText(fmt::format("Archivos recibidos en esta sesión ({})", history_.size()));
+    historyTitleLabel_->setText(fmt::format("{} ({})", t("Archivos recibidos en esta sesión", "Files received in this session"), history_.size()));
     historyList_->clearViews();
     
     for (const auto& item : history_) {
@@ -280,6 +281,57 @@ void MTPView::updateStatus() {
 }
 
 void MTPView::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) {
+    brls::Box::draw(vg, x, y, width, height, style, ctx);
+}
+
+MTPExplorerView::MTPExplorerView() : brls::Box(brls::Axis::COLUMN) {
+    this->setFocusable(true);
+    this->setAlignItems(brls::AlignItems::STRETCH);
+
+    MTP::Init(true); // Mount ONLY Unit 2: SD Card Explorer
+
+    brls::Box* centerBox = new brls::Box(brls::Axis::COLUMN);
+    centerBox->setJustifyContent(brls::JustifyContent::CENTER);
+    centerBox->setAlignItems(brls::AlignItems::CENTER);
+    centerBox->setGrow(1.0f);
+
+    titleLabel_ = new brls::Label();
+    titleLabel_->setText(t("EXPLORAR MICROSD", "EXPLORE MICROSD"));
+    titleLabel_->setFontSize(54);
+    titleLabel_->setTextColor(brls::Application::getTheme().getColor("brls/accent")); // Goonies Yellow
+    titleLabel_->setMarginBottom(40);
+    centerBox->addView(titleLabel_);
+
+    statusLabel_ = new brls::Label();
+    lastConnected_ = MTP::IsConnected();
+    statusLabel_->setText(lastConnected_ ? t("Mira las carpetas en tu PC", "Look at the folders on your PC") : t("Conecta el cable USB a tu PC", "Connect the USB cable to your PC"));
+    statusLabel_->setFontSize(36);
+    statusLabel_->setTextColor(lastConnected_ ? brls::Application::getTheme().getColor("brls/accent") : nvgRGB(255, 255, 255));
+    statusLabel_->setMarginBottom(20);
+    centerBox->addView(statusLabel_);
+
+    this->addView(centerBox);
+    this->addView(new brls::BottomBar());
+
+    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View*) {
+        brls::Application::popActivity();
+        return true;
+    }, false, false, brls::SOUND_BACK);
+}
+
+MTPExplorerView::~MTPExplorerView() {
+    MTP::Exit();
+}
+
+void MTPExplorerView::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) {
+    if (statusLabel_) {
+        bool connected = MTP::IsConnected();
+        if (connected != lastConnected_) {
+            lastConnected_ = connected;
+            statusLabel_->setText(connected ? t("Mira las carpetas en tu PC", "Look at the folders on your PC") : t("Conecta el cable USB a tu PC", "Connect the USB cable to your PC"));
+            statusLabel_->setTextColor(connected ? brls::Application::getTheme().getColor("brls/accent") : nvgRGB(255, 255, 255));
+        }
+    }
     brls::Box::draw(vg, x, y, width, height, style, ctx);
 }
 

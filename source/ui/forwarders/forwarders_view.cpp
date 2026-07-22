@@ -250,7 +250,7 @@ ForwardersView::ForwardersView(HomebrewService* service)
     header->setPadding(40, 80, 20, 80);
     
     brls::Label* title = new brls::Label();
-    title->setText("Aplicaciones Homebrew");
+    title->setText(t("Aplicaciones Homebrew", "Homebrew Applications"));
     title->setFontSize(28);
     title->setTextColor(theme::accent());
     header->addView(title);
@@ -288,20 +288,20 @@ ForwardersView::ForwardersView(HomebrewService* service)
         recycler_->reloadData();
     }
 
-    this->registerAction("Volver", brls::BUTTON_B, [](brls::View*) {
+    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View*) {
         brls::Application::popActivity();
         return true;
     }, false, false, brls::SOUND_BACK);
     
     // Vista toggle button was removed
 
-    this->registerAction("Buscar", brls::BUTTON_Y, [this](brls::View*) {
+    this->registerAction(t("Buscar", "Search"), brls::BUTTON_Y, [this](brls::View*) {
         brls::Application::getImeManager()->openForText([this](std::string text) {
             auto titles = service_->titles();
             dataSource_->setTitles(titles, text);
             recycler_->reloadData();
             brls::Application::giveFocus(this);
-        }, "Buscar homebrew", "Introduce el nombre del homebrew", 100, "", 0);
+        }, t("Buscar homebrew", "Search homebrew"), t("Introduce el nombre del homebrew", "Enter homebrew name"), 100, "", 0);
         return true;
     });
 }

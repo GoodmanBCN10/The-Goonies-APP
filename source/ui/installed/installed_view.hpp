@@ -242,7 +242,7 @@ public:
     brls::RecyclerCell* cellForRow(brls::RecyclerFrame* recycler, brls::IndexPath index) override {
         if (titles_.empty()) {
             auto* cell = static_cast<TextMessageCell*>(recycler->dequeueReusableCell("Message"));
-            cell->setMessage("No installed applications found.");
+            cell->setMessage(t("No se encontraron aplicaciones instaladas.", "No installed applications found."));
             return cell;
         }
         
