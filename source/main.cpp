@@ -99,13 +99,6 @@ int main(int argc, char* argv[]) {
         writeLog("romfsInit FAILED");
     }
 
-    if (R_SUCCEEDED(socketInitializeDefault())) {
-        socketReady = true;
-        writeLog("socketInitialize OK");
-    } else {
-        writeLog("socketInitialize FAILED");
-    }
-
     bool nvReady = false;
     Result nvRc = nvInitialize();
     if (R_SUCCEEDED(nvRc)) {
@@ -121,15 +114,48 @@ int main(int argc, char* argv[]) {
         brls::Logger::setLogOutput(borealisLogFile);
     }
 
-    // Init logger
     try {
         brls::Logger::setLogLevel(brls::LogLevel::LOG_DEBUG);
-        
-        CURLcode curlResult = curl_global_init(CURL_GLOBAL_DEFAULT);
-        if (curlResult != CURLE_OK) {
-            throw std::runtime_error("curl_global_init failed");
+
+        // 1. Initialize Borealis Window IMMEDIATELY (Instant startup under 1 second)
+        appletSetFocusHandlingMode(AppletFocusHandlingMode_NoSuspend);
+        NWindow* win = nwindowGetDefault();
+        if (win) {
+            nwindowSetDimensions(win, 1280, 720);
         }
-        curlReady = true;
+
+        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+        if (!brls::Application::init()) {
+            throw std::runtime_error("Unable to init Borealis application");
+        }
+        writeLog("brls::Application::init OK");
+
+        pipensx::ui::theme::registerColors();
+
+        brls::Application::createWindow("The Goonies APP");
+        brls::Application::setGlobalQuit(true);
+        brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);
+        writeLog("createWindow OK");
+
+        // 2. Initialize Sockets & System Services in background after window is visible
+        if (R_SUCCEEDED(socketInitializeDefault())) {
+            socketReady = true;
+            writeLog("socketInitialize OK");
+        } else {
+            writeLog("socketInitialize FAILED (non-fatal)");
+        }
+
+        Result usbRc = usbHsFsInitialize(0);
+        if (R_SUCCEEDED(usbRc)) {
+            writeLog("usbHsFsInitialize OK");
+        } else {
+            writeLog("usbHsFsInitialize FAILED (non-fatal)");
+        }
+
+        CURLcode curlResult = curl_global_init(CURL_GLOBAL_DEFAULT);
+        if (curlResult == CURLE_OK) {
+            curlReady = true;
+        }
 
         Result rc = ncmInitialize();
         if (R_SUCCEEDED(rc)) {
@@ -138,8 +164,6 @@ int main(int argc, char* argv[]) {
         } else {
             writeLog("ncmInitialize FAILED (non-fatal)");
         }
-
-        writeLog("Starting app");
 
         rc = nsInitialize();
         if (R_SUCCEEDED(rc)) {
@@ -163,32 +187,10 @@ int main(int argc, char* argv[]) {
         }
         bool accountReady = R_SUCCEEDED(rc);
         if (accountReady) writeLog("accountInitialize OK");
-        else writeLog("accountInitialize FAILED");
 
         rc = setsysInitialize();
         setsysReady = R_SUCCEEDED(rc);
         if (setsysReady) writeLog("setsysInitialize OK");
-        else writeLog("setsysInitialize FAILED");
-
-        // Init application
-        appletSetFocusHandlingMode(AppletFocusHandlingMode_NoSuspend);
-        NWindow* win = nwindowGetDefault();
-        if (win) {
-            nwindowSetDimensions(win, 1280, 720);
-        }
-
-        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
-        if (!brls::Application::init()) {
-            throw std::runtime_error("Unable to init Borealis application");
-        }
-        writeLog("brls::Application::init OK");
-
-        pipensx::ui::theme::registerColors();
-
-        brls::Application::createWindow("The Goonies Installer");
-        brls::Application::setGlobalQuit(true);
-        brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);
-        writeLog("createWindow OK");
 
         // Init Pipensx Services
         const char* BundledCatalogPath = "romfs:/catalog/switch_games.json";
