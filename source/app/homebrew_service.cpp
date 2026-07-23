@@ -1,24 +1,22 @@
 #include "homebrew_service.hpp"
-#include <filesystem>
-#include <utility>
 #include "nro.hpp"
+#include <utility>
+#include <algorithm>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <strings.h>
 
 namespace pipensx {
 
 void normalizePath(std::string& path) {
-    // Reemplazar backslashes con forward slashes
     for (char &c : path) {
         if (c == '\\') {
             c = '/';
         }
     }
-    
-    // Quitar barra diagonal al final si existe
     if (!path.empty() && path.back() == '/') {
         path.pop_back();
     }
-
-    // Corregir dobles barras diagonales (como "sdmc://", o "switch//")
     size_t pos = 0;
     while ((pos = path.find("//", pos)) != std::string::npos) {
         if (pos >= 5 && path.substr(pos - 5, 7) == "sdmc://") {
@@ -31,6 +29,37 @@ void normalizePath(std::string& path) {
     }
 }
 
+struct DirectoryContentInfo {
+    bool has_subdirs = false;
+    std::vector<std::string> nro_files;
+};
+
+DirectoryContentInfo scanDirectory(const std::string& dirPath) {
+    DirectoryContentInfo info;
+    DIR* dir = opendir(dirPath.c_str());
+    if (!dir) return info;
+    
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != NULL) {
+        std::string name = ent->d_name;
+        if (name == "." || name == "..") continue;
+        
+        std::string fullPath = dirPath + "/" + name;
+        normalizePath(fullPath);
+        
+        struct stat st;
+        if (stat(fullPath.c_str(), &st) == 0) {
+            if (S_ISDIR(st.st_mode)) {
+                info.has_subdirs = true;
+            } else if (name.size() > 4 && strcasecmp(name.substr(name.size() - 4).c_str(), ".nro") == 0) {
+                info.nro_files.push_back(fullPath);
+            }
+        }
+    }
+    closedir(dir);
+    return info;
+}
+
 HomebrewService::HomebrewService() {}
 
 bool HomebrewService::refresh(const std::string& rootPath, std::string& error) {
@@ -39,59 +68,70 @@ bool HomebrewService::refresh(const std::string& rootPath, std::string& error) {
     std::string cleanRoot = rootPath;
     normalizePath(cleanRoot);
     
-    std::error_code ec;
-    if (!std::filesystem::exists(cleanRoot, ec)) {
+    DIR* dir = opendir(cleanRoot.c_str());
+    if (!dir) {
         error = "Directorio " + cleanRoot + " no encontrado";
         return false;
     }
 
-    for (const auto& entry : std::filesystem::directory_iterator(cleanRoot, ec)) {
-        if (ec) continue;
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != NULL) {
+        std::string name = ent->d_name;
+        if (name == "." || name == "..") continue;
 
-        std::string path = entry.path().string();
+        std::string path = cleanRoot + "/" + name;
         normalizePath(path);
-        std::string nroPath = "";
+        
+        struct stat st;
+        if (stat(path.c_str(), &st) == 0) {
+            std::string nroPath = "";
 
-        if (std::filesystem::is_directory(entry.status(ec))) {
-            // Check if directory has an .nro with the same name
-            std::string dirName = entry.path().filename().string();
-            // Ignorar carpeta thegoonies o thegoonies_installer para no ensuciar
-            if (dirName == "thegoonies" || dirName == "thegoonies_installer") continue;
-
-            std::string possibleNro = path + "/" + dirName + ".nro";
-            normalizePath(possibleNro);
-            if (std::filesystem::exists(possibleNro, ec)) {
-                nroPath = possibleNro;
-            } else {
-                // Es una subcarpeta que no es una app directa, la añadimos como carpeta
-                HomebrewTitle folderTitle;
-                folderTitle.path = path;
-                folderTitle.name = dirName;
-                folderTitle.author = "Carpeta";
-                folderTitle.is_folder = true;
-                titles_.push_back(folderTitle);
+            if (S_ISDIR(st.st_mode)) {
+                DirectoryContentInfo info = scanDirectory(path);
+                if (!info.nro_files.empty()) {
+                    for (const auto& npath : info.nro_files) {
+                        HomebrewTitle title;
+                        title.path = npath;
+                        normalizePath(title.path);
+                        
+                        // Obtener nombre del archivo sin extensión
+                        size_t lastSlash = npath.find_last_of('/');
+                        std::string filename = (lastSlash == std::string::npos) ? npath : npath.substr(lastSlash + 1);
+                        size_t lastDot = filename.find_last_of('.');
+                        title.name = (lastDot == std::string::npos) ? filename : filename.substr(0, lastDot);
+                        title.author = "Unknown";
+                        
+                        GooniesInstaller::ReadNroAsset(npath, title.icon, title.name, title.author, title.nacp);
+                        titles_.push_back(title);
+                    }
+                } else if (info.has_subdirs) {
+                    HomebrewTitle folderTitle;
+                    folderTitle.path = path;
+                    folderTitle.name = name;
+                    folderTitle.author = "Carpeta";
+                    folderTitle.is_folder = true;
+                    titles_.push_back(folderTitle);
+                }
                 continue;
+            } else if (name.size() > 4 && strcasecmp(name.substr(name.size() - 4).c_str(), ".nro") == 0) {
+                nroPath = path;
             }
-        } else if (entry.path().extension() == ".nro") {
-            nroPath = path;
-        }
 
-        if (!nroPath.empty()) {
-            HomebrewTitle title;
-            title.path = nroPath;
-            normalizePath(title.path);
-            title.name = entry.path().stem().string(); // Default name
-            title.author = "Unknown";
-            
-            // This reads NACP details + icon from the NRO
-            GooniesInstaller::ReadNroAsset(nroPath, title.icon, title.name, title.author, title.nacp);
-            
-            titles_.push_back(title);
+            if (!nroPath.empty()) {
+                HomebrewTitle title;
+                title.path = nroPath;
+                normalizePath(title.path);
+                title.name = name.substr(0, name.size() - 4); // default stem
+                title.author = "Unknown";
+                
+                GooniesInstaller::ReadNroAsset(nroPath, title.icon, title.name, title.author, title.nacp);
+                titles_.push_back(title);
+            }
         }
     }
+    closedir(dir);
 
-    // Ordenar para que las carpetas salgan al final
-    // Usamos un ordenamiento de burbuja simple para evitar arrastrar cabeceras pesadas y posibles bucles de plantilla en el compilador
+    // Ordenar con burbuja
     if (!titles_.empty()) {
         for (size_t i = 0; i < titles_.size() - 1; i++) {
             for (size_t j = 0; j < titles_.size() - 1 - i; j++) {

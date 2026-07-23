@@ -1,5 +1,8 @@
 #include "mtp_view.hpp"
 #include "ui/common/ui_helpers.hpp"
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
 #include <fmt/core.h>
 #include <borealis/views/bottom_bar.hpp>
 #include <fmt/core.h>
@@ -116,6 +119,9 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
 
     // Init MTP
     MTP::Init();
+#ifdef __SWITCH__
+    appletSetMediaPlaybackState(true);
+#endif
     
     MTP::InitInstallMode(
         [this](const char* filename, size_t size) -> bool {
@@ -182,6 +188,9 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
 MTPView::~MTPView() {
     brls::Application::getRunLoopEvent()->unsubscribe(runLoopSubscription_);
     MTP::DisableInstallMode();
+#ifdef __SWITCH__
+    appletSetMediaPlaybackState(false);
+#endif
     if (g_mtpInstallerCore) {
         delete g_mtpInstallerCore;
         g_mtpInstallerCore = nullptr;
@@ -289,6 +298,9 @@ MTPExplorerView::MTPExplorerView() : brls::Box(brls::Axis::COLUMN) {
     this->setAlignItems(brls::AlignItems::STRETCH);
 
     MTP::Init(true); // Mount ONLY Unit 2: SD Card Explorer
+#ifdef __SWITCH__
+    appletSetMediaPlaybackState(true);
+#endif
 
     brls::Box* centerBox = new brls::Box(brls::Axis::COLUMN);
     centerBox->setJustifyContent(brls::JustifyContent::CENTER);
@@ -321,6 +333,9 @@ MTPExplorerView::MTPExplorerView() : brls::Box(brls::Axis::COLUMN) {
 
 MTPExplorerView::~MTPExplorerView() {
     MTP::Exit();
+#ifdef __SWITCH__
+    appletSetMediaPlaybackState(false);
+#endif
 }
 
 void MTPExplorerView::draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) {

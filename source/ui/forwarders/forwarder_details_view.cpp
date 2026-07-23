@@ -108,6 +108,7 @@ void ForwarderDetailsView::CreateForwarder() {
     owoCfg.icon = title_.icon;
     owoCfg.nacp = title_.nacp;
     
+    brls::Application::notify("Ruta: " + owoCfg.nro_path);
     Result res = GooniesInstaller::install_forwarder(owoCfg, NcmStorageId_SdCard);
     
     if (R_SUCCEEDED(res)) {
