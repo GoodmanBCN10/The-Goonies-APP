@@ -5,21 +5,51 @@
 
 namespace pipensx {
 
+void normalizePath(std::string& path) {
+    // Reemplazar backslashes con forward slashes
+    for (char &c : path) {
+        if (c == '\\') {
+            c = '/';
+        }
+    }
+    
+    // Quitar barra diagonal al final si existe
+    if (!path.empty() && path.back() == '/') {
+        path.pop_back();
+    }
+
+    // Corregir dobles barras diagonales (como "sdmc://", o "switch//")
+    size_t pos = 0;
+    while ((pos = path.find("//", pos)) != std::string::npos) {
+        if (pos >= 5 && path.substr(pos - 5, 7) == "sdmc://") {
+            path.erase(pos, 1);
+        } else if (pos > 0 && path[pos-1] == ':') {
+            pos += 2;
+        } else {
+            path.erase(pos, 1);
+        }
+    }
+}
+
 HomebrewService::HomebrewService() {}
 
 bool HomebrewService::refresh(const std::string& rootPath, std::string& error) {
     titles_.clear();
     
+    std::string cleanRoot = rootPath;
+    normalizePath(cleanRoot);
+    
     std::error_code ec;
-    if (!std::filesystem::exists(rootPath, ec)) {
-        error = "Directorio " + rootPath + " no encontrado";
+    if (!std::filesystem::exists(cleanRoot, ec)) {
+        error = "Directorio " + cleanRoot + " no encontrado";
         return false;
     }
 
-    for (const auto& entry : std::filesystem::directory_iterator(rootPath, ec)) {
+    for (const auto& entry : std::filesystem::directory_iterator(cleanRoot, ec)) {
         if (ec) continue;
 
         std::string path = entry.path().string();
+        normalizePath(path);
         std::string nroPath = "";
 
         if (std::filesystem::is_directory(entry.status(ec))) {
@@ -29,6 +59,7 @@ bool HomebrewService::refresh(const std::string& rootPath, std::string& error) {
             if (dirName == "thegoonies" || dirName == "thegoonies_installer") continue;
 
             std::string possibleNro = path + "/" + dirName + ".nro";
+            normalizePath(possibleNro);
             if (std::filesystem::exists(possibleNro, ec)) {
                 nroPath = possibleNro;
             } else {
@@ -48,6 +79,7 @@ bool HomebrewService::refresh(const std::string& rootPath, std::string& error) {
         if (!nroPath.empty()) {
             HomebrewTitle title;
             title.path = nroPath;
+            normalizePath(title.path);
             title.name = entry.path().stem().string(); // Default name
             title.author = "Unknown";
             
