@@ -19,13 +19,6 @@ public:
 
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) override;
 
-    struct HistoryItem {
-        std::string name;
-        u64 size;
-        std::string status;
-        NVGcolor statusColor;
-    };
-
     brls::Label* instructionsLabel_;
     brls::Box* activeInstallBox_;
     brls::Label* activeFilenameLabel_;
@@ -41,7 +34,8 @@ public:
 
     u64 currentTotalSize_ = 0;
     std::string currentFilename_ = "";
-    std::vector<HistoryItem> history_;
+    brls::Label* activeHistoryStatusLabel_ = nullptr;
+    int sessionFileCount_ = 0;
 
     u32 lastUpdateTicks_ = 0;
     u64 lastBytesWritten_ = 0;
@@ -49,7 +43,6 @@ public:
     double currentSpeed_ = 0.0;
 
     void updateStatus();
-    void buildHistoryUI();
     std::string formatSize(u64 size);
 
     brls::Event<>::Subscription runLoopSubscription_;

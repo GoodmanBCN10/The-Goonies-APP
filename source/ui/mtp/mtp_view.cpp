@@ -133,15 +133,44 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
                     lastBytesWritten_ = 0;
                     lastTime_ = std::chrono::steady_clock::now();
                     
-                    // Add to history
-                    HistoryItem item;
-                    item.name = fname;
-                    item.size = size;
-                    item.status = t("Instalando...", "Installing...");
-                    item.statusColor = brls::Application::getTheme().getColor("brls/accent"); // Yellow
-                    history_.insert(history_.begin(), item);
+                    // Create dynamic row and insert at the top of historyList_ without clearing
+                    brls::Box* row = new brls::Box(brls::Axis::ROW);
+                    row->setFocusable(true);
+                    row->setWidthPercentage(100.0f);
+                    row->setHeight(30.0f);
+                    row->setJustifyContent(brls::JustifyContent::SPACE_BETWEEN);
+                    row->setMarginBottom(5);
                     
-                    buildHistoryUI();
+                    brls::Label* nameL = new brls::Label();
+                    nameL->setText(fname);
+                    nameL->setFontSize(18);
+                    nameL->setTextColor(nvgRGB(255, 255, 255));
+                    
+                    brls::Box* rightBox = new brls::Box(brls::Axis::ROW);
+                    rightBox->setJustifyContent(brls::JustifyContent::FLEX_END);
+                    
+                    brls::Label* sizeL = new brls::Label();
+                    sizeL->setText(formatSize(size));
+                    sizeL->setFontSize(18);
+                    sizeL->setTextColor(nvgRGB(200, 200, 200));
+                    sizeL->setMarginRight(30);
+                    
+                    activeHistoryStatusLabel_ = new brls::Label();
+                    activeHistoryStatusLabel_->setText(t("Instalando...", "Installing..."));
+                    activeHistoryStatusLabel_->setFontSize(18);
+                    activeHistoryStatusLabel_->setTextColor(brls::Application::getTheme().getColor("brls/accent")); // Yellow
+                    
+                    rightBox->addView(sizeL);
+                    rightBox->addView(activeHistoryStatusLabel_);
+                    
+                    row->addView(nameL);
+                    row->addView(rightBox);
+                    
+                    // Insert at position 0
+                    historyList_->addView(row, 0);
+                    
+                    sessionFileCount_++;
+                    historyTitleLabel_->setText(fmt::format("{} ({})", t("Archivos recibidos en esta sesión", "Files received in this session"), sessionFileCount_));
                 });
                 
                 return g_mtpInstallerCore->StartInstallation(filename);
@@ -156,15 +185,15 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
             if (g_mtpInstallerCore) {
                 g_mtpInstallerCore->FinishInstallation();
                 brls::sync([this]() {
-                    if (!history_.empty()) {
+                    if (activeHistoryStatusLabel_) {
                         if (g_mtpInstallerCore->HasError()) {
-                            history_[0].status = t("Error", "Error");
-                            history_[0].statusColor = nvgRGB(255, 50, 50);
+                            activeHistoryStatusLabel_->setText(t("Error", "Error"));
+                            activeHistoryStatusLabel_->setTextColor(nvgRGB(255, 50, 50));
                         } else {
-                            history_[0].status = t("Completado", "Completed");
-                            history_[0].statusColor = nvgRGB(50, 255, 50);
+                            activeHistoryStatusLabel_->setText(t("Completado", "Completed"));
+                            activeHistoryStatusLabel_->setTextColor(nvgRGB(50, 255, 50));
                         }
-                        buildHistoryUI();
+                        activeHistoryStatusLabel_ = nullptr;
                     }
                 });
             }
@@ -200,45 +229,7 @@ brls::View* MTPView::create() {
     return new MTPView();
 }
 
-void MTPView::buildHistoryUI() {
-    historyTitleLabel_->setText(fmt::format("{} ({})", t("Archivos recibidos en esta sesión", "Files received in this session"), history_.size()));
-    historyList_->clearViews();
-    
-    for (const auto& item : history_) {
-        brls::Box* row = new brls::Box(brls::Axis::ROW);
-        row->setWidthPercentage(100.0f);
-        row->setHeight(30.0f);
-        row->setJustifyContent(brls::JustifyContent::SPACE_BETWEEN);
-        row->setMarginBottom(5);
-        
-        brls::Label* nameL = new brls::Label();
-        nameL->setText(item.name);
-        nameL->setFontSize(18);
-        nameL->setTextColor(nvgRGB(255, 255, 255));
-        
-        brls::Box* rightBox = new brls::Box(brls::Axis::ROW);
-        rightBox->setJustifyContent(brls::JustifyContent::FLEX_END);
-        
-        brls::Label* sizeL = new brls::Label();
-        sizeL->setText(formatSize(item.size));
-        sizeL->setFontSize(18);
-        sizeL->setTextColor(nvgRGB(200, 200, 200));
-        sizeL->setMarginRight(30);
-        
-        brls::Label* statusL = new brls::Label();
-        statusL->setText(item.status);
-        statusL->setFontSize(18);
-        statusL->setTextColor(item.statusColor);
-        
-        rightBox->addView(sizeL);
-        rightBox->addView(statusL);
-        
-        row->addView(nameL);
-        row->addView(rightBox);
-        
-        historyList_->addView(row);
-    }
-}
+
 
 std::string MTPView::formatSize(u64 size) {
     if (size < 1024) return fmt::format("{} B", size);
