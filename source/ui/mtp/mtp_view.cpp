@@ -140,7 +140,6 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
                     item.status = t("Instalando...", "Installing...");
                     item.statusColor = brls::Application::getTheme().getColor("brls/accent"); // Yellow
                     history_.insert(history_.begin(), item);
-                    if (history_.size() > 5) history_.pop_back(); // Keep last 5 visually
                     
                     buildHistoryUI();
                 });
