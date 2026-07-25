@@ -74,6 +74,14 @@ public:
         fwLabel->setMarginBottom(8);
         content->addView(fwLabel);
 
+        // App Version
+        auto* appVerLabel = new brls::Label();
+        appVerLabel->setText(std::string(t("Versión de la App: ", "App Version: ")) + PIPENSX_VERSION);
+        appVerLabel->setFontSize(20);
+        appVerLabel->setMarginTop(8);
+        appVerLabel->setMarginBottom(12);
+        content->addView(appVerLabel);
+
         addSection(content, t("Almacenamiento (microSD)", "Storage (microSD)"));
 
         std::error_code ec;
