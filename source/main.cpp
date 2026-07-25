@@ -23,8 +23,10 @@ extern "C" {
 #include "app/homebrew_service.hpp"
 
 #include "ui/catalog/catalog_view.hpp"
+#include "linkuser.hpp"
 #include "ui/main_menu.hpp"
 #include "ui/common/ui_helpers.hpp"
+#include "app/update_service.hpp"
 #include "ui/theme.hpp"
 
 using pipensx::AppSettings;
@@ -36,6 +38,34 @@ using pipensx::HomebrewService;
 using namespace pipensx::ui;
 
 int main(int argc, char* argv[]) {
+    // Check if we are running as update helper first before doing heavy initialization
+    std::string nroPath = "sdmc:/switch/thegoonies/TheGooniesInstaller.nro";
+    std::vector<std::string> args;
+    if (argc > 0 && argv != nullptr) {
+        if (argv[0] != nullptr && std::string(argv[0]).find("sdmc:/") == 0) {
+            nroPath = argv[0];
+        }
+        for (int i = 0; i < argc; ++i) {
+            if (argv[i] != nullptr) {
+                args.push_back(argv[i]);
+            }
+        }
+    }
+    pipensx::UpdateService updater(nroPath);
+    if (updater.isStagedLaunch(args)) {
+        std::string err;
+        if (updater.finalizeStaged(err)) {
+            envSetNextLoad(updater.targetPath().c_str(), updater.targetPath().c_str());
+        } else {
+            std::FILE* errLog = std::fopen("sdmc:/switch/thegoonies/update_error.log", "w");
+            if (errLog) {
+                std::fprintf(errLog, "Update finalize failed: %s\n", err.c_str());
+                std::fclose(errLog);
+            }
+        }
+        return 0;
+    }
+
     // Check if launched in Library Applet Mode (Album mode without Title Override)
     AppletType at = appletGetAppletType();
     if (at == AppletType_LibraryApplet || at == AppletType_OverlayApplet) {
@@ -215,7 +245,7 @@ int main(int argc, char* argv[]) {
         writeLog("Services constructed OK");
 
         // Push the activity before loading heavy services so we can pump the UI loop
-        goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(&download_manager, &catalog_service, &metadata_service, &installed_service, &settings, &homebrew_service);
+        goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(&download_manager, &catalog_service, &metadata_service, &installed_service, &settings, &homebrew_service, &updater);
         brls::Application::pushActivity(new brls::Activity(rootFrame));
         writeLog("pushActivity OK");
         
@@ -324,5 +354,8 @@ int main(int argc, char* argv[]) {
     romfsExit();
 
     // Exit
+    if (pipensx::linkuser::g_shouldReboot) {
+        pipensx::linkuser::rebootSystem();
+    }
     return EXIT_SUCCESS;
 }

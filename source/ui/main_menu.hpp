@@ -7,6 +7,7 @@
 #include "app/installed_title_service.hpp"
 #include "app/app_settings.hpp"
 #include "app/homebrew_service.hpp"
+#include "app/update_service.hpp"
 
 namespace goonies::ui {
 
@@ -15,7 +16,7 @@ public:
     MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* catalog,
              pipensx::GameMetadataService* metadata,
              pipensx::InstalledTitleService* installed, pipensx::AppSettings* settings,
-             pipensx::HomebrewService* homebrew);
+             pipensx::HomebrewService* homebrew, pipensx::UpdateService* updater);
 
 private:
     pipensx::DownloadManager* manager_;
@@ -24,6 +25,7 @@ private:
     pipensx::InstalledTitleService* installed_;
     pipensx::AppSettings* settings_;
     pipensx::HomebrewService* homebrew_;
+    pipensx::UpdateService* updater_;
 
     brls::Button* createMenuButton(const std::string& title, std::function<void()> onClick);
 };

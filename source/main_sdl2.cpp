@@ -2804,7 +2804,7 @@ int main(int argc, char *argv[]) {
             DrawText(renderer, fontSmall, fwStr, leftX + 250, topY + 65, {200,200,200,255});
             
             DrawText(renderer, fontSmall, GetText("sys_app_ver"), leftX + 20, topY + 105, colorTextMain);
-            DrawText(renderer, fontSmall, "The Goonies OS v1.2.1", leftX + 250, topY + 105, {200,200,200,255});
+            DrawText(renderer, fontSmall, "The Goonies OS v2.1", leftX + 250, topY + 105, {200,200,200,255});
             
             DrawText(renderer, fontSmall, GetText("sys_sd"), leftX + 20, topY + 145, colorTextMain);
             

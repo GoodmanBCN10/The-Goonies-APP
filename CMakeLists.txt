@@ -13,7 +13,7 @@ set(BRLS_UNITY_BUILD OFF CACHE BOOL "" FORCE)
 include(${BOREALIS_LIBRARY}/cmake/commonOption.cmake)
 include(${BOREALIS_LIBRARY}/cmake/toolchain.cmake)
 
-project(TheGooniesInstaller VERSION 2.0.0 LANGUAGES C CXX)
+project(TheGooniesInstaller VERSION 2.1.0 LANGUAGES C CXX)
 set(APP_TITLE "The Goonies APP")
 set(APP_AUTHOR "GoodmanBCN")
 set(APP_ICON ${CMAKE_CURRENT_SOURCE_DIR}/icon.jpg)
@@ -127,6 +127,10 @@ target_link_libraries(TheGooniesInstaller PRIVATE
     miniupnpc
 )
 
+if(NOT DEFINED APP_VERSION)
+    set(APP_VERSION "v2.1")
+endif()
+
 target_compile_definitions(TheGooniesInstaller PRIVATE
     PIPENSX_VERSION="${APP_VERSION}"
 )
@@ -137,7 +141,7 @@ if (PLATFORM_SWITCH)
     add_custom_target(TheGooniesInstaller_nro ALL
         DEPENDS TheGooniesInstaller
         COMMAND ${NX_NACPTOOL_EXE}
-            --create "${APP_TITLE}" "${APP_AUTHOR}" "${PROJECT_VERSION}"
+            --create "${APP_TITLE}" "${APP_AUTHOR}" "${APP_VERSION}"
             TheGooniesInstaller.nacp
         COMMAND ${NX_ELF2NRO_EXE}
             $<TARGET_FILE:TheGooniesInstaller> TheGooniesInstaller.nro

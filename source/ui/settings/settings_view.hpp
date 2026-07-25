@@ -11,6 +11,7 @@
 #include <borealis.hpp>
 #ifdef __SWITCH__
 #include <switch.h>
+#include <unistd.h>
 #endif
 
 #include <filesystem>
@@ -24,6 +25,8 @@
 #include "ui/common/message_cells.hpp"
 #include "ui/common/ui_helpers.hpp"
 #include "app/cleanup_helper.hpp"
+#include "linkuser.hpp"
+#include "ui/mtp/mtp_view.hpp"
 
 namespace pipensx::ui {
 
@@ -37,7 +40,7 @@ public:
           alive_(std::make_shared<std::atomic<bool>>(true)) {
           
         auto* content = new brls::Box(brls::Axis::COLUMN);
-        content->setPadding(24, 34, 24, 34);
+        content->setPadding(20, 34, 20, 34);
 
         addSection(content, t("Consola", "Console"));
         
@@ -52,6 +55,8 @@ public:
                 settings->update(vals, err);
                 brls::Application::notify(t("Reinicia la app para aplicar el idioma.", "Restart the app to apply language."));
             });
+        langToggle->title->setFontSize(20);
+        langToggle->detail->setFontSize(20);
         content->addView(langToggle);
 
         // System Firmware Version
@@ -64,9 +69,9 @@ public:
         }
         auto* fwLabel = new brls::Label();
         fwLabel->setText(fwStr);
-        fwLabel->setFontSize(18);
-        fwLabel->setMarginTop(15);
-        fwLabel->setMarginBottom(10);
+        fwLabel->setFontSize(20);
+        fwLabel->setMarginTop(12);
+        fwLabel->setMarginBottom(8);
         content->addView(fwLabel);
 
         addSection(content, t("Almacenamiento (microSD)", "Storage (microSD)"));
@@ -84,8 +89,8 @@ public:
         
         auto* sdLabel = new brls::Label();
         sdLabel->setText(sdStr);
-        sdLabel->setFontSize(18);
-        sdLabel->setMarginBottom(20);
+        sdLabel->setFontSize(20);
+        sdLabel->setMarginBottom(12);
         content->addView(sdLabel);
 
         addSection(content, t("Mantenimiento", "Maintenance"));
@@ -110,6 +115,15 @@ public:
                 }
             }));
 
+        addSection(content, t("Conectividad", "Connectivity"));
+
+        // Explorar microSD Cell
+        content->addView(actionCell(t("Explorar microSD (Conexión MTP)", "Explore microSD (MTP Connection)"),
+            t("Inicia la conexión MTP para transferir archivos desde tu PC.", "Starts MTP connection to transfer files from your PC."),
+            [] {
+                brls::Application::pushActivity(new brls::Activity(new goonies::ui::MTPExplorerView()));
+            }));
+
         auto* scroll = new brls::ScrollingFrame();
         scroll->setGrow(1);
         scroll->setContentView(content);
@@ -132,7 +146,7 @@ private:
     static void addSection(brls::Box* content, const std::string& text) {
         auto* title = new brls::Label();
         title->setText(text);
-        title->setFontSize(25);
+        title->setFontSize(20);
         title->setMarginTop(14);
         title->setMarginBottom(8);
         content->addView(title);
@@ -144,6 +158,8 @@ private:
         auto* cell = new brls::DetailCell();
         cell->setText(title);
         cell->setDetailText(detail);
+        cell->title->setFontSize(20);
+        cell->detail->setFontSize(20);
         cell->registerClickAction(
             [callback = std::move(callback)](brls::View*) {
                 callback();
