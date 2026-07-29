@@ -176,6 +176,10 @@ inline std::string taskStatusText(const DownloadTask& task) {
 
     switch (task.status) {
         case DownloadStatus::Checking:
+            if (!task.error.empty()) {
+                return task.error;
+            }
+            // Fallthrough
         case DownloadStatus::Downloading:
         case DownloadStatus::Verifying:
             return withPercent(pipensx::statusName(task.status),

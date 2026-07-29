@@ -256,7 +256,13 @@ private:
                          "   Checked: " +
                          std::to_string(task->piecesVerified));
         path_->setText("Output: " + task->dataPath);
-        error_->setText(task->error.empty() ? "" : "Error: " + task->error);
+        if (task->status == DownloadStatus::Checking) {
+            error_->setText(task->error);
+            error_->setTextColor(theme::accent());
+        } else {
+            error_->setText(task->error.empty() ? "" : "Error: " + task->error);
+            error_->setTextColor(theme::error());
+        }
 
         updateButtons(*task);
     }

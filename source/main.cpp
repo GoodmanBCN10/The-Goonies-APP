@@ -220,7 +220,9 @@ int main(int argc, char* argv[]) {
 
         rc = setsysInitialize();
         setsysReady = R_SUCCEEDED(rc);
-        if (setsysReady) writeLog("setsysInitialize OK");
+        if (setsysReady) {
+            writeLog("setsysInitialize OK");
+        }
 
         // Init Pipensx Services
         const char* BundledCatalogPath = "romfs:/catalog/switch_games.json";
@@ -228,6 +230,15 @@ int main(int argc, char* argv[]) {
         std::string loadError;
         settings.load(loadError);
         writeLog("settings.load OK");
+        
+        if (setsysReady) {
+            setsysSetUsb30EnableFlag(settings.get().enableUsb30);
+            if (settings.get().enableUsb30) {
+                writeLog("USB set to 3.0");
+            } else {
+                writeLog("USB forced to 2.0");
+            }
+        }
         
         if (settings.get().language == 1) {
             brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
@@ -293,7 +304,7 @@ int main(int argc, char* argv[]) {
         writeLog("Main loop EXITED. Application closing normally.");
 
         // Gracefully shutdown background threads before local services are destroyed
-        MTP::Exit();
+        // MTP::Exit();
 
     } catch (const std::exception& e) {
         std::string errMsg = std::string("Fatal error: ") + e.what();

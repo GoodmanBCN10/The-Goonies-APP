@@ -216,6 +216,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
 MTPView::~MTPView() {
     brls::Application::getRunLoopEvent()->unsubscribe(runLoopSubscription_);
     MTP::DisableInstallMode();
+    MTP::Exit();
 #ifdef __SWITCH__
     appletSetMediaPlaybackState(false);
 #endif

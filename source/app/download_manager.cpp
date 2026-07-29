@@ -4,6 +4,9 @@
 #include "../install/install_backend.hpp"
 #include "../install/install_journal.hpp"
 #include "../install/package_stream.hpp"
+#include "app_settings.hpp"
+#include <curl/curl.h>
+#include "RealDebridProvider.hpp"
 
 extern "C" {
 #include "../core/bencode.h"
@@ -362,7 +365,7 @@ public:
                 static_cast<unsigned long long>(budget.peakBytes),
                 maxBufferedBytes_, maxQueuedBytes_, lookaheadMin_,
                 lookaheadWindow_, lookaheadMax_);
-            installWorker_ = std::thread(&PackageCoordinator::installMain, this);
+            installWorker_ = nx::thread(&PackageCoordinator::installMain, this);
         }
     }
 
@@ -505,6 +508,12 @@ private:
                          int64_t fileOffset, const uint8_t* data, size_t size) {
         return static_cast<PackageCoordinator*>(user)->sink(
             fileIndex, fileOffset, data, size) ? 1 : 0;
+    }
+
+public:
+    size_t getBufferedBytes() {
+        std::lock_guard<std::mutex> lock(queueMutex_);
+        return bufferedBytesLocked();
     }
 
     bool sink(uint32_t fileIndex, int64_t fileOffset,
@@ -1131,7 +1140,7 @@ private:
     std::condition_variable drained_;
     std::deque<InstallChunk> queue_;
     std::map<PendingKey, InstallChunk> pending_;
-    std::thread installWorker_;
+    nx::thread installWorker_;
     size_t queuedBytes_ = 0;
     size_t pendingBytes_ = 0;
     size_t processingBytes_ = 0;
@@ -1212,6 +1221,72 @@ const char* persistedMode(TransferMode mode) {
     return mode == TransferMode::StreamInstall ? "install" : "download";
 }
 
+struct RDWriteContext {
+    std::atomic<bool>* stopping;
+    std::atomic<bool>* cancelActiveTask;
+    DownloadManager* manager;
+    std::string taskId;
+    TransferMode mode;
+    PackageCoordinator* coordinator;
+    FILE* diskFile;
+    std::mutex* fileMutex;
+    uint32_t fileIndex;
+    int64_t currentOffset;
+    uint64_t lastSpeedCalcTime;
+    uint64_t lastSpeedCalcBytes;
+    std::function<bool(int64_t, int64_t)> progressCallback;
+    std::vector<uint8_t> buffer;
+    std::atomic<uint64_t>* totalDownloadedBytes = nullptr;
+};
+
+static size_t RDWriteCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+    RDWriteContext* ctx = static_cast<RDWriteContext*>(userdata);
+    if (ctx->stopping->load() || (ctx->cancelActiveTask && ctx->cancelActiveTask->load())) return 0; // Abort
+    
+    size_t totalSize = size * nmemb;
+    
+    if (ctx->mode == TransferMode::StreamInstall && ctx->coordinator) {
+        const uint8_t* dataPtr = reinterpret_cast<const uint8_t*>(ptr);
+        ctx->buffer.insert(ctx->buffer.end(), dataPtr, dataPtr + totalSize);
+
+        if (ctx->buffer.size() >= 1024 * 1024) {
+            if (!ctx->coordinator->sink(static_cast<uint32_t>(ctx->fileIndex), ctx->currentOffset, ctx->buffer.data(), ctx->buffer.size())) {
+                return 0;
+            }
+            ctx->currentOffset += ctx->buffer.size();
+            ctx->buffer.clear();
+        }
+    } else if (ctx->diskFile) {
+        if (ctx->fileMutex) ctx->fileMutex->lock();
+        fseek(ctx->diskFile, ctx->currentOffset, SEEK_SET);
+        fwrite(ptr, size, nmemb, ctx->diskFile);
+        if (ctx->fileMutex) ctx->fileMutex->unlock();
+        ctx->currentOffset += totalSize;
+    } else {
+        ctx->currentOffset += totalSize;
+    }
+    
+    if (ctx->totalDownloadedBytes) {
+        ctx->totalDownloadedBytes->fetch_add(totalSize);
+    }
+    
+    return totalSize;
+}
+
+#if LIBCURL_VERSION_NUM >= 0x072000
+static int RDProgressCallback(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
+#else
+static int RDProgressCallback(void* clientp, double dltotal, double dlnow, double ultotal, double ulnow) {
+#endif
+    RDWriteContext* ctx = static_cast<RDWriteContext*>(clientp);
+    if (ctx->stopping->load() || (ctx->cancelActiveTask && ctx->cancelActiveTask->load())) return 1; // Abort
+    
+    if (ctx->progressCallback) {
+        if (!ctx->progressCallback(dltotal, dlnow)) return 1;
+    }
+    return 0;
+}
+
 } // namespace
 
 const char* statusName(DownloadStatus status) {
@@ -1242,7 +1317,7 @@ DownloadManager::DownloadManager(std::string rootPath, bool startWorker)
     load();
     if (startWorker) {
         workerStarted_ = true;
-        worker_ = std::thread(&DownloadManager::workerMain, this);
+        worker_ = nx::thread(&DownloadManager::workerMain, this);
     }
 }
 
@@ -1288,7 +1363,8 @@ bool DownloadManager::importTorrent(const std::string& path,
                                     const std::vector<uint8_t>& selectedFiles,
                                     std::string& taskId,
                                     std::string& error,
-                                    const std::vector<uint8_t>& initialPeers) {
+                                    const std::vector<uint8_t>& initialPeers,
+                                    int provider) {
     TorrentPreview preview;
     if (!previewTorrent(path, preview, error))
         return false;
@@ -1299,7 +1375,7 @@ bool DownloadManager::importTorrent(const std::string& path,
     return importTorrentActions(path,
                                 actionsFromLegacySelection(preview, mode,
                                                            selectedFiles),
-                                taskId, error, initialPeers);
+                                taskId, error, initialPeers, provider);
 }
 
 bool DownloadManager::importTorrentActions(
@@ -1307,7 +1383,8 @@ bool DownloadManager::importTorrentActions(
                                     const std::vector<uint8_t>& fileActions,
                                     std::string& taskId,
                                     std::string& error,
-                                    const std::vector<uint8_t>& initialPeers) {
+                                    const std::vector<uint8_t>& initialPeers,
+                                    int provider) {
     TorrentPreview preview;
     if (!previewTorrent(path, preview, error))
         return false;
@@ -1380,6 +1457,7 @@ bool DownloadManager::importTorrentActions(
     task.packageCount = installPackageCount;
     task.fileSelection = std::move(selection);
     task.initialPeers = initialPeers;
+    task.provider = (provider == -1) ? defaultProvider_ : provider;
     tasks_.push_back(std::move(task));
     taskId = preview.infoHash;
 
@@ -1407,6 +1485,9 @@ bool DownloadManager::pause(const std::string& taskId) {
         return false;
     task->status = DownloadStatus::Paused;
     task->speedBytesPerSecond = 0;
+    if (taskId == activeTaskId_) {
+        cancelActiveTask_.store(true);
+    }
     std::string ignored;
     saveLocked(ignored);
     condition_.notify_all();
@@ -1452,6 +1533,10 @@ bool DownloadManager::remove(const std::string& taskId, bool deleteData,
     if (!task) {
         error = "Download task not found.";
         return false;
+    }
+
+    if (taskId == activeTaskId_) {
+        cancelActiveTask_.store(true);
     }
 
     if (task->status == DownloadStatus::Checking ||
@@ -1515,6 +1600,7 @@ bool DownloadManager::saveLocked(std::string& error) const {
         state << "4:name" << bstr(task.name);
         state << "13:package-count" << bint(task.packageCount);
         state << "13:packages-done" << bint(task.packagesInstalled);
+        state << "8:provider" << bint(task.provider);
         state << "9:selection" << bstr(std::string(task.fileSelection.begin(),
                                                    task.fileSelection.end()));
         state << "6:status" << bstr(persistedStatus(task.status));
@@ -1607,13 +1693,15 @@ void DownloadManager::load() {
             std::string mode;
             uint64_t packageCount = 0;
             uint64_t packagesDone = 0;
+            uint64_t providerVal = 0;
             if (dictionaryString(item, "mode", mode))
                 task.mode = persistedMode(mode);
             if (dictionaryInteger(item, "package-count", packageCount))
                 task.packageCount = static_cast<uint32_t>(packageCount);
             if (dictionaryInteger(item, "packages-done", packagesDone))
-                task.packagesInstalled =
-                    static_cast<uint32_t>(packagesDone);
+                task.packagesInstalled = static_cast<uint32_t>(packagesDone);
+            if (dictionaryInteger(item, "provider", providerVal))
+                task.provider = static_cast<int>(providerVal);
         }
         if (version.ival >= 3) {
             std::string selection;
@@ -1693,6 +1781,7 @@ void DownloadManager::workerMain() {
         uint32_t packagesInstalled = 0;
         std::vector<uint8_t> fileSelection;
         std::vector<uint8_t> initialPeers;
+        int provider = 0;
         {
             std::unique_lock<std::mutex> lock(mutex_);
             condition_.wait(lock, [this] {
@@ -1715,9 +1804,12 @@ void DownloadManager::workerMain() {
                     packagesInstalled = task.packagesInstalled;
                     fileSelection = task.fileSelection;
                     initialPeers = task.initialPeers;
+                    provider = task.provider;
                     break;
                 }
             }
+            activeTaskId_ = activeId;
+            cancelActiveTask_.store(false);
         }
 
         metainfo_t metainfo;
@@ -1796,6 +1888,334 @@ void DownloadManager::workerMain() {
             std::lock_guard<std::mutex> lock(mutex_);
             if (DownloadTask* task = findLocked(activeId))
                 task->packageCount = coordinator->packageCount();
+        }
+        
+        if (provider == 1) {
+            // Real-Debrid HTTP Implementation
+            std::string magnet = "magnet:?xt=urn:btih:" + activeId;
+            RealDebridProvider rd;
+            
+            auto progressCb = [this, activeId](const std::string& stage, float prog) {
+                std::lock_guard<std::mutex> lock(mutex_);
+                if (DownloadTask* task = findLocked(activeId)) {
+                    if (task->status != DownloadStatus::Removing && task->status != DownloadStatus::Paused) {
+                        task->status = DownloadStatus::Checking;
+                        task->error = stage;
+                    }
+                }
+            };
+            
+            std::string url = rd.GetUnlockedLinkFromMagnet(magnet, progressCb, cancelActiveTask_);
+            
+            if (url.empty()) {
+                bool isRemoving = false;
+                bool deleteData = false;
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    if (DownloadTask* task = findLocked(activeId)) {
+                        if (task->status == DownloadStatus::Removing) {
+                            isRemoving = true;
+                            deleteData = task->error == "delete-data";
+                        } else if (task->status != DownloadStatus::Paused) {
+                            if (!stopping_.load()) {
+                                task->status = DownloadStatus::Error;
+                                if (task->error.empty() || task->error == "Desbloqueando enlace premium..." || task->error.find("Descargando") != std::string::npos) {
+                                    task->error = cancelActiveTask_.load() ? "Descarga cancelada." : "Error obteniendo enlace de Real-Debrid. ¿Está tu cuenta vinculada?";
+                                }
+                            }
+                            std::string ignored;
+                            saveLocked(ignored);
+                        }
+                    }
+                }
+                
+                if (coordinator && isRemoving) {
+                    coordinator->abandonResume();
+                }
+                
+                coordinator.reset();
+                metainfo_free(&metainfo);
+                
+                if (isRemoving) {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    std::string removeError;
+                    removeLocked(activeId, deleteData, removeError);
+                }
+                
+                continue;
+            }
+            
+            // Bypass SSL overhead on Switch CPU by forcing HTTP (if supported by RD settings)
+            if (url.find("https://") == 0) {
+                url.replace(0, 5, "http");
+            }
+            
+            appletSetMediaPlaybackState(true);
+            
+            FILE* fp = nullptr;
+            uint32_t targetFileIndex = 0;
+            if (mode == TransferMode::DownloadOnly) {
+                std::string outFilename = "game.nsp";
+                for (uint32_t i = 0; i < fileSelection.size(); ++i) {
+                    if (fileSelection[i]) {
+                        targetFileIndex = i;
+                        if (i < static_cast<uint32_t>(metainfo.num_files) && metainfo.files[i].path) {
+                            outFilename = safeComponent(metainfo.files[i].path);
+                        }
+                        break;
+                    }
+                }
+                fp = fopen((dataPath + "/" + outFilename).c_str(), "wb");
+            } else {
+                for (uint32_t i = 0; i < fileSelection.size(); ++i) {
+                    if (fileSelection[i]) {
+                        targetFileIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            CURLcode res = CURLE_FAILED_INIT;
+            
+            if (mode == TransferMode::StreamInstall) {
+                std::atomic<uint64_t> nextChunkOffset{0};
+                std::atomic<uint64_t> totalDownloadedBytes{0};
+                std::atomic<bool> downloadFailed{false};
+                std::mutex errMutex;
+                const uint64_t CHUNK_SIZE = 16 * 1024 * 1024;
+                uint64_t totalSize = metainfo.files[targetFileIndex].length;
+                
+                auto progressThreadFunc = [&]() {
+                    uint64_t lastCalcTime = now_ms();
+                    uint64_t lastCalcBytes = 0;
+                    while (!stopping_.load() && !cancelActiveTask_.load() && totalDownloadedBytes.load() < totalSize && !downloadFailed.load()) {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                        uint64_t current = totalDownloadedBytes.load();
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        if (DownloadTask* task = findLocked(activeId)) {
+                            task->totalBytes = totalSize;
+                            task->completedBytes = current;
+                            if (task->status == DownloadStatus::Checking) {
+                                task->status = DownloadStatus::Downloading;
+                                task->error.clear();
+                            }
+                            
+                            uint64_t nowMs = now_ms();
+                            if (nowMs - lastCalcTime >= 1000) {
+                                uint64_t elapsed = nowMs - lastCalcTime;
+                                uint64_t downloaded = current - lastCalcBytes;
+                                task->speedBytesPerSecond = (downloaded * 1000) / elapsed;
+                                lastCalcTime = nowMs;
+                                lastCalcBytes = current;
+                            }
+                        }
+                    }
+                };
+                
+                auto workerThread = [&]() {
+                    while (!stopping_.load() && !cancelActiveTask_.load() && !downloadFailed.load()) {
+                        if (coordinator && coordinator->getBufferedBytes() > 128 * 1024 * 1024) {
+                            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                            continue;
+                        }
+                        
+                        uint64_t start = nextChunkOffset.fetch_add(CHUNK_SIZE);
+                        if (start >= totalSize) break;
+                        uint64_t end = std::min(start + CHUNK_SIZE - 1, totalSize - 1);
+                        
+                        RDWriteContext tctx;
+                        tctx.stopping = &stopping_;
+                        tctx.cancelActiveTask = &cancelActiveTask_;
+                        tctx.manager = this;
+                        tctx.taskId = activeId;
+                        tctx.mode = mode;
+                        tctx.coordinator = coordinator.get();
+                        tctx.diskFile = nullptr;
+                        tctx.fileMutex = nullptr;
+                        tctx.fileIndex = targetFileIndex;
+                        tctx.currentOffset = start;
+                        tctx.totalDownloadedBytes = &totalDownloadedBytes;
+                        
+                        CURL* tcurl = curl_easy_init();
+                        if (!tcurl) {
+                            downloadFailed = true;
+                            break;
+                        }
+                        
+                        std::string rangeStr = std::to_string(start) + "-" + std::to_string(end);
+                        
+                        curl_easy_setopt(tcurl, CURLOPT_URL, url.c_str());
+                        curl_easy_setopt(tcurl, CURLOPT_WRITEFUNCTION, RDWriteCallback);
+                        curl_easy_setopt(tcurl, CURLOPT_WRITEDATA, &tctx);
+                        curl_easy_setopt(tcurl, CURLOPT_NOPROGRESS, 0L);
+                        
+                        #if LIBCURL_VERSION_NUM >= 0x072000
+                        curl_easy_setopt(tcurl, CURLOPT_XFERINFOFUNCTION, RDProgressCallback);
+                        curl_easy_setopt(tcurl, CURLOPT_XFERINFODATA, &tctx);
+                        #else
+                        curl_easy_setopt(tcurl, CURLOPT_PROGRESSFUNCTION, RDProgressCallback);
+                        curl_easy_setopt(tcurl, CURLOPT_PROGRESSDATA, &tctx);
+                        #endif
+                        
+                        curl_easy_setopt(tcurl, CURLOPT_BUFFERSIZE, 512 * 1024L);
+                        curl_easy_setopt(tcurl, CURLOPT_FOLLOWLOCATION, 1L);
+                        curl_easy_setopt(tcurl, CURLOPT_SSL_VERIFYPEER, 0L);
+                        curl_easy_setopt(tcurl, CURLOPT_RANGE, rangeStr.c_str());
+                        curl_easy_setopt(tcurl, CURLOPT_CONNECTTIMEOUT, 10L);
+                        curl_easy_setopt(tcurl, CURLOPT_LOW_SPEED_LIMIT, 1L);
+                        curl_easy_setopt(tcurl, CURLOPT_LOW_SPEED_TIME, 15L);
+                        
+                        CURLcode tres = curl_easy_perform(tcurl);
+                        
+                        if (tctx.mode == TransferMode::StreamInstall && tctx.coordinator && !tctx.buffer.empty()) {
+                            tctx.coordinator->sink(static_cast<uint32_t>(tctx.fileIndex), tctx.currentOffset, tctx.buffer.data(), tctx.buffer.size());
+                            tctx.currentOffset += tctx.buffer.size();
+                            tctx.buffer.clear();
+                        }
+                        
+                        curl_easy_cleanup(tcurl);
+                        
+                        if (tres != CURLE_OK && tres != CURLE_ABORTED_BY_CALLBACK) {
+                            std::lock_guard<std::mutex> lk(errMutex);
+                            downloadFailed = true;
+                            break;
+                        }
+                    }
+                };
+                
+                std::vector<nx::thread> threads;
+                nx::thread progressThread(progressThreadFunc);
+                int NUM_THREADS = 4;
+                for (int i = 0; i < NUM_THREADS; ++i) {
+                    threads.emplace_back(workerThread);
+                }
+                
+                for (auto& t : threads) {
+                    if (t.joinable()) t.join();
+                }
+                if (progressThread.joinable()) progressThread.join();
+                
+                res = downloadFailed.load() ? CURLE_HTTP_RETURNED_ERROR : CURLE_OK;
+                if (res == CURLE_HTTP_RETURNED_ERROR && cancelActiveTask_.load()) {
+                    res = CURLE_ABORTED_BY_CALLBACK;
+                }
+            } else {
+                RDWriteContext ctx;
+                ctx.stopping = &stopping_;
+                ctx.cancelActiveTask = &cancelActiveTask_;
+                ctx.manager = this;
+                ctx.taskId = activeId;
+                ctx.mode = mode;
+                ctx.coordinator = nullptr;
+                ctx.diskFile = fp;
+                ctx.fileMutex = nullptr;
+                ctx.fileIndex = targetFileIndex;
+                ctx.currentOffset = 0;
+                ctx.lastSpeedCalcTime = now_ms();
+                ctx.lastSpeedCalcBytes = 0;
+                ctx.progressCallback = [this, &activeId, &ctx, mode](curl_off_t total, curl_off_t now) -> bool {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    if (DownloadTask* task = findLocked(activeId)) {
+                        if (task->status == DownloadStatus::Removing || task->status == DownloadStatus::Paused) {
+                            return false;
+                        }
+                        task->totalBytes = static_cast<uint64_t>(total);
+                        task->completedBytes = static_cast<uint64_t>(now);
+                        if (mode != TransferMode::StreamInstall) {
+                            task->status = DownloadStatus::Downloading;
+                        }
+                        
+                        uint64_t nowMs = now_ms();
+                        if (nowMs - ctx.lastSpeedCalcTime >= 1000) {
+                            uint64_t elapsed = nowMs - ctx.lastSpeedCalcTime;
+                            uint64_t downloaded = static_cast<uint64_t>(now) - ctx.lastSpeedCalcBytes;
+                            task->speedBytesPerSecond = (downloaded * 1000) / elapsed;
+                            ctx.lastSpeedCalcTime = nowMs;
+                            ctx.lastSpeedCalcBytes = static_cast<uint64_t>(now);
+                        }
+                        return true;
+                    }
+                    return false;
+                };
+                
+                CURL* curl = curl_easy_init();
+                if (curl) {
+                    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+                    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RDWriteCallback);
+                    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
+                    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+                    curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 512 * 1024L);
+                    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
+                    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1L);
+                    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 15L);
+                    
+                    #if LIBCURL_VERSION_NUM >= 0x072000
+                    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, RDProgressCallback);
+                    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &ctx);
+                    #else
+                    curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, RDProgressCallback);
+                    curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, &ctx);
+                    #endif
+                    
+                    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+                    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+                    
+                    res = curl_easy_perform(curl);
+                    
+                    curl_easy_cleanup(curl);
+                }
+            }
+            
+            if (fp) fclose(fp);
+            
+            appletSetMediaPlaybackState(false);
+            
+            bool installOk = (mode != TransferMode::StreamInstall) || (coordinator && coordinator->finish());
+            
+            bool isRemoving = false;
+            bool deleteData = false;
+            
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                DownloadTask* task = findLocked(activeId);
+                if (task) {
+                    if (task->status == DownloadStatus::Removing) {
+                        isRemoving = true;
+                        deleteData = task->error == "delete-data";
+                    } else if (task->status != DownloadStatus::Paused) {
+                        if (res != CURLE_OK || stopping_.load() || cancelActiveTask_.load()) {
+                            task->status = DownloadStatus::Error;
+                            if (task->error.empty() || task->error.find("Descargando") != std::string::npos || task->error == "Desbloqueando enlace premium...") {
+                                task->error = cancelActiveTask_.load() ? "Descarga cancelada." : "Error de red en la descarga HTTP.";
+                            }
+                        } else if (!installOk) {
+                            task->status = DownloadStatus::Error;
+                            task->error = coordinator ? coordinator->error() : "Error instalando";
+                        } else {
+                            task->status = DownloadStatus::Completed;
+                            task->completedBytes = task->totalBytes;
+                        }
+                        std::string ignored;
+                        saveLocked(ignored);
+                    }
+                }
+            }
+            
+            if (coordinator) {
+                if (isRemoving)
+                    coordinator->abandonResume();
+            }
+            
+            coordinator.reset();
+            metainfo_free(&metainfo);
+            
+            if (isRemoving) {
+                std::lock_guard<std::mutex> lock(mutex_);
+                std::string removeError;
+                removeLocked(activeId, deleteData, removeError);
+            }
+            
+            continue;
         }
 
         torrent_t* torrent = torrent_create_ex(
@@ -1941,6 +2361,7 @@ void DownloadManager::shutdown() {
     if (!workerStarted_)
         return;
     stopping_ = true;
+    cancelActiveTask_ = true;
     condition_.notify_all();
     if (worker_.joinable())
         worker_.join();

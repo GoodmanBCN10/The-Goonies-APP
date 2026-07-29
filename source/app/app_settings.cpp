@@ -104,6 +104,15 @@ bool parseSettings(const std::string& text, AppSettingsData& values,
     } else {
         values.language = 0;
     }
+    
+    if (root.contains("download_provider") && root["download_provider"].is_number()) {
+        values.downloadProvider = root["download_provider"].get<int>();
+    } else {
+        values.downloadProvider = 0;
+    }
+
+    if (!readBool(root, "enable_usb_30", values.enableUsb30, error))
+        return false;
 
     if (catalog == "all")
         values.catalogFilter = CatalogFilter::All;
@@ -146,6 +155,8 @@ std::string serializeSettings(const AppSettingsData& values) {
     root["check_for_updates_on_launch"] = values.checkForUpdatesOnLaunch;
     root["catalog_disclaimer_ack"] = values.catalogDisclaimerAcknowledged;
     root["language"] = values.language;
+    root["download_provider"] = values.downloadProvider;
+    root["enable_usb_30"] = values.enableUsb30;
     return root.dump(2) + "\n";
 }
 
@@ -161,7 +172,10 @@ bool AppSettingsData::operator==(const AppSettingsData& other) const {
            showCompletedDownloads == other.showCompletedDownloads &&
            extendedTelemetry == other.extendedTelemetry &&
            checkForUpdatesOnLaunch == other.checkForUpdatesOnLaunch &&
-           catalogDisclaimerAcknowledged == other.catalogDisclaimerAcknowledged;
+           catalogDisclaimerAcknowledged == other.catalogDisclaimerAcknowledged &&
+           language == other.language &&
+           downloadProvider == other.downloadProvider &&
+           enableUsb30 == other.enableUsb30;
 }
 
 bool dailyRefreshDue(uint64_t nowMs, uint64_t lastRefreshMs) {

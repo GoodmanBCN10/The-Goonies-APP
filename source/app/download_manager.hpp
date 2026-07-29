@@ -5,8 +5,8 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <vector>
+#include <nx_thread.hpp>
 
 extern "C" {
 #include "../core/torrent.h"
@@ -64,6 +64,8 @@ struct DownloadTask {
     uint64_t installTotalBytes = 0;
     std::string currentPackage;
     std::vector<uint8_t> fileSelection;
+    int provider = 0; // 0=P2P, 1=Real-Debrid
+    std::string rdDownloadUrl;
     /* Compact IPv4 endpoints verified during magnet resolution. Ephemeral:
        queued before tracker/DHT results and intentionally not persisted. */
     std::vector<uint8_t> initialPeers;
@@ -101,11 +103,13 @@ public:
     bool importTorrent(const std::string& path, TransferMode mode,
                        const std::vector<uint8_t>& selectedFiles,
                        std::string& taskId, std::string& error,
-                       const std::vector<uint8_t>& initialPeers = {});
+                       const std::vector<uint8_t>& initialPeers = {},
+                       int provider = -1);
     bool importTorrentActions(const std::string& path,
                               const std::vector<uint8_t>& fileActions,
                               std::string& taskId, std::string& error,
-                              const std::vector<uint8_t>& initialPeers = {});
+                              const std::vector<uint8_t>& initialPeers = {},
+                              int provider = -1);
     bool importTorrent(const std::string& path, TransferMode mode,
                        std::string& taskId, std::string& error) {
         std::vector<uint8_t> selectedFiles;
@@ -137,6 +141,7 @@ public:
     const std::string& rootPath() const { return rootPath_; }
     const std::string& downloadRoot() const { return downloadRoot_; }
     const std::string& torrentRoot() const { return torrentRoot_; }
+    void setDefaultProvider(int provider) { defaultProvider_ = provider; }
 
 private:
     void load();
@@ -151,12 +156,15 @@ private:
     std::string torrentRoot_;
     std::string downloadRoot_;
     std::string statePath_;
+    int defaultProvider_ = 0;
 
     mutable std::mutex mutex_;
     std::condition_variable condition_;
     std::vector<DownloadTask> tasks_;
-    std::thread worker_;
+    nx::thread worker_;
     std::atomic<bool> stopping_{false};
+    std::atomic<bool> cancelActiveTask_{false};
+    std::string activeTaskId_;
     std::atomic<install::InstallStorageTarget> installTarget_{
         install::InstallStorageTarget::SdCard};
     bool workerStarted_ = false;

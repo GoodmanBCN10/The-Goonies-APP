@@ -34,12 +34,12 @@ TARGET		:=	TheGooniesInstaller
 BUILD		:=	build
 SOURCES		:=	source source/installer source/utils source/yati source/yati/container source/yati/nx source/yati/nx/nxdumptool source/yati/source source/minini source/libhaze source/mtp source/torrent_core source/torrent_core/vendor_dht
 DATA		:=	data
-INCLUDES	:=	include include/minini include/yati/nx/nxdumptool include/libhaze
+INCLUDES	:=	include include/minini include/yati/nx/nxdumptool include/libhaze vendor/borealis/library/include vendor/borealis/library/include/borealis/extern vendor/borealis/library/include/borealis/extern/nanovg vendor/borealis/library/lib/extern/nanovg vendor/borealis/library/lib/extern/fmt/include vendor/borealis/library/lib/extern/yoga vendor/borealis/library/lib/extern/tweeny/include
 ROMFS		:=	romfs
 
 APP_TITLE	:=	The Goonies Installer
 APP_AUTHOR	:=	GoodmanBCN
-APP_VERSION	:=	v2.1.1
+APP_VERSION	:=	v2.1.4
 DEFINES		:=	-DPIPENSX_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------

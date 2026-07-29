@@ -193,7 +193,17 @@ private:
     }
 
     void refresh() {
-        auto next = manager_->snapshot();
+        if (!initialized_) {
+            // First time
+        } else {
+            // Check if we are the active activity. If not, don't modify views in the background!
+            auto stack = brls::Application::getActivitiesStack();
+            if (!stack.empty() && stack.back()->getContentView() != this) {
+                return;
+            }
+        }
+
+        std::vector<DownloadTask> next = manager_->snapshot();
         if (settings_ && !settings_->get().showCompletedDownloads) {
             next.erase(std::remove_if(next.begin(), next.end(),
                 [](const DownloadTask& task) {
@@ -241,7 +251,15 @@ private:
         // Find which task is focused by looking at the index
         if (ownsFocus && focused) {
             for (size_t i = 0; i < list_->getChildren().size(); ++i) {
-                if (list_->getChildren()[i] == focused) {
+                brls::View* child = list_->getChildren()[i];
+                bool childOwnsFocus = false;
+                for (brls::View* v = focused; v; v = v->getParent()) {
+                    if (v == child) {
+                        childOwnsFocus = true;
+                        break;
+                    }
+                }
+                if (childOwnsFocus) {
                     if (i < tasks_.size()) {
                         focusedTaskId = tasks_[i].id;
                     }
@@ -256,7 +274,9 @@ private:
             
             if (next.empty()) {
                 ensureEmptyState()->setVisibility(brls::Visibility::VISIBLE);
+                if (ownsFocus) brls::Application::giveFocus(emptyState_);
             } else {
+                bool focusRestored = false;
                 for (const auto& task : next) {
                     auto* cell = new DownloadCell();
                     cell->setTask(task, metadata_);
@@ -269,7 +289,11 @@ private:
                     
                     if (task.id == focusedTaskId && ownsFocus) {
                         brls::Application::giveFocus(cell);
+                        focusRestored = true;
                     }
+                }
+                if (ownsFocus && !focusRestored && list_->getChildren().size() > 0) {
+                    brls::Application::giveFocus(list_->getChildren()[0]);
                 }
             }
         } else {

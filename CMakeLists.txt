@@ -64,6 +64,7 @@ add_executable(TheGooniesInstaller
     source/log.cpp
     source/nro.cpp
     source/forwarder.cpp
+    source/RealDebridProvider.cpp
     vendor/dht/dht.c
     vendor/qrcodegen/qrcodegen.cpp
     vendor/libnx-ext/libnx-ipcext/source/es.c
@@ -128,7 +129,7 @@ target_link_libraries(TheGooniesInstaller PRIVATE
 )
 
 if(NOT DEFINED APP_VERSION)
-    set(APP_VERSION "v2.1.1")
+    set(APP_VERSION "v2.1.4")
 endif()
 
 target_compile_definitions(TheGooniesInstaller PRIVATE

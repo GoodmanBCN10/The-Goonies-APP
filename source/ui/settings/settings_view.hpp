@@ -27,6 +27,7 @@
 #include "app/cleanup_helper.hpp"
 #include "linkuser.hpp"
 #include "ui/mtp/mtp_view.hpp"
+#include "ui/settings/rd_auth_dialog.hpp"
 
 namespace pipensx::ui {
 
@@ -57,7 +58,10 @@ public:
             });
         langToggle->title->setFontSize(20);
         langToggle->detail->setFontSize(20);
+        langToggle->detail->setFontSize(20);
         content->addView(langToggle);
+
+
 
         // System Firmware Version
         SetSysFirmwareVersion fw;
@@ -132,6 +136,69 @@ public:
                 brls::Application::pushActivity(new brls::Activity(new goonies::ui::MTPExplorerView()));
             }));
 
+        auto* providerToggle = new brls::SelectorCell();
+        providerToggle->init(t("Motor de Descarga", "Download Engine"), {"P2P Torrent", "Real-Debrid (Alta Velocidad)"},
+            settings_->get().downloadProvider,
+            [this](int selected) {
+                auto vals = settings_->get();
+                vals.downloadProvider = selected;
+                std::string err;
+                settings_->update(vals, err);
+                
+                if (manager_) {
+                    manager_->setDefaultProvider(selected);
+                }
+                
+                if (selected == 1) {
+                    brls::Application::notify(t("Has activado Real-Debrid.", "Real-Debrid activated."));
+                }
+            });
+        providerToggle->title->setFontSize(20);
+        providerToggle->detail->setFontSize(20);
+        content->addView(providerToggle);
+
+        // Real-Debrid Auth Cell
+        RealDebridProvider tempProvider;
+        bool isLinked = tempProvider.IsAuthenticated();
+        
+        std::string rdTitle = isLinked ? t("Cerrar sesión en Real-Debrid", "Log out of Real-Debrid") : t("Vincular cuenta de Real-Debrid", "Link Real-Debrid account");
+        std::string rdDetail = isLinked ? t("Tu cuenta ya está vinculada. Toca para cerrar sesión.", "Your account is linked. Tap to log out.") : t("Inicia sesión en Real-Debrid para descargas de alta velocidad.", "Log in to Real-Debrid for high-speed downloads.");
+        
+        content->addView(actionCell(rdTitle, rdDetail,
+            [isLinked] {
+                if (isLinked) {
+                    RealDebridProvider p;
+                    p.Logout();
+                    brls::Application::notify(t("Sesión de Real-Debrid cerrada.", "Real-Debrid session closed."));
+                    brls::Application::popActivity(); // Pop to force refresh
+                } else {
+                    ShowRealDebridAuthDialog();
+                }
+            }));
+
+        auto* usbToggle = new brls::SelectorCell();
+        usbToggle->init(t("Modo USB", "USB Mode"), {"USB 2.0 (Estable)", "USB 3.0 (Rápido)"},
+            settings_->get().enableUsb30 ? 1 : 0,
+            [this](int selected) {
+                auto vals = settings_->get();
+                vals.enableUsb30 = (selected == 1);
+                std::string err;
+                settings_->update(vals, err);
+                
+#ifdef __SWITCH__
+                setsysSetUsb30EnableFlag(vals.enableUsb30);
+#endif
+                
+                if (selected == 1) {
+                    brls::Application::notify(t("USB 3.0 activado. Puede causar interferencias con mandos Bluetooth.", "USB 3.0 activated. May cause Bluetooth controller interference."));
+                } else {
+                    brls::Application::notify(t("USB 2.0 activado (Estable).", "USB 2.0 activated (Stable)."));
+                }
+            });
+        usbToggle->title->setFontSize(20);
+        usbToggle->detail->setFontSize(20);
+        content->addView(usbToggle);
+
         auto* scroll = new brls::ScrollingFrame();
         scroll->setGrow(1);
         scroll->setContentView(content);
@@ -178,8 +245,10 @@ private:
 
     bool persist(const AppSettingsData& values, const char* tag) {
         std::string error;
-        if (settings_->update(values, error))
+        if (settings_->update(values, error)) {
+            manager_->setDefaultProvider(values.downloadProvider);
             return true;
+        }
         diagnostic_error("settings", tag, "error=%s", error.c_str());
         brls::Application::notify(error);
         return false;

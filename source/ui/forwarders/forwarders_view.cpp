@@ -71,7 +71,7 @@ void HomebrewGridItem::setTitle(const HomebrewTitle& title, std::function<void(c
         if (!title.icon.empty()) {
             icon_->setImageFromMem(title.icon.data(), title.icon.size());
         } else {
-            icon_->setImageFromFile("romfs:/icon.jpg");
+            icon_->setImageFromFile("romfs:/logo.png");
         }
     }
 }

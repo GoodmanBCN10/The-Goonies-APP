@@ -36,6 +36,8 @@ struct AppSettingsData {
     // once, then this is set so later launches skip it.
     bool catalogDisclaimerAcknowledged = false;
     int language = 0; // 0=unset, 1=es, 2=en
+    int downloadProvider = 0; // 0=Torrent, 1=Real-Debrid
+    bool enableUsb30 = false;
 
     bool operator==(const AppSettingsData& other) const;
     bool operator!=(const AppSettingsData& other) const {

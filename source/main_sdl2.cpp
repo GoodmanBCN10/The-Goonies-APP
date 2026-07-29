@@ -281,7 +281,7 @@ std::map<std::string, std::vector<std::string>> langDict = {
     {"no_games", {"No hay juegos instalados o error leyendo ns.", "No installed games found."}},
     {"unknown_game", {"Desconocido", "Unknown"}},
     {"popup_title", {"GESTOR DE PARTIDAS", "SAVE DATA MANAGER"}},
-    {"popup_sd_path", {"Ruta SD: sdmc:/switch/thegoonies_installer/saves/", "SD Path: sdmc:/switch/thegoonies_installer/saves/"}},
+    {"popup_sd_path", {"Ruta SD: sdmc:/switch/thegoonies/saves/", "SD Path: sdmc:/switch/thegoonies/saves/"}},
     {"popup_opt_backup", {"1. Hacer Backup a SD", "1. Backup to SD"}},
     {"popup_opt_restore", {"2. Importar desde SD", "2. Restore from SD"}},
     {"popup_opt_cancel", {"3. Cancelar", "3. Cancel"}},
@@ -347,7 +347,7 @@ std::string GetText(std::string key) {
 extern bool isGridView;
 
 void LoadConfig() {
-    std::ifstream file("sdmc:/switch/thegoonies_installer/config.ini");
+    std::ifstream file("sdmc:/switch/thegoonies/config.ini");
     if (file.is_open()) {
         file >> settingLanguage >> settingDarkMode >> isGridView >> settingAccentColor;
         file.close();
@@ -359,8 +359,8 @@ void LoadConfig() {
 
 void SaveConfig() {
     std::error_code ec;
-    std::filesystem::create_directories("sdmc:/switch/thegoonies_installer", ec);
-    std::ofstream file("sdmc:/switch/thegoonies_installer/config.ini");
+    std::filesystem::create_directories("sdmc:/switch/thegoonies", ec);
+    std::ofstream file("sdmc:/switch/thegoonies/config.ini");
     if (file.is_open()) {
         file << settingLanguage << " " << settingDarkMode << " " << isGridView << " " << settingAccentColor;
         file.close();
@@ -1777,7 +1777,7 @@ int main(int argc, char *argv[]) {
                         if (userFound) {
                             u64 titleId = installedGamesList[selectedGameIndex].titleId;
                             if (R_SUCCEEDED(fsdevMountSaveData("save", titleId, uid))) {
-                                std::string destPath = "sdmc:/switch/thegoonies_installer/saves/" + GetTitleIdHex(titleId);
+                                std::string destPath = "sdmc:/switch/thegoonies/saves/" + GetTitleIdHex(titleId);
                                 std::error_code ec;
                                 std::filesystem::create_directories(destPath, ec);
                                 std::filesystem::copy("save:/", destPath, std::filesystem::copy_options::recursive | std::filesystem::copy_options::update_existing, ec);
@@ -1807,7 +1807,7 @@ int main(int argc, char *argv[]) {
 
                         if (userFound) {
                             u64 titleId = installedGamesList[selectedGameIndex].titleId;
-                            std::string srcPath = "sdmc:/switch/thegoonies_installer/saves/" + GetTitleIdHex(titleId);
+                            std::string srcPath = "sdmc:/switch/thegoonies/saves/" + GetTitleIdHex(titleId);
                             if (std::filesystem::exists(srcPath)) {
                                 if (R_SUCCEEDED(fsdevMountSaveData("save", titleId, uid))) {
                                     std::error_code ec;

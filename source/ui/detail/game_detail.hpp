@@ -629,7 +629,7 @@ private:
         std::string id;
         std::string err;
         if (manager_->importTorrent(path, TransferMode::StreamInstall, mask,
-                                    id, err, initialPeers)) {
+                                    id, err, initialPeers, settings_->get().downloadProvider)) {
             log_msg("[catalog] imported torrent %s\n", id.c_str());
             if (extras > 0) {
                 statusLabel_->setText("Installing game files. Extra files "
