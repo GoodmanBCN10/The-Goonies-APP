@@ -66,6 +66,9 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
+    // Clean up any leftover updater files from a previous update
+    updater.discardStaged();
+
     // Check if launched in Library Applet Mode (Album mode without Title Override)
     AppletType at = appletGetAppletType();
     if (at == AppletType_LibraryApplet || at == AppletType_OverlayApplet) {
