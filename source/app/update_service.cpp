@@ -28,9 +28,9 @@ namespace {
 #endif
 
 constexpr const char* kLatestReleaseUrl =
-    "https://api.github.com/repos/i3sey/pipensx/releases/latest";
+    "https://api.github.com/repos/GoodmanBCN10/The-Goonies-APP/releases/latest";
 constexpr const char* kReleaseAssetPrefix =
-    "https://github.com/i3sey/pipensx/releases/download/";
+    "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/";
 constexpr size_t kMetadataLimit = 512 * 1024;
 constexpr size_t kChecksumLimit = 1024;
 constexpr size_t kNroLimit = 64 * 1024 * 1024;
@@ -404,13 +404,13 @@ bool UpdateService::parseRelease(const std::string& json, ReleaseInfo& release,
         const std::string url = asset.value("browser_download_url", "");
         if (!trustedAssetUrl(url))
             continue;
-        if (name == "pipensx.nro")
+        if (name == "TheGooniesInstaller.nro")
             release.nroUrl = url;
-        else if (name == "pipensx.nro.sha256")
+        else if (name == "TheGooniesInstaller.nro.sha256")
             release.checksumUrl = url;
     }
     if (release.nroUrl.empty() || release.checksumUrl.empty()) {
-        error = "GitHub release must include pipensx.nro and pipensx.nro.sha256.";
+        error = "GitHub release must include TheGooniesInstaller.nro and TheGooniesInstaller.nro.sha256.";
         return false;
     }
     return true;
