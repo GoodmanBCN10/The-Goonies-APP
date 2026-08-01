@@ -8,15 +8,19 @@
 namespace goonies::ui {
 
 InstallFileCell::InstallFileCell(InstallBrowserView* owner) : owner_(owner) {
-    this->setWidthPercentage(100);
-    this->setHeight(64);
     this->setFocusable(true);
-    this->inflateFromXMLRes("xml/install_file_cell.xml");
+    this->setPadding(15, 20, 15, 20);
+    this->setHeight(64);
+
+    label_ = new brls::Label();
+    label_->setFontSize(24);
+    label_->setSingleLine(true);
+    label_->setHorizontalAlign(brls::HorizontalAlign::LEFT);
+    this->addView(label_);
     
     this->registerAction(t("Marcar", "Mark"), brls::BUTTON_Y, [this](brls::View* view) {
         if (owner_ && cellIndex_ != (size_t)-1) {
             owner_->toggleSelection(cellIndex_);
-            // Update this specific cell's UI directly to avoid reloadData() killing focus
             if (cellIndex_ < owner_->entries().size()) {
                 this->setEntry(owner_->entries()[cellIndex_], cellIndex_);
             }
@@ -34,17 +38,15 @@ InstallFileCell::InstallFileCell(InstallBrowserView* owner) : owner_(owner) {
 
 void InstallFileCell::setEntry(const InstallFileEntry& entry, size_t index) {
     cellIndex_ = index;
-    if (checkbox_ && label_) {
+    if (label_) {
         if (entry.directory) {
-            checkbox_->setText("");
-            label_->setText(fmt::format("\uE2C7 {}", entry.name)); // Folder icon if we had one, just text for now
+            label_->setText(fmt::format("\uE2C7 {}", entry.name)); // Folder icon
         } else {
             if (entry.selected) {
-                checkbox_->setText("\uE834"); // Checkbox checked
+                label_->setText(fmt::format("\uE834 {}", entry.name)); // Checkbox checked
             } else {
-                checkbox_->setText("\uE835"); // Checkbox unchecked
+                label_->setText(fmt::format("\uE835 {}", entry.name)); // Checkbox unchecked
             }
-            label_->setText(entry.name);
         }
     }
 }
@@ -104,7 +106,14 @@ InstallBrowserView::InstallBrowserView(const std::string& startPath) : brls::Box
         return true;
     });
 
-    loadDirectory(currentPath_);
+    brls::sync([this, path = currentPath_]() {
+        loadDirectory(path);
+        brls::sync([this]() {
+            if (this->recycler_) {
+                brls::Application::giveFocus(this->recycler_);
+            }
+        });
+    });
 }
 
 void InstallBrowserView::loadDirectory(const std::string& path) {

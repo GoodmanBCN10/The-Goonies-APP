@@ -36,11 +36,10 @@ public:
     void setEntry(const InstallFileEntry& entry, size_t index);
 
 private:
-    InstallBrowserView* owner_;
-    size_t cellIndex_ = (size_t)-1;
+    InstallBrowserView* owner_ = nullptr;
+    size_t cellIndex_ = -1;
     
-    BRLS_BIND(brls::Label, checkbox_, "checkbox");
-    BRLS_BIND(brls::Label, label_, "label");
+    brls::Label* label_ = nullptr;
 };
 
 class InstallBrowserView : public brls::Box {
