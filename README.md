@@ -1,8 +1,8 @@
 # The Goonies App
 
 Instalador y gestor de contenido para Nintendo Switch, desarrollado para la comunidad Switch ES — The Goonies OS.
-Únete a nuestra comunidad en https://t.me/+WWoAIRB3xjAwYTM0
 ---
+Únete a nuestra comunidad en https://t.me/+WWoAIRB3xjAwYTM0
 
 ## Qué es
 
