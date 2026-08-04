@@ -15,7 +15,7 @@ The Goonies App es una aplicación homebrew para Nintendo Switch con interfaz pr
 *   **Partidas Guardadas:** Administra las saves de tus juegos.
 *   **Crea Forwarders:** Crea accesos directos de tus apps de Homebrew favoritas.
 *   **Explorar microSD desde MTP:** Navegador de archivos de la tarjeta SD.
-*   
+  
 ## Componentes de terceros
 
 Este proyecto utiliza los siguientes componentes de código abierto:
