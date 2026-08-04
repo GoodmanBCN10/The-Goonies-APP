@@ -1,22 +1,21 @@
 # The Goonies App
 
 Instalador y gestor de contenido para Nintendo Switch, desarrollado para la comunidad Switch ES — The Goonies OS.
-
+Únete a nuestra comunidad en https://t.me/+WWoAIRB3xjAwYTM0
 ---
 
 ## Qué es
 
 The Goonies App es una aplicación homebrew para Nintendo Switch con interfaz propia, diseñada para simplificar la gestión de contenido en consolas con CFW. Todo desde una interfaz en español (con opción de inglés).
 
-*   **¡Novedad V2.0! Descarga de Juegos:** Soporte integrado para descargar contenido a través de red (Torrents y enlaces Magnet) directamente desde la consola.
+*   **Descarga de Juegos:** Soporte integrado para descargar contenido a través de red (Torrents y enlaces Magnet) directamente desde la consola.
 *   **Instalar por MTP:** Conecta el cable USB al PC y transfiere archivos directamente, sin necesidad de software adicional en el PC.
 *   **Instalar desde un pendrive o un disco externo:** Conecta el USB o el disco externo a la consola y transfiere archivos directamente.  Admite discos duros y pendrives formateados en NTFS, exFAT y FAT32
 *   **Juegos Instalados:** Visualiza, gestiona y elimina títulos instalados en la consola.
 *   **Partidas Guardadas:** Administra las saves de tus juegos.
 *   **Crea Forwarders:** Crea accesos directos de tus apps de Homebrew favoritas.
 *   **Explorar microSD desde MTP:** Navegador de archivos de la tarjeta SD.
-*   **Actualiza tu CFW sin PC:** Descarga tu Pack The Goonies OS CFW y actualiza tu pack, conservando las carpetas esenciales y las que tú decidas.
-
+*   
 ## Componentes de terceros
 
 Este proyecto utiliza los siguientes componentes de código abierto:
