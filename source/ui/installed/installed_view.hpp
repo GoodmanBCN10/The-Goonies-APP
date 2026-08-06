@@ -210,6 +210,8 @@ private:
 
 class InstalledDataSource : public brls::RecyclerDataSource {
 public:
+    enum class SortType { Alphabetical, LastPlayed, InstallDate };
+
     explicit InstalledDataSource(GameMetadataService* metadata, std::function<void(const InstalledTitle&)> onClick = nullptr)
         : metadata_(metadata), onClick_(onClick) {}
 
@@ -228,6 +230,16 @@ public:
                 }
             }
         }
+        applySort();
+    }
+
+    void setSortType(SortType type) {
+        sortType_ = type;
+        applySort();
+    }
+
+    SortType getSortType() const {
+        return sortType_;
     }
 
     void setGridView(bool grid, int columns) {
@@ -242,7 +254,7 @@ public:
     brls::RecyclerCell* cellForRow(brls::RecyclerFrame* recycler, brls::IndexPath index) override {
         if (titles_.empty()) {
             auto* cell = static_cast<TextMessageCell*>(recycler->dequeueReusableCell("Message"));
-            cell->setMessage(t("No se encontraron aplicaciones instaladas.", "No installed applications found."));
+            cell->setMessage(t("No se encontraron aplicaciones instaladas.", "No installed applications found.", "Nenhum aplicativo instalado encontrado."));
             return cell;
         }
         
@@ -252,10 +264,27 @@ public:
     }
 
 private:
+    void applySort() {
+        if (sortType_ == SortType::LastPlayed) {
+            std::stable_sort(titles_.begin(), titles_.end(), [](const InstalledTitle& a, const InstalledTitle& b) {
+                return a.lastPlayedTimestamp > b.lastPlayedTimestamp;
+            });
+        } else if (sortType_ == SortType::InstallDate) {
+            std::stable_sort(titles_.begin(), titles_.end(), [](const InstalledTitle& a, const InstalledTitle& b) {
+                return a.installTimestamp > b.installTimestamp;
+            });
+        } else {
+            std::stable_sort(titles_.begin(), titles_.end(), [](const InstalledTitle& a, const InstalledTitle& b) {
+                return a.name < b.name;
+            });
+        }
+    }
+
     GameMetadataService* metadata_;
     std::vector<InstalledTitle> titles_;
     int columns_ = 6;
     std::function<void(const InstalledTitle&)> onClick_;
+    SortType sortType_ = SortType::Alphabetical;
 };
 
 class InstalledView : public brls::Box {
@@ -269,7 +298,20 @@ public:
         status_->setMarginTop(10);
         status_->setMarginLeft(34);
         status_->setTextColor(theme::textTertiary());
-        addView(status_);
+        
+        sortLabel_ = new brls::Label();
+        sortLabel_->setFontSize(15);
+        sortLabel_->setMarginTop(10);
+        sortLabel_->setMarginRight(34);
+        sortLabel_->setTextColor(theme::textTertiary());
+        sortLabel_->setHorizontalAlign(brls::HorizontalAlign::RIGHT);
+        
+        brls::Box* topBar = new brls::Box(brls::Axis::ROW);
+        topBar->addView(status_);
+        topBar->addView(new brls::Box()); // Spacer
+        topBar->getChildren().back()->setGrow(1);
+        topBar->addView(sortLabel_);
+        addView(topBar);
 
         recycler_ = new brls::RecyclerFrame();
         recycler_->setGrow(1);
@@ -302,6 +344,22 @@ public:
             return true;
         });
 
+        registerAction("Ordenar", brls::BUTTON_X, [this](brls::View*) {
+            auto current = dataSource_->getSortType();
+            if (current == InstalledDataSource::SortType::Alphabetical) {
+                dataSource_->setSortType(InstalledDataSource::SortType::InstallDate);
+            } else if (current == InstalledDataSource::SortType::InstallDate) {
+                dataSource_->setSortType(InstalledDataSource::SortType::LastPlayed);
+            } else {
+                dataSource_->setSortType(InstalledDataSource::SortType::Alphabetical);
+            }
+            updateSortLabel();
+            recycler_->reloadData();
+            recycler_->selectRowAt(brls::IndexPath(0, 0), false);
+            brls::Application::giveFocus(recycler_);
+            return true;
+        });
+
         // Vista action was removed
         this->registerAction("Volver", brls::BUTTON_B, [](brls::View*) {
             brls::Application::popActivity();
@@ -312,6 +370,18 @@ public:
     ~InstalledView() override { alive_->store(false); }
 
 private:
+    void updateSortLabel() {
+        if (!dataSource_) return;
+        auto current = dataSource_->getSortType();
+        if (current == InstalledDataSource::SortType::Alphabetical) {
+            sortLabel_->setText("Ordenado por: Orden alfabético");
+        } else if (current == InstalledDataSource::SortType::InstallDate) {
+            sortLabel_->setText("Ordenado por: Fecha de instalación");
+        } else {
+            sortLabel_->setText("Ordenado por: Última partida");
+        }
+    }
+
     void updateViewMode() {
         recycler_->estimatedRowHeight = 230;
         dataSource_->setGridView(true, columns_);
@@ -359,6 +429,7 @@ private:
                                        : brls::Visibility::VISIBLE);
         status_->setText(std::to_string(count) +
             (count == 1 ? " installed application" : " installed applications"));
+        updateSortLabel();
     }
 
     void refresh() {
@@ -393,6 +464,7 @@ private:
     InstalledTitleService* installed_;
     DownloadManager* manager_;
     brls::Label* status_ = nullptr;
+    brls::Label* sortLabel_ = nullptr;
     EmptyStateView* emptyState_ = nullptr;
     brls::RecyclerFrame* recycler_ = nullptr;
     InstalledDataSource* dataSource_ = nullptr;

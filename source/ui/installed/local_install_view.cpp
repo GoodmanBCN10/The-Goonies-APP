@@ -25,14 +25,14 @@ LocalInstallView::LocalInstallView(const std::vector<std::string>& queue) : brls
 
     // --- Premium Title and Instructions ---
     titleLabel_ = new brls::Label();
-    titleLabel_->setText(t("Instalar por Cola Local", "Local Queue Installer"));
+    titleLabel_->setText(t("Instalar por Cola Local", "Local Queue Installer", "Instalar via fila local"));
     titleLabel_->setFontSize(36);
     titleLabel_->setTextColor(brls::Application::getTheme().getColor("brls/accent"));
     titleLabel_->setMarginBottom(10);
     this->addView(titleLabel_);
 
     instructionsLabel_ = new brls::Label();
-    instructionsLabel_->setText(t("Por favor, no apagues la consola ni extraigas la unidad.", "Please do not turn off the console or remove the drive."));
+    instructionsLabel_->setText(t("Por favor, no apagues la consola ni extraigas la unidad.", "Please do not turn off the console or remove the drive.", "Não desligue o console nem remova a unidade."));
     instructionsLabel_->setFontSize(20);
     instructionsLabel_->setTextColor(nvgRGB(180, 180, 180));
     instructionsLabel_->setMarginBottom(30);
@@ -51,7 +51,7 @@ LocalInstallView::LocalInstallView(const std::vector<std::string>& queue) : brls
     activeTopRow->setMarginBottom(10);
 
     activeFilenameLabel_ = new brls::Label();
-    activeFilenameLabel_->setText(t("Iniciando...", "Starting..."));
+    activeFilenameLabel_->setText(t("Iniciando...", "Starting...", "Começando..."));
     activeFilenameLabel_->setFontSize(22);
     activeTopRow->addView(activeFilenameLabel_);
 
@@ -84,7 +84,7 @@ LocalInstallView::LocalInstallView(const std::vector<std::string>& queue) : brls
     historyBox_->setGrow(1.0f); // Fill remaining space
 
     historyTitleLabel_ = new brls::Label();
-    historyTitleLabel_->setText(fmt::format("{} ({})", t("Cola de Instalación", "Installation Queue"), queue_.size()));
+    historyTitleLabel_->setText(fmt::format("{} ({})", t("Cola de Instalación", "Installation Queue", "Fila de instalação"), queue_.size()));
     historyTitleLabel_->setFontSize(22);
     historyTitleLabel_->setTextColor(nvgRGB(255, 255, 255));
     historyTitleLabel_->setMarginBottom(20);
@@ -103,9 +103,9 @@ LocalInstallView::LocalInstallView(const std::vector<std::string>& queue) : brls
     this->addView(historyBox_);
 
     // Setup actions
-    this->registerAction(t("Cancelar/Volver", "Cancel/Back"), brls::BUTTON_B, [this](brls::View* view) {
+    this->registerAction(t("Cancelar/Volver", "Cancel/Back", "Cancelar/Devolver"), brls::BUTTON_B, [this](brls::View* view) {
         if (g_localInstallerCore && !g_localInstallerCore->IsFinished() && !g_localInstallerCore->HasError()) {
-            brls::Application::notify(t("Cancelando instalación actual...", "Canceling current installation..."));
+            brls::Application::notify(t("Cancelando instalación actual...", "Canceling current installation...", "Cancelando a instalação atual..."));
             g_localInstallerCore->AbortInstallation();
         } else {
             brls::Application::popActivity();
@@ -200,10 +200,10 @@ void LocalInstallView::installNext() {
     brls::Logger::info("LocalInstallView::installNext called, currentIndex: {}", currentIndex_);
     if (currentIndex_ >= (int)queue_.size()) {
         brls::Logger::info("LocalInstallView::installNext finished queue");
-        activeFilenameLabel_->setText(t("¡Proceso completado!", "Process completed!"));
+        activeFilenameLabel_->setText(t("¡Proceso completado!", "Process completed!", "Processo concluído!"));
         progressBar_->setProgress(1.0f);
         speedLabel_->setText("");
-        progressTextLabel_->setText(t("Todas las instalaciones han terminado.", "All installations have finished."));
+        progressTextLabel_->setText(t("Todas las instalaciones han terminado.", "All installations have finished.", "Todas as instalações foram concluídas."));
         buildHistoryUI(); // Ensure the last item shows as Completado
         return;
     }
@@ -212,7 +212,7 @@ void LocalInstallView::installNext() {
     buildHistoryUI();
 
     std::string fn = queue_[currentIndex_].name;
-    activeFilenameLabel_->setText(fmt::format("{}: {}", t("Instalando", "Installing"), fn));
+    activeFilenameLabel_->setText(fmt::format("{}: {}", t("Instalando", "Installing", "Instalando"), fn));
     
     brls::Logger::info("LocalInstallView::installNext calling StartInstallation for {}", fn);
     if (g_localInstallerCore->StartInstallation(fn)) {
@@ -231,7 +231,7 @@ void LocalInstallView::installNext() {
 }
 
 void LocalInstallView::buildHistoryUI() {
-    historyTitleLabel_->setText(fmt::format("{} ({})", t("Cola de Instalación", "Installation Queue"), queue_.size()));
+    historyTitleLabel_->setText(fmt::format("{} ({})", t("Cola de Instalación", "Installation Queue", "Fila de instalação"), queue_.size()));
     historyList_->clearViews(true);
     
     for (const auto& item : queue_) {
@@ -260,16 +260,16 @@ void LocalInstallView::buildHistoryUI() {
         
         brls::Label* statusL = new brls::Label();
         if (item.status == 1) {
-            statusL->setText(t("Completado", "Completed"));
+            statusL->setText(t("Completado", "Completed", "Preenchido"));
             statusL->setTextColor(nvgRGB(50, 200, 50));
         } else if (item.status == 0) {
-            statusL->setText(t("Instalando...", "Installing..."));
+            statusL->setText(t("Instalando...", "Installing...", "Instalando..."));
             statusL->setTextColor(brls::Application::getTheme().getColor("brls/accent"));
         } else if (item.status == 2) {
-            statusL->setText(t("Error", "Error"));
+            statusL->setText(t("Error", "Error", "Erro"));
             statusL->setTextColor(nvgRGB(200, 50, 50));
         } else {
-            statusL->setText(t("En cola", "Queued"));
+            statusL->setText(t("En cola", "Queued", "na fila"));
             statusL->setTextColor(nvgRGB(150, 150, 150));
         }
         statusL->setFontSize(20);

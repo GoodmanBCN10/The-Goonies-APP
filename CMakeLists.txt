@@ -129,7 +129,7 @@ target_link_libraries(TheGooniesInstaller PRIVATE
 )
 
 if(NOT DEFINED APP_VERSION)
-    set(APP_VERSION "v2.1.4")
+    set(APP_VERSION "v2.1.6")
 endif()
 
 target_compile_definitions(TheGooniesInstaller PRIVATE
@@ -149,7 +149,8 @@ if (PLATFORM_SWITCH)
             --icon=${APP_ICON}
             --nacp=TheGooniesInstaller.nacp
             --romfsdir=${ROMFS_DIR}
-        BYPRODUCTS TheGooniesInstaller.nacp TheGooniesInstaller.nro
+        COMMAND sh -c "sha256sum TheGooniesInstaller.nro > TheGooniesInstaller.nro.sha256"
+        BYPRODUCTS TheGooniesInstaller.nacp TheGooniesInstaller.nro TheGooniesInstaller.nro.sha256
         VERBATIM
     )
 endif()

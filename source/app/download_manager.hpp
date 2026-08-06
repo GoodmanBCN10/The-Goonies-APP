@@ -162,6 +162,8 @@ private:
     std::condition_variable condition_;
     std::vector<DownloadTask> tasks_;
     nx::thread worker_;
+    std::mutex cleanupMutex_;
+    std::vector<std::thread> cleanupThreads_;
     std::atomic<bool> stopping_{false};
     std::atomic<bool> cancelActiveTask_{false};
     std::string activeTaskId_;

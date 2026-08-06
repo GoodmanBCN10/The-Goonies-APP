@@ -4,6 +4,7 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <ctime>
 
 #include <borealis.hpp>
 #include <switch.h>
@@ -76,7 +77,7 @@ public:
 
         // Left Column (Icon + Info)
         brls::Box* leftColumn = new brls::Box(brls::Axis::COLUMN);
-        leftColumn->setWidth(300);
+        leftColumn->setWidth(380);
         leftColumn->setPadding(40, 20, 40, 40);
 
         brls::Box* iconBox = new brls::Box(brls::Axis::COLUMN);
@@ -162,6 +163,37 @@ public:
         reqLabel->setMarginTop(4);
         reqLabel->setTextColor(theme::textSecondary());
         infoBox->addView(reqLabel);
+
+        if (title.playtimeMinutes > 0) {
+            uint64_t hrs = title.playtimeMinutes / 60;
+            uint64_t mins = title.playtimeMinutes % 60;
+            std::string playtimeStr = "Tiempo de juego: ";
+            if (hrs > 0) playtimeStr += std::to_string(hrs) + "h ";
+            if (mins > 0 || hrs == 0) playtimeStr += std::to_string(mins) + "m";
+            
+            brls::Label* timeLabel = new brls::Label();
+            timeLabel->setText(playtimeStr);
+            timeLabel->setFontSize(20);
+            timeLabel->setMarginTop(8);
+            timeLabel->setTextColor(theme::textSecondary());
+            infoBox->addView(timeLabel);
+        }
+
+        if (title.lastPlayedTimestamp > 0) {
+            std::time_t ts = static_cast<std::time_t>(title.lastPlayedTimestamp);
+            std::tm* tm_info = std::localtime(&ts);
+            if (tm_info) {
+                char buffer[32];
+                std::strftime(buffer, sizeof(buffer), "%d/%m/%Y", tm_info);
+                
+                brls::Label* lastPlayedLabel = new brls::Label();
+                lastPlayedLabel->setText(std::string("Última partida: ") + buffer);
+                lastPlayedLabel->setFontSize(20);
+                lastPlayedLabel->setMarginTop(4);
+                lastPlayedLabel->setTextColor(theme::textSecondary());
+                infoBox->addView(lastPlayedLabel);
+            }
+        }
 
         leftColumn->addView(infoBox);
 
@@ -270,7 +302,7 @@ public:
 
         brls::Button* backupBtn = new brls::Button();
         backupBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
-        backupBtn->setText(t("Hacer Backup a SD", "Backup to SD"));
+        backupBtn->setText(t("Hacer Backup a SD", "Backup to SD", "Backup para SD"));
         backupBtn->setHeight(50);
         backupBtn->setGrow(1);
         backupBtn->setMarginRight(8);
@@ -288,13 +320,13 @@ public:
 
         brls::Button* restoreBtn = new brls::Button();
         restoreBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
-        restoreBtn->setText(t("Importar \"save\" desde SD", "Import save from SD"));
+        restoreBtn->setText(t("Importar \"save\" desde SD", "Import save from SD", "Importar \"salvar\"do SD"));
         restoreBtn->setHeight(50);
         restoreBtn->setGrow(1);
         restoreBtn->setMarginRight(8);
         restoreBtn->registerClickAction([title, statusLabel](brls::View*) {
-            brls::Dialog* dialog = new brls::Dialog(t("¿Deseas sobreescribir la partida de la consola con la copia de la SD?", "Overwrite console save with SD copy?"));
-            dialog->addButton(t("Si", "Yes"), [title, statusLabel, dialog]() {
+            brls::Dialog* dialog = new brls::Dialog(t("¿Deseas sobreescribir la partida de la consola con la copia de la SD?", "Overwrite console save with SD copy?", "Quer substituir o jogo do console pela cópia SD?"));
+            dialog->addButton(t("Si", "Yes", "Sim"), [title, statusLabel, dialog]() {
                 std::string msg;
                 if (saves::SaveManager::RestoreSave(title.applicationId, title.name, msg)) {
                     statusLabel->setText(msg);
@@ -305,7 +337,7 @@ public:
                 }
                 dialog->dismiss();
             });
-            dialog->addButton(t("No", "No"), [dialog]() {
+            dialog->addButton(t("No", "No", "Não"), [dialog]() {
                 dialog->dismiss();
             });
             dialog->open();
@@ -314,12 +346,12 @@ public:
 
         brls::Button* deleteBtn = new brls::Button();
         deleteBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
-        deleteBtn->setText(t("Eliminar backup SD", "Delete SD backup"));
+        deleteBtn->setText(t("Eliminar backup SD", "Delete SD backup", "Excluir backup SD"));
         deleteBtn->setHeight(50);
         deleteBtn->setGrow(1);
         deleteBtn->registerClickAction([title, statusLabel](brls::View*) {
-            brls::Dialog* dialog = new brls::Dialog(t("¿Deseas eliminar la copia de seguridad de la SD?", "Delete SD backup?"));
-            dialog->addButton(t("Si", "Yes"), [title, statusLabel, dialog]() {
+            brls::Dialog* dialog = new brls::Dialog(t("¿Deseas eliminar la copia de seguridad de la SD?", "Delete SD backup?", "Você deseja excluir o backup SD?"));
+            dialog->addButton(t("Si", "Yes", "Sim"), [title, statusLabel, dialog]() {
                 std::string msg;
                 if (saves::SaveManager::DeleteBackup(title.applicationId, title.name, msg)) {
                     statusLabel->setText(msg);
@@ -330,7 +362,7 @@ public:
                 }
                 dialog->dismiss();
             });
-            dialog->addButton(t("No", "No"), [dialog]() {
+            dialog->addButton(t("No", "No", "Não"), [dialog]() {
                 dialog->dismiss();
             });
             dialog->open();

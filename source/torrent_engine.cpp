@@ -6,11 +6,12 @@
 #include <filesystem>
 
 extern "C" {
-#include "torrent_core/torrent.h"
-#include "torrent_core/metainfo.h"
+#include "core/torrent.h"
+#include "core/metainfo.h"
 }
 
-#include "torrent_core/magnet_resolver.hpp"
+// Includes adicionales de la clase
+#include "app/magnet_resolver.hpp"
 
 struct ActiveDownload {
     int id;

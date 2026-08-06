@@ -128,7 +128,8 @@ bool copyFile(const std::string& source, const std::string& destination) {
     return input.good() || input.eof() ? output.good() : false;
 }
 
-bool removeTree(const std::string& path) {
+bool removeTree(const std::string& path, const std::atomic<bool>* stopping = nullptr) {
+    if (stopping && *stopping) return false;
     struct stat st {};
     if (lstat(path.c_str(), &st) != 0)
         return errno == ENOENT;
@@ -140,14 +141,19 @@ bool removeTree(const std::string& path) {
         return false;
     bool ok = true;
     while (dirent* entry = readdir(dir)) {
+        if (stopping && *stopping) {
+            ok = false;
+            break;
+        }
         if (std::strcmp(entry->d_name, ".") == 0 ||
             std::strcmp(entry->d_name, "..") == 0)
             continue;
         std::string child = path + "/" + entry->d_name;
-        if (!removeTree(child))
+        if (!removeTree(child, stopping))
             ok = false;
     }
     closedir(dir);
+    if (stopping && *stopping) return false;
     return ok && rmdir(path.c_str()) == 0;
 }
 
@@ -1755,13 +1761,30 @@ bool DownloadManager::removeLocked(const std::string& id, bool deleteData,
             saveLocked(ignored);
             return false;
         }
-        if (deleteData && !removeTree(it->dataPath)) {
-            error = "Unable to remove all downloaded data.";
-            it->status = DownloadStatus::Error;
-            it->error = error;
-            std::string ignored;
-            saveLocked(ignored);
-            return false;
+        if (deleteData) {
+            std::string dataPath = it->dataPath;
+            std::lock_guard<std::mutex> cl(cleanupMutex_);
+            cleanupThreads_.emplace_back([this, dataPath]() {
+                std::string trashPath = dataPath + ".deleted." + std::to_string(time(nullptr));
+                // Retry rename for up to 5 seconds if torrent engine is still holding files
+                bool renamed = false;
+                for (int i = 0; i < 50; i++) {
+                    if (stopping_) return;
+                    if (rename(dataPath.c_str(), trashPath.c_str()) == 0) {
+                        renamed = true;
+                        break;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+                
+                if (stopping_) return;
+                
+                if (renamed) {
+                    removeTree(trashPath, &stopping_);
+                } else {
+                    removeTree(dataPath, &stopping_);
+                }
+            });
         }
         unlink(it->metainfoPath.c_str());
         install::removeInstallJournal(installJournalPath(rootPath_, it->id));
@@ -2365,6 +2388,16 @@ void DownloadManager::shutdown() {
     condition_.notify_all();
     if (worker_.joinable())
         worker_.join();
+        
+    {
+        std::lock_guard<std::mutex> cl(cleanupMutex_);
+        for (auto& t : cleanupThreads_) {
+            if (t.joinable())
+                t.join();
+        }
+        cleanupThreads_.clear();
+    }
+        
     std::string ignored;
     save(ignored);
     workerStarted_ = false;

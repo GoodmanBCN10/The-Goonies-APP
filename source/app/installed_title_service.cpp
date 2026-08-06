@@ -104,6 +104,9 @@ bool InstalledTitleService::refresh(std::string& error) {
     std::lock_guard<std::mutex> refreshLock(refreshMutex_);
     const uint64_t startedMs = now_ms();
     error.clear();
+    
+    Result pdm_rc = pdmqryInitialize();
+    bool has_pdm = R_SUCCEEDED(pdm_rc);
     std::vector<NsApplicationRecord> records;
     constexpr s32 PageSize = 64;
     s32 offset = 0;
@@ -178,7 +181,21 @@ bool InstalledTitleService::refresh(std::string& error) {
             diagnostic_error("installed", title.titleId.c_str(),
                              "event=control_data result=0x%08x", rc);
         }
+        
+        if (has_pdm) {
+            PdmPlayStatistics stats;
+            if (R_SUCCEEDED(pdmqryQueryPlayStatisticsByApplicationId(record.application_id, false, &stats))) {
+                title.playtimeMinutes = stats.playtime / 60000000000ULL; // nanoseconds to minutes
+                title.lastPlayedTimestamp = stats.last_timestamp_user;
+                title.installTimestamp = stats.first_timestamp_user;
+            }
+        }
+        
         next.push_back(std::move(title));
+    }
+
+    if (has_pdm) {
+        pdmqryExit();
     }
 
     std::stable_sort(next.begin(), next.end(),

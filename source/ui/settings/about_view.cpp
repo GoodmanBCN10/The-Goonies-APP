@@ -160,19 +160,19 @@ AboutView::AboutView() : brls::Box(brls::Axis::COLUMN) {
     auto* title =
         addLabel(summary, "pipensx", theme::kFontTitle, theme::textPrimary());
     title->setMarginBottom(10);
-    auto* version = addLabel(summary, std::string(t("Versión ", "Version ")) + PIPENSX_VERSION,
+    auto* version = addLabel(summary, std::string(t("Versión ", "Version ", "Versão")) + PIPENSX_VERSION,
                              theme::kFontSmall, theme::accent());
     version->setMarginBottom(4);
     auto* build = addLabel(summary,
-                           std::string(t("Compilado ", "Built ")) + __DATE__ + " " + __TIME__,
+                           std::string(t("Compilado ", "Built ", "Compilado")) + __DATE__ + " " + __TIME__,
                            theme::kFontCaption, theme::textTertiary());
     build->setMarginBottom(14);
     auto* description = addLabel(
         summary,
-        t("El instalador y actualizador The Goonies OS.", "The Goonies OS installer and updater."),
+        t("El instalador y actualizador The Goonies OS.", "The Goonies OS installer and updater.", "O instalador e atualizador do sistema operacional Goonies."),
         theme::kFontSmall, theme::textSecondary());
     description->setMarginBottom(12);
-    addLabel(summary, t("Visita nuestro canal para soporte.", "Visit our channel for support."),
+    addLabel(summary, t("Visita nuestro canal para soporte.", "Visit our channel for support.", "Visite nosso canal para suporte."),
              theme::kFontCaption, theme::textSecondary());
     hero->addView(summary);
     content->addView(hero);
@@ -181,10 +181,10 @@ AboutView::AboutView() : brls::Box(brls::Axis::COLUMN) {
     qrRow->setAlignItems(brls::AlignItems::STRETCH);
     qrRow->setMarginBottom(kCardGap);
     auto* telegram = makeQrCard("Telegram", "@GoodmanBCN10",
-                                t("Canal oficial de Telegram", "Official Telegram Channel"),
+                                t("Canal oficial de Telegram", "Official Telegram Channel", "Canal oficial do Telegram"),
                                 "https://t.me/GooniesOS");
     auto* github = makeQrCard("GitHub", "GoodmanBCN10",
-                              t("Código fuente y actualizaciones", "Source code and updates"),
+                              t("Código fuente y actualizaciones", "Source code and updates", "Código fonte e atualizações"),
                               "https://github.com/GoodmanBCN10");
     github->setMarginLeft(kCardGap);
     qrRow->addView(telegram);
@@ -193,20 +193,20 @@ AboutView::AboutView() : brls::Box(brls::Axis::COLUMN) {
 
     auto* details = makeCard();
     auto* detailsTitle =
-        addLabel(details, t("Información del Proyecto", "Project info"), theme::kFontBody, theme::textPrimary());
+        addLabel(details, t("Información del Proyecto", "Project info", "Informações do projeto"), theme::kFontBody, theme::textPrimary());
     detailsTitle->setMarginBottom(12);
     auto* storage = addLabel(
         details,
-        std::string(t("Catálogo: guardado en SD.\nRegistro: ", "Catalog: cached on SD.\nLog: ")) + LogPath + t("\nAjustes: ", "\nSettings: ") + SettingsPath,
+        std::string(t("Catálogo: guardado en SD.\nRegistro: ", "Catalog: cached on SD.\nLog: ", "Catálogo: salvo em SD.\nRegistro:")) + LogPath + t("\nAjustes: ", "\nSettings: ", "\nConfigurações:") + SettingsPath,
         theme::kFontSmall, theme::textSecondary());
     storage->setMarginBottom(16);
     auto* libs = addLabel(
         details,
-        t("Compilado con libnx, Borealis, curl, libzip y otras librerias open-source.", "Built with libnx, Borealis, curl, libzip and other open-source libraries."),
+        t("Compilado con libnx, Borealis, curl, libzip y otras librerias open-source.", "Built with libnx, Borealis, curl, libzip and other open-source libraries.", "Compilado com libnx, Borealis, curl, libzip e outras bibliotecas de código aberto."),
         theme::kFontCaption, theme::textSecondary());
     libs->setMarginBottom(12);
     addLabel(details,
-             t("The Goonies Installer es un proyecto independiente y no está afiliado a Nintendo.", "The Goonies Installer is an independent project and is not affiliated with Nintendo."),
+             t("The Goonies Installer es un proyecto independiente y no está afiliado a Nintendo.", "The Goonies Installer is an independent project and is not affiliated with Nintendo.", "O Goonies Installer é um projeto independente e não é afiliado à Nintendo."),
              theme::kFontCaption, theme::textTertiary());
     content->addView(details);
 

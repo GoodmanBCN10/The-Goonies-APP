@@ -14,6 +14,9 @@ struct InstalledTitle {
     std::string name;
     std::string publisher;
     std::string iconPath;
+    uint64_t playtimeMinutes = 0;
+    uint64_t lastPlayedTimestamp = 0;
+    uint64_t installTimestamp = 0;
 };
 
 class InstalledTitleService {

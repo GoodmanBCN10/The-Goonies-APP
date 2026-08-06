@@ -18,7 +18,7 @@ InstallFileCell::InstallFileCell(InstallBrowserView* owner) : owner_(owner) {
     label_->setHorizontalAlign(brls::HorizontalAlign::LEFT);
     this->addView(label_);
     
-    this->registerAction(t("Marcar", "Mark"), brls::BUTTON_Y, [this](brls::View* view) {
+    this->registerAction(t("Marcar", "Mark", "Marcação"), brls::BUTTON_Y, [this](brls::View* view) {
         if (owner_ && cellIndex_ != (size_t)-1) {
             owner_->toggleSelection(cellIndex_);
             if (cellIndex_ < owner_->entries().size()) {
@@ -28,7 +28,7 @@ InstallFileCell::InstallFileCell(InstallBrowserView* owner) : owner_(owner) {
         return true;
     });
 
-    this->registerAction(t("Instalar Marcados", "Install Marked"), brls::BUTTON_X, [this](brls::View* view) {
+    this->registerAction(t("Instalar Marcados", "Install Marked", "Instalar marcado"), brls::BUTTON_X, [this](brls::View* view) {
         if (owner_) {
             owner_->startInstallQueue("");
         }
@@ -75,7 +75,7 @@ InstallBrowserView::InstallBrowserView(const std::string& startPath) : brls::Box
     centerBox->setGrow(1.0f);
 
     titleLabel_ = new brls::Label();
-    titleLabel_->setText(t("Explorador de Archivos", "File Browser"));
+    titleLabel_->setText(t("Explorador de Archivos", "File Browser", "Explorador de arquivos"));
     titleLabel_->setFontSize(45);
     titleLabel_->setTextColor(brls::Application::getTheme().getColor("brls/accent"));
     titleLabel_->setMarginBottom(20);
@@ -96,12 +96,12 @@ InstallBrowserView::InstallBrowserView(const std::string& startPath) : brls::Box
     // Y button action is now handled by the cell directly.
 
     // X button to install all selected
-    this->registerAction(t("Instalar Marcados", "Install Marked"), brls::BUTTON_X, [this](brls::View* view) {
+    this->registerAction(t("Instalar Marcados", "Install Marked", "Instalar marcado"), brls::BUTTON_X, [this](brls::View* view) {
         startInstallQueue("");
         return true;
     });
 
-    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View* view) {
+    this->registerAction(t("Volver", "Back", "Retornar"), brls::BUTTON_B, [](brls::View* view) {
         brls::Application::popActivity();
         return true;
     });
@@ -121,12 +121,12 @@ void InstallBrowserView::loadDirectory(const std::string& path) {
     currentPath_ = path;
 
     InstallFileEntry loadingEntry;
-    loadingEntry.name = t("Cargando contenido del USB...", "Loading USB content...");
+    loadingEntry.name = t("Cargando contenido del USB...", "Loading USB content...", "Carregando conteúdo do USB...");
     loadingEntry.directory = false;
     loadingEntry.path = "";
     entries_.push_back(loadingEntry);
     
-    titleLabel_->setText(std::string(t("Explorador - ", "Browser - ")) + path);
+    titleLabel_->setText(std::string(t("Explorador - ", "Browser - ", "Explorador -")) + path);
 
     std::vector<InstallFileEntry> newEntries;
 
@@ -214,14 +214,14 @@ void InstallBrowserView::select(size_t index) {
 
     // It's a file. If it's selected via A button, we should ask to install.
     // Wait, let's just add an action in the cell, or just pop a dialog
-    auto* dialog = new brls::Dialog(fmt::format("{} {}?", t("¿Instalar", "Install"), entry.name));
-    dialog->addButton(t("Instalar", "Install"), [this, path = entry.path]() {
+    auto* dialog = new brls::Dialog(fmt::format("{} {}?", t("¿Instalar", "Install", "Instalar"), entry.name));
+    dialog->addButton(t("Instalar", "Install", "Instalar"), [this, path = entry.path]() {
         startInstallQueue(path);
     });
-    dialog->addButton(t("Marcar/Desmarcar", "Mark/Unmark"), [this, index]() {
+    dialog->addButton(t("Marcar/Desmarcar", "Mark/Unmark", "Marcar/Desmarcar"), [this, index]() {
         toggleSelection(index);
     });
-    dialog->addButton(t("Cancelar", "Cancel"), []() {});
+    dialog->addButton(t("Cancelar", "Cancel", "Cancelar"), []() {});
     dialog->open();
 }
 
@@ -245,7 +245,7 @@ void InstallBrowserView::startInstallQueue(const std::string& singleClickedPath)
     }
 
     if (queue.empty()) {
-        brls::Application::notify(t("No hay archivos marcados para instalar.", "No marked files to install."));
+        brls::Application::notify(t("No hay archivos marcados para instalar.", "No marked files to install.", "Não há arquivos marcados para instalação."));
         return;
     }
 

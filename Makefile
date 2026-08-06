@@ -32,14 +32,14 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	TheGooniesInstaller
 BUILD		:=	build
-SOURCES		:=	source source/installer source/utils source/yati source/yati/container source/yati/nx source/yati/nx/nxdumptool source/yati/source source/minini source/libhaze source/mtp source/torrent_core source/torrent_core/vendor_dht
+SOURCES		:=	vendor/qrcodegen source source/app source/ui source/ui/catalog source/ui/downloads source/ui/forwarders source/ui/installed source/ui/mtp source/ui/saves source/ui/settings source/ui/updater source/ui/detail source/install source/platform  source/installer source/utils source/yati source/yati/container source/yati/nx source/yati/nx/nxdumptool source/yati/source source/minini source/libhaze source/mtp source/core
 DATA		:=	data
-INCLUDES	:=	include include/minini include/yati/nx/nxdumptool include/libhaze vendor/borealis/library/include vendor/borealis/library/include/borealis/extern vendor/borealis/library/include/borealis/extern/nanovg vendor/borealis/library/lib/extern/nanovg vendor/borealis/library/lib/extern/fmt/include vendor/borealis/library/lib/extern/yoga vendor/borealis/library/lib/extern/tweeny/include
+INCLUDES	:=	vendor source vendor/libnx-ext/libnx-ipcext/include vendor/libnx-ext/libnx-ext/include include include/minini include/yati/nx/nxdumptool include/libhaze vendor/borealis/library/include vendor/borealis/library/include/borealis/extern vendor/borealis/library/include/borealis/extern/nanovg vendor/borealis/library/lib/extern/nanovg vendor/borealis/library/lib/extern/fmt/include vendor/borealis/library/lib/extern/yoga vendor/borealis/library/lib/extern/tweeny/include
 ROMFS		:=	romfs
 
 APP_TITLE	:=	The Goonies Installer
 APP_AUTHOR	:=	GoodmanBCN
-APP_VERSION	:=	v2.1.4
+APP_VERSION	:=	v2.1.6
 DEFINES		:=	-DPIPENSX_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------
@@ -54,12 +54,12 @@ CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
 # We use pkg-config to get SDL2 flags
 CFLAGS	+=	$(INCLUDE) -D__SWITCH__ `pkg-config --cflags sdl2 SDL2_image SDL2_ttf`
 
-CXXFLAGS	:= $(CFLAGS) -std=gnu++23
+CXXFLAGS	:= $(CFLAGS) -std=gnu++23 -DBRLS_RESOURCES=\ 
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:=	`pkg-config --libs --static sdl2 SDL2_image SDL2_ttf SDL2_gfx` -lmbedtls -lmbedcrypto -lmbedx509 -lzstd -lusbhsfs -lntfs-3g -llwext4 -lcurl  -lz -lnx -lm
+LIBS	:=	$(CURDIR)/vendor/borealis/library/libborealis.a $(CURDIR)/vendor/borealis/library/lib/extern/fmt/libfmt.a $(CURDIR)/vendor/borealis/library/lib/extern/yoga/yoga/libyogacore.a $(CURDIR)/vendor/borealis/library/libtinyxml2.a `pkg-config --libs --static sdl2 SDL2_image SDL2_ttf SDL2_gfx` -lmbedtls -lmbedcrypto -lmbedx509 -lzstd -lusbhsfs -lntfs-3g -llwext4 -lcurl  -lz -ldeko3d -lnsext -lminiupnpc -lnx -lm
 
 #---------------------------------------------------------------------------------
 LIBDIRS	:= $(PORTLIBS) $(LIBNX)

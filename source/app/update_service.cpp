@@ -469,45 +469,6 @@ bool UpdateService::install(const ReleaseInfo& release, std::string& error) cons
         error = "Update checksum does not match GitHub release.";
         return false;
     }
-    std::ofstream markerFile(marker, std::ios::binary | std::ios::trunc);
-    markerFile << expectedChecksum << '\n';
-    markerFile.flush();
-    if (!markerFile) {
-        unlink(marker.c_str());
-        unlink(temporary.c_str());
-        error = "Unable to save staged update checksum.";
-        return false;
-    }
-    markerFile.close();
-    std::string helperError;
-    if (!copyFileContents(targetPath_, helper, helperError)) {
-        unlink(helper.c_str());
-        unlink(marker.c_str());
-        unlink(temporary.c_str());
-        error = "Unable to create update helper: " + helperError;
-        return false;
-    }
-    return true;
-}
-
-bool UpdateService::finalizeStaged(std::string& error) const {
-    const std::string temporary = stagedPath();
-    const std::string marker = temporary + ".sha256";
-    std::ifstream markerFile(marker, std::ios::binary);
-    std::ostringstream markerText;
-    markerText << markerFile.rdbuf();
-    std::string expectedChecksum;
-    if (!markerFile || !parseChecksum(markerText.str(), expectedChecksum)) {
-        error = "Staged update checksum is missing or invalid.";
-        return false;
-    }
-    std::string actualChecksum;
-    if (!checksumFile(temporary, actualChecksum, error))
-        return false;
-    if (actualChecksum != expectedChecksum) {
-        error = "Staged update checksum does not match.";
-        return false;
-    }
 
     const std::string backup = targetPath_ + ".previous";
     unlink(backup.c_str());
@@ -518,40 +479,30 @@ bool UpdateService::finalizeStaged(std::string& error) const {
         } else {
             std::string backupError;
             if (!copyFileContents(targetPath_, backup, backupError)) {
-                error = "Unable to back up current application: " +
-                        backupError;
+                error = "Unable to back up current application: " + backupError;
                 return false;
             }
             haveBackup = true;
         }
     }
-
-    std::string copyError;
-    bool installed = copyFileContents(temporary, targetPath_, copyError);
-    if (installed) {
-        std::string installedChecksum;
-        installed = checksumFile(targetPath_, installedChecksum, copyError) &&
-                    installedChecksum == expectedChecksum;
-        if (!installed && copyError.empty())
-            copyError = "installed file checksum does not match";
-    }
-    if (!installed) {
-        unlink(targetPath_.c_str());
-        if (haveBackup) {
-            if (rename(backup.c_str(), targetPath_.c_str()) != 0) {
-                std::string ignored;
-                copyFileContents(backup, targetPath_, ignored);
-            }
+    if (rename(temporary.c_str(), targetPath_.c_str()) != 0) {
+        int renameErrno = errno;
+        std::string restoreError;
+        if (haveBackup && !copyFileContents(backup, targetPath_, restoreError)) {
+            error = "Unable to replace application with update, and unable to restore from backup: " + restoreError;
+            return false;
+        } else if (haveBackup) {
+            rename(backup.c_str(), targetPath_.c_str());
         }
-        error = "Unable to finalize staged update: " + copyError;
+        error = "Unable to replace application with update: " + std::string(std::strerror(renameErrno));
         return false;
     }
-
-    if (haveBackup)
-        unlink(backup.c_str());
-    unlink(marker.c_str());
-    unlink(temporary.c_str());
+    
     return true;
+}
+
+bool UpdateService::finalizeStaged(std::string& error) const {
+    return false;
 }
 
 bool UpdateService::stagedReady() const {

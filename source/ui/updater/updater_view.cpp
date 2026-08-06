@@ -15,10 +15,7 @@ namespace fs = std::filesystem;
 
 namespace goonies::ui {
 
-static const char* t(const char* es, const char* en) {
-    return brls::Platform::APP_LOCALE_DEFAULT == brls::LOCALE_EN_US ? en : es;
-}
-
+#include "ui/common/ui_helpers.hpp"
 static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
     return size * nmemb;
@@ -54,7 +51,7 @@ static void remove_recursive(const std::string& path) {
 static void ExtractZip(const std::string& temp_zip, brls::Label* status_label, brls::Rectangle* progress_fill) {
     unzFile uf = unzOpen64(temp_zip.c_str());
     if (uf == NULL) {
-        brls::sync([status_label]() { status_label->setText(t("Error al abrir el archivo ZIP.", "Error opening ZIP file.")); });
+        brls::sync([status_label]() { status_label->setText(t("Error al abrir el archivo ZIP.", "Error opening ZIP file.", "Erro ao abrir arquivo ZIP.")); });
         return;
     }
 
@@ -94,7 +91,7 @@ static void ExtractZip(const std::string& temp_zip, brls::Label* status_label, b
         
         if (i % 20 == 0 || (i + 1) == gi.number_entry) {
             brls::sync([status_label, progress_fill, i, gi]() {
-                status_label->setText(std::string(t("Descomprimiendo: ", "Extracting: ")) + std::to_string(i + 1) + t(" de ", " of ") + std::to_string(gi.number_entry) + "...");
+                status_label->setText(std::string(t("Descomprimiendo: ", "Extracting: ", "Descompactando:")) + std::to_string(i + 1) + t(" de ", " of ", "de") + std::to_string(gi.number_entry) + "...");
                 float pct = (float)(i + 1) / (float)gi.number_entry;
                 progress_fill->setWidth(600.0f * pct);
             });
@@ -118,13 +115,13 @@ UpdaterView::UpdaterView() : brls::Box(brls::Axis::COLUMN), is_fetching(true), i
     centerBox->setGrow(1.0f);
 
     brls::Label* title = new brls::Label();
-    title->setText(t("Actualización CFW The Goonies OS", "The Goonies OS CFW Update"));
+    title->setText(t("Actualización CFW The Goonies OS", "The Goonies OS CFW Update", "Atualização do sistema operacional CFW The Goonies"));
     title->setFontSize(48);
     title->setMarginBottom(40);
     centerBox->addView(title);
 
     status_label = new brls::Label();
-    status_label->setText(t("Buscando última versión en GitHub...", "Searching for latest version on GitHub..."));
+    status_label->setText(t("Buscando última versión en GitHub...", "Searching for latest version on GitHub...", "Procurando pela versão mais recente no GitHub..."));
     status_label->setFontSize(24);
     status_label->setMarginBottom(30);
     centerBox->addView(status_label);
@@ -138,7 +135,7 @@ UpdaterView::UpdaterView() : brls::Box(brls::Axis::COLUMN), is_fetching(true), i
     checkboxes_box->setWidth(600);
     
     brls::Label* info_label = new brls::Label();
-    info_label->setText(t("Selecciona las carpetas a conservar (Nintendo y emuMMC siempre se conservan).", "Select folders to keep (Nintendo and emuMMC are always kept)."));
+    info_label->setText(t("Selecciona las carpetas a conservar (Nintendo y emuMMC siempre se conservan).", "Select folders to keep (Nintendo and emuMMC are always kept).", "Selecione as pastas a serem mantidas (Nintendo e emuMMC são sempre mantidas)."));
     info_label->setFontSize(20);
     info_label->setMarginBottom(10);
     checkboxes_box->addView(info_label);
@@ -164,7 +161,7 @@ UpdaterView::UpdaterView() : brls::Box(brls::Axis::COLUMN), is_fetching(true), i
 
     update_button = new brls::Button();
     update_button->setStyle(&brls::BUTTONSTYLE_BORDERED);
-    update_button->setText(t("Comenzar Actualización", "Start Update"));
+    update_button->setText(t("Comenzar Actualización", "Start Update", "Iniciar atualização"));
     update_button->setVisibility(brls::Visibility::VISIBLE);
     update_button->setState(brls::ButtonState::DISABLED);
     update_button->registerClickAction([this](brls::View* view) {
@@ -180,7 +177,7 @@ UpdaterView::UpdaterView() : brls::Box(brls::Axis::COLUMN), is_fetching(true), i
     this->addView(centerBox);
     this->addView(new brls::BottomBar());
 
-    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View* view) {
+    this->registerAction(t("Volver", "Back", "Retornar"), brls::BUTTON_B, [](brls::View* view) {
         brls::Application::popActivity();
         return true;
     });
@@ -228,7 +225,7 @@ void UpdaterView::FetchLatestVersion() {
                     if (url.find(".zip") != std::string::npos) {
                         download_url = url;
                         brls::sync([this]() {
-                            status_label->setText(t("Última versión encontrada. ¿Deseas instalarla?", "Latest version found. Do you want to install it?"));
+                            status_label->setText(t("Última versión encontrada. ¿Deseas instalarla?", "Latest version found. Do you want to install it?", "Última versão encontrada. Você quer instalá-lo?"));
                             
                             centerBox->removeView(update_button, false);
                             centerBox->addView(scroll_frame);
@@ -280,14 +277,14 @@ void UpdaterView::FetchLatestVersion() {
             }
             brls::sync([this, readBuffer]() {
                 if (readBuffer.find("API rate limit") != std::string::npos) {
-                    status_label->setText(t("Error: Límite de peticiones de GitHub excedido.", "Error: GitHub API rate limit exceeded."));
+                    status_label->setText(t("Error: Límite de peticiones de GitHub excedido.", "Error: GitHub API rate limit exceeded.", "Erro: limite de solicitação do GitHub excedido."));
                 } else {
-                    status_label->setText(t("Error: No se encontró un archivo .zip en el release.", "Error: No .zip file found in release."));
+                    status_label->setText(t("Error: No se encontró un archivo .zip en el release.", "Error: No .zip file found in release.", "Erro: um arquivo .zip não foi encontrado na versão."));
                 }
             });
         } else {
             brls::sync([this]() {
-                status_label->setText(t("Error de conexión al buscar actualizaciones.", "Connection error while checking for updates."));
+                status_label->setText(t("Error de conexión al buscar actualizaciones.", "Connection error while checking for updates.", "Erro de conexão ao verificar atualizações."));
             });
         }
     }
@@ -296,7 +293,7 @@ void UpdaterView::FetchLatestVersion() {
 void UpdaterView::PerformUpdate() {
     brls::async([this]() {
         brls::sync([this]() {
-            status_label->setText(t("Descargando actualización...", "Downloading update..."));
+            status_label->setText(t("Descargando actualización...", "Downloading update...", "Baixando atualização..."));
         });
 
         std::string temp_zip = "sdmc:/goonies_update.zip";
@@ -343,7 +340,7 @@ void UpdaterView::PerformUpdate() {
         }
         
         brls::sync([this]() { 
-            status_label->setText(t("Limpiando SD e instalando actualización...", "Cleaning SD and installing update...")); 
+            status_label->setText(t("Limpiando SD e instalando actualización...", "Cleaning SD and installing update...", "Limpando SD e instalando atualização...")); 
             centerBox->removeView(scroll_frame, false);
             centerBox->removeView(update_button, false);
             centerBox->addView(progress_bar_bg);
@@ -381,7 +378,7 @@ void UpdaterView::PerformUpdate() {
         // Explicitly clean legacy sysmodules/themes to prevent 010041544D530000 ams_mitm crash on new HOS firmware
         remove_recursive("sdmc:/atmosphere/contents");
 
-        brls::sync([this]() { status_label->setText(t("Extrayendo archivos...", "Extracting files...")); });
+        brls::sync([this]() { status_label->setText(t("Extrayendo archivos...", "Extracting files...", "Extraindo arquivos...")); });
         ExtractZip(temp_zip, status_label, progress_bar_fill);
 
         fs::remove(temp_zip);
@@ -391,8 +388,8 @@ void UpdaterView::PerformUpdate() {
         brls::sync([this]() {
             centerBox->removeView(progress_bar_bg, false);
             centerBox->addView(update_button);
-            status_label->setText(t("¡Actualización completada con éxito!", "Update completed successfully!"));
-            update_button->setText(t("Cerrar App", "Close App"));
+            status_label->setText(t("¡Actualización completada con éxito!", "Update completed successfully!", "Atualização concluída com sucesso!"));
+            update_button->setText(t("Cerrar App", "Close App", "Fechar aplicativo"));
             update_button->setState(brls::ButtonState::ENABLED);
             update_button->registerClickAction([](brls::View* view) {
                 brls::Application::quit();
@@ -408,7 +405,7 @@ int UpdaterView::ProgressCallback(void *clientp, curl_off_t dltotal, curl_off_t 
         UpdaterView* view = static_cast<UpdaterView*>(clientp);
         if (percent != view->last_progress_percent) {
             view->last_progress_percent = percent;
-            std::string text = std::string(t("Descargando actualización... ", "Downloading update... ")) + std::to_string(percent) + "%";
+            std::string text = std::string(t("Descargando actualización... ", "Downloading update... ", "Baixando atualização...")) + std::to_string(percent) + "%";
             brls::sync([view, text, percent]() { 
                 view->status_label->setText(text); 
                 view->progress_bar_fill->setWidth(600.0f * ((float)percent / 100.0f));

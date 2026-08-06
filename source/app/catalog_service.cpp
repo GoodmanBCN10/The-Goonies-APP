@@ -21,9 +21,9 @@ extern "C" {
 namespace pipensx {
 namespace {
 
-constexpr size_t kMaxCatalogBytes = 16 * 1024 * 1024;
-constexpr size_t kMaxCatalogEntries = 20000;
-constexpr size_t kMaxInfoDictBytes = 8 * 1024 * 1024;
+constexpr size_t kMaxCatalogBytes = 32 * 1024 * 1024;
+constexpr size_t kMaxCatalogEntries = 40000;
+constexpr size_t kMaxInfoDictBytes = 16 * 1024 * 1024;
 
 /* The live catalogue source: the Langegen switch-games repo publishes a single
    switch_games.json on GitHub's raw host. Fetched on demand by the refresh

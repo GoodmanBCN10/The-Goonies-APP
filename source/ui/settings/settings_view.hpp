@@ -43,18 +43,25 @@ public:
         auto* content = new brls::Box(brls::Axis::COLUMN);
         content->setPadding(20, 34, 20, 34);
 
-        addSection(content, t("Consola", "Console"));
+        addSection(content, t("Consola", "Console", "Console"));
         
         auto* langToggle = new brls::SelectorCell();
-        langToggle->init(t("Idioma / Language", "Language / Idioma"), {"Español", "English"},
-            brls::Platform::APP_LOCALE_DEFAULT == brls::LOCALE_EN_US ? 1 : 0,
+        int currentLangIdx = 0;
+        if (brls::Platform::APP_LOCALE_DEFAULT == brls::LOCALE_EN_US) currentLangIdx = 1;
+        else if (brls::Platform::APP_LOCALE_DEFAULT == brls::LOCALE_PT_BR) currentLangIdx = 2;
+        
+        langToggle->init(t("Idioma / Language", "Language / Idioma", "Idioma / Language"), {"Español", "English", "Português"},
+            currentLangIdx,
             [settings](int selected) {
-                brls::Platform::APP_LOCALE_DEFAULT = selected == 1 ? brls::LOCALE_EN_US : brls::LOCALE_ES;
+                if (selected == 1) brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
+                else if (selected == 2) brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_PT_BR;
+                else brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+                
                 auto vals = settings->get();
-                vals.language = (selected == 1) ? 2 : 1;
+                vals.language = selected + 1; // 1=ES, 2=EN, 3=PT
                 std::string err;
                 settings->update(vals, err);
-                brls::Application::notify(t("Reinicia la app para aplicar el idioma.", "Restart the app to apply language."));
+                brls::Application::notify(t("Reinicia la app para aplicar el idioma.", "Restart the app to apply language.", "Reinicie o aplicativo para aplicar o idioma."));
             });
         langToggle->title->setFontSize(20);
         langToggle->detail->setFontSize(20);
@@ -80,22 +87,22 @@ public:
 
         // App Version
         auto* appVerLabel = new brls::Label();
-        appVerLabel->setText(std::string(t("Versión de la App: ", "App Version: ")) + PIPENSX_VERSION);
+        appVerLabel->setText(std::string(t("Versión de la App: ", "App Version: ", "Versão do aplicativo:")) + PIPENSX_VERSION);
         appVerLabel->setFontSize(20);
         appVerLabel->setMarginTop(8);
         appVerLabel->setMarginBottom(12);
         content->addView(appVerLabel);
 
-        addSection(content, t("Almacenamiento (microSD)", "Storage (microSD)"));
+        addSection(content, t("Almacenamiento (microSD)", "Storage (microSD)", "Armazenamento (microSD)"));
 
         std::error_code ec;
         auto spaceInfo = std::filesystem::space("sdmc:/", ec);
-        std::string sdStr = t("No se pudo leer la SD", "Could not read SD");
+        std::string sdStr = t("No se pudo leer la SD", "Could not read SD", "Não foi possível ler SD");
         if (!ec) {
             double totalGB = static_cast<double>(spaceInfo.capacity) / (1024.0 * 1024.0 * 1024.0);
             double freeGB = static_cast<double>(spaceInfo.available) / (1024.0 * 1024.0 * 1024.0);
             char sd_buf[256];
-            snprintf(sd_buf, sizeof(sd_buf), t("Capacidad: %.2f GB / Libre: %.2f GB", "Capacity: %.2f GB / Free: %.2f GB"), totalGB, freeGB);
+            snprintf(sd_buf, sizeof(sd_buf), t("Capacidad: %.2f GB / Libre: %.2f GB", "Capacity: %.2f GB / Free: %.2f GB", "Capacidade: %,2f GB / Gratuito: %,2f GB"), totalGB, freeGB);
             sdStr = sd_buf;
         }
         
@@ -105,9 +112,9 @@ public:
         sdLabel->setMarginBottom(12);
         content->addView(sdLabel);
 
-        addSection(content, t("Mantenimiento", "Maintenance"));
+        addSection(content, t("Mantenimiento", "Maintenance", "Manutenção"));
 
-        content->addView(actionCell(t("Limpiar archivos huérfanos", "Clean orphaned files"), "",
+        content->addView(actionCell(t("Limpiar archivos huérfanos", "Clean orphaned files", "Limpe arquivos órfãos"), "",
             [] { 
                 try {
                     u64 freedBytes = 0;
@@ -117,27 +124,27 @@ public:
                     if (CleanupHelper::cleanSystem(errorOut, freedBytes, deletedTickets)) {
                         double sizeMB = freedBytes / (1024.0 * 1024.0);
                         char msg[256];
-                        snprintf(msg, sizeof(msg), t("Limpieza completada! Eliminados %d tickets huérfanos y liberados %.2f MB.", "Cleanup completed! Deleted %d orphan tickets and freed %.2f MB."), deletedTickets, sizeMB);
+                        snprintf(msg, sizeof(msg), t("Limpieza completada! Eliminados %d tickets huérfanos y liberados %.2f MB.", "Cleanup completed! Deleted %d orphan tickets and freed %.2f MB.", "Limpeza concluída! %d tickets órfãos removidos e %,2f MB liberados."), deletedTickets, sizeMB);
                         brls::Application::notify(msg);
                     } else {
                         brls::Application::notify("Error: " + errorOut);
                     }
                 } catch (...) {
-                    brls::Application::notify(t("Error al limpiar archivos.", "Error cleaning files."));
+                    brls::Application::notify(t("Error al limpiar archivos.", "Error cleaning files.", "Erro ao limpar arquivos."));
                 }
             }));
 
-        addSection(content, t("Conectividad", "Connectivity"));
+        addSection(content, t("Conectividad", "Connectivity", "Conectividade"));
 
         // Explorar microSD Cell
-        content->addView(actionCell(t("Explorar microSD (Conexión MTP)", "Explore microSD (MTP Connection)"),
-            t("Inicia la conexión MTP para transferir archivos desde tu PC.", "Starts MTP connection to transfer files from your PC."),
+        content->addView(actionCell(t("Explorar microSD (Conexión MTP)", "Explore microSD (MTP Connection)", "Explorar microSD (conexão MTP)"),
+            t("Inicia la conexión MTP para transferir archivos desde tu PC.", "Starts MTP connection to transfer files from your PC.", "Inicie a conexão MTP para transferir arquivos do seu PC."),
             [] {
                 brls::Application::pushActivity(new brls::Activity(new goonies::ui::MTPExplorerView()));
             }));
 
         auto* providerToggle = new brls::SelectorCell();
-        providerToggle->init(t("Motor de Descarga", "Download Engine"), {"P2P Torrent", "Real-Debrid (Alta Velocidad)"},
+        providerToggle->init(t("Motor de Descarga", "Download Engine", "Mecanismo de download"), {"P2P Torrent", "Real-Debrid (Alta Velocidad)"},
             settings_->get().downloadProvider,
             [this](int selected) {
                 auto vals = settings_->get();
@@ -150,7 +157,7 @@ public:
                 }
                 
                 if (selected == 1) {
-                    brls::Application::notify(t("Has activado Real-Debrid.", "Real-Debrid activated."));
+                    brls::Application::notify(t("Has activado Real-Debrid.", "Real-Debrid activated.", "Você ativou o Real-Debrid."));
                 }
             });
         providerToggle->title->setFontSize(20);
@@ -161,15 +168,15 @@ public:
         RealDebridProvider tempProvider;
         bool isLinked = tempProvider.IsAuthenticated();
         
-        std::string rdTitle = isLinked ? t("Cerrar sesión en Real-Debrid", "Log out of Real-Debrid") : t("Vincular cuenta de Real-Debrid", "Link Real-Debrid account");
-        std::string rdDetail = isLinked ? t("Tu cuenta ya está vinculada. Toca para cerrar sesión.", "Your account is linked. Tap to log out.") : t("Inicia sesión en Real-Debrid para descargas de alta velocidad.", "Log in to Real-Debrid for high-speed downloads.");
+        std::string rdTitle = isLinked ? t("Cerrar sesión en Real-Debrid", "Log out of Real-Debrid", "Sair do Real-Debrid") : t("Vincular cuenta de Real-Debrid", "Link Real-Debrid account", "Vincular conta Real-Debrid");
+        std::string rdDetail = isLinked ? t("Tu cuenta ya está vinculada. Toca para cerrar sesión.", "Your account is linked. Tap to log out.", "Sua conta agora está vinculada. Toque para sair.") : t("Inicia sesión en Real-Debrid para descargas de alta velocidad.", "Log in to Real-Debrid for high-speed downloads.", "Faça login no Real-Debrid para downloads de alta velocidade.");
         
         content->addView(actionCell(rdTitle, rdDetail,
             [isLinked] {
                 if (isLinked) {
                     RealDebridProvider p;
                     p.Logout();
-                    brls::Application::notify(t("Sesión de Real-Debrid cerrada.", "Real-Debrid session closed."));
+                    brls::Application::notify(t("Sesión de Real-Debrid cerrada.", "Real-Debrid session closed.", "Sessão Real-Debrid encerrada."));
                     brls::Application::popActivity(); // Pop to force refresh
                 } else {
                     ShowRealDebridAuthDialog();
@@ -177,7 +184,7 @@ public:
             }));
 
         auto* usbToggle = new brls::SelectorCell();
-        usbToggle->init(t("Modo USB", "USB Mode"), {"USB 2.0 (Estable)", "USB 3.0 (Rápido)"},
+        usbToggle->init(t("Modo USB", "USB Mode", "Modo USB"), {"USB 2.0 (Estable)", "USB 3.0 (Rápido)"},
             settings_->get().enableUsb30 ? 1 : 0,
             [this](int selected) {
                 auto vals = settings_->get();
@@ -190,9 +197,9 @@ public:
 #endif
                 
                 if (selected == 1) {
-                    brls::Application::notify(t("USB 3.0 activado. Puede causar interferencias con mandos Bluetooth.", "USB 3.0 activated. May cause Bluetooth controller interference."));
+                    brls::Application::notify(t("USB 3.0 activado. Puede causar interferencias con mandos Bluetooth.", "USB 3.0 activated. May cause Bluetooth controller interference.", "USB 3.0 habilitado. Pode causar interferência nos controles do Bluetooth."));
                 } else {
-                    brls::Application::notify(t("USB 2.0 activado (Estable).", "USB 2.0 activated (Stable)."));
+                    brls::Application::notify(t("USB 2.0 activado (Estable).", "USB 2.0 activated (Stable).", "USB 2.0 ativado (estável)."));
                 }
             });
         usbToggle->title->setFontSize(20);
@@ -207,7 +214,7 @@ public:
         addView(new brls::BottomBar());
         
         // Add bottom bar action
-        this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View*) { 
+        this->registerAction(t("Volver", "Back", "Retornar"), brls::BUTTON_B, [](brls::View*) { 
             brls::Application::popActivity();
             return true; 
         });

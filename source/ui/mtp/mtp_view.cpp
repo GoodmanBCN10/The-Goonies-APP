@@ -40,7 +40,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
 
     // Header Title
     brls::Label* title = new brls::Label();
-    title->setText(t("Instalar por MTP", "MTP Installer"));
+    title->setText(t("Instalar por MTP", "MTP Installer", "Instalar via MTP"));
     title->setFontSize(45);
     title->setTextColor(brls::Application::getTheme().getColor("brls/accent")); // Goonies Yellow
     title->setMarginBottom(20);
@@ -56,7 +56,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
     activeTopRow->setMarginBottom(10);
     
     activeFilenameLabel_ = new brls::Label();
-    activeFilenameLabel_->setText(t("Esperando conexión o arrastra juegos...", "Waiting for connection or drag games..."));
+    activeFilenameLabel_->setText(t("Esperando conexión o arrastra juegos...", "Waiting for connection or drag games...", "Aguardando conexão ou arrastando jogos..."));
     activeFilenameLabel_->setFontSize(22);
     activeFilenameLabel_->setTextColor(nvgRGB(255, 255, 255));
     activeTopRow->addView(activeFilenameLabel_);
@@ -89,7 +89,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
     historyBox_->setGrow(1.0f); // Fill remaining space
     
     historyTitleLabel_ = new brls::Label();
-    historyTitleLabel_->setText(t("Archivos recibidos en esta sesión (0)", "Files received in this session (0)"));
+    historyTitleLabel_->setText(t("Archivos recibidos en esta sesión (0)", "Files received in this session (0)", "Arquivos recebidos nesta sessão (0)"));
     historyTitleLabel_->setFontSize(22);
     historyTitleLabel_->setTextColor(nvgRGB(255, 255, 255));
     historyTitleLabel_->setMarginBottom(20);
@@ -156,7 +156,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
                     sizeL->setMarginRight(30);
                     
                     activeHistoryStatusLabel_ = new brls::Label();
-                    activeHistoryStatusLabel_->setText(t("Instalando...", "Installing..."));
+                    activeHistoryStatusLabel_->setText(t("Instalando...", "Installing...", "Instalando..."));
                     activeHistoryStatusLabel_->setFontSize(18);
                     activeHistoryStatusLabel_->setTextColor(brls::Application::getTheme().getColor("brls/accent")); // Yellow
                     
@@ -170,7 +170,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
                     historyList_->addView(row, 0);
                     
                     sessionFileCount_++;
-                    historyTitleLabel_->setText(fmt::format("{} ({})", t("Archivos recibidos en esta sesión", "Files received in this session"), sessionFileCount_));
+                    historyTitleLabel_->setText(fmt::format("{} ({})", t("Archivos recibidos en esta sesión", "Files received in this session", "Arquivos recebidos nesta sessão"), sessionFileCount_));
                 });
                 
                 return g_mtpInstallerCore->StartInstallation(filename);
@@ -187,10 +187,10 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
                 brls::sync([this]() {
                     if (activeHistoryStatusLabel_) {
                         if (g_mtpInstallerCore->HasError()) {
-                            activeHistoryStatusLabel_->setText(t("Error", "Error"));
+                            activeHistoryStatusLabel_->setText(t("Error", "Error", "Erro"));
                             activeHistoryStatusLabel_->setTextColor(nvgRGB(255, 50, 50));
                         } else {
-                            activeHistoryStatusLabel_->setText(t("Completado", "Completed"));
+                            activeHistoryStatusLabel_->setText(t("Completado", "Completed", "Preenchido"));
                             activeHistoryStatusLabel_->setTextColor(nvgRGB(50, 255, 50));
                         }
                         activeHistoryStatusLabel_ = nullptr;
@@ -200,7 +200,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
         }
     );
 
-    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [this](brls::View* view) {
+    this->registerAction(t("Volver", "Back", "Retornar"), brls::BUTTON_B, [this](brls::View* view) {
         if (g_mtpInstallerCore && !g_mtpInstallerCore->IsFinished() && !g_mtpInstallerCore->HasError()) {
             g_mtpInstallerCore->AbortInstallation();
         }
@@ -299,7 +299,7 @@ MTPExplorerView::MTPExplorerView() : brls::Box(brls::Axis::COLUMN) {
     centerBox->setGrow(1.0f);
 
     titleLabel_ = new brls::Label();
-    titleLabel_->setText(t("EXPLORAR MICROSD", "EXPLORE MICROSD"));
+    titleLabel_->setText(t("EXPLORAR MICROSD", "EXPLORE MICROSD", "EXPLORAR MICROSD"));
     titleLabel_->setFontSize(54);
     titleLabel_->setTextColor(brls::Application::getTheme().getColor("brls/accent")); // Goonies Yellow
     titleLabel_->setMarginBottom(40);
@@ -307,7 +307,7 @@ MTPExplorerView::MTPExplorerView() : brls::Box(brls::Axis::COLUMN) {
 
     statusLabel_ = new brls::Label();
     lastConnected_ = MTP::IsConnected();
-    statusLabel_->setText(lastConnected_ ? t("Mira las carpetas en tu PC", "Look at the folders on your PC") : t("Conecta el cable USB a tu PC", "Connect the USB cable to your PC"));
+    statusLabel_->setText(lastConnected_ ? t("Mira las carpetas en tu PC", "Look at the folders on your PC", "Veja pastas no seu PC") : t("Conecta el cable USB a tu PC", "Connect the USB cable to your PC", "Conecte o cabo USB ao seu PC"));
     statusLabel_->setFontSize(36);
     statusLabel_->setTextColor(lastConnected_ ? brls::Application::getTheme().getColor("brls/accent") : nvgRGB(255, 255, 255));
     statusLabel_->setMarginBottom(20);
@@ -316,7 +316,7 @@ MTPExplorerView::MTPExplorerView() : brls::Box(brls::Axis::COLUMN) {
     this->addView(centerBox);
     this->addView(new brls::BottomBar());
 
-    this->registerAction(t("Volver", "Back"), brls::BUTTON_B, [](brls::View*) {
+    this->registerAction(t("Volver", "Back", "Retornar"), brls::BUTTON_B, [](brls::View*) {
         brls::Application::popActivity();
         return true;
     }, false, false, brls::SOUND_BACK);
@@ -334,7 +334,7 @@ void MTPExplorerView::draw(NVGcontext* vg, float x, float y, float width, float 
         bool connected = MTP::IsConnected();
         if (connected != lastConnected_) {
             lastConnected_ = connected;
-            statusLabel_->setText(connected ? t("Mira las carpetas en tu PC", "Look at the folders on your PC") : t("Conecta el cable USB a tu PC", "Connect the USB cable to your PC"));
+            statusLabel_->setText(connected ? t("Mira las carpetas en tu PC", "Look at the folders on your PC", "Veja pastas no seu PC") : t("Conecta el cable USB a tu PC", "Connect the USB cable to your PC", "Conecte o cabo USB ao seu PC"));
             statusLabel_->setTextColor(connected ? brls::Application::getTheme().getColor("brls/accent") : nvgRGB(255, 255, 255));
         }
     }

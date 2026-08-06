@@ -28,6 +28,7 @@ extern "C" {
 #include "ui/common/ui_helpers.hpp"
 #include "app/update_service.hpp"
 #include "ui/theme.hpp"
+#include <borealis/views/progress_spinner.hpp>
 
 using pipensx::AppSettings;
 using pipensx::CatalogService;
@@ -38,35 +39,13 @@ using pipensx::HomebrewService;
 using namespace pipensx::ui;
 
 int main(int argc, char* argv[]) {
-    // Check if we are running as update helper first before doing heavy initialization
     std::string nroPath = "sdmc:/switch/thegoonies/TheGooniesInstaller.nro";
-    std::vector<std::string> args;
     if (argc > 0 && argv != nullptr) {
         if (argv[0] != nullptr && std::string(argv[0]).find("sdmc:/") == 0) {
             nroPath = argv[0];
         }
-        for (int i = 0; i < argc; ++i) {
-            if (argv[i] != nullptr) {
-                args.push_back(argv[i]);
-            }
-        }
     }
     pipensx::UpdateService updater(nroPath);
-    if (updater.isStagedLaunch(args)) {
-        std::string err;
-        if (updater.finalizeStaged(err)) {
-            envSetNextLoad(updater.targetPath().c_str(), updater.targetPath().c_str());
-        } else {
-            std::FILE* errLog = std::fopen("sdmc:/switch/thegoonies/update_error.log", "w");
-            if (errLog) {
-                std::fprintf(errLog, "Update finalize failed: %s\n", err.c_str());
-                std::fclose(errLog);
-            }
-        }
-        return 0;
-    }
-
-    // Clean up any leftover updater files from a previous update
     updater.discardStaged();
 
     // Check if launched in Library Applet Mode (Album mode without Title Override)
@@ -150,14 +129,30 @@ int main(int argc, char* argv[]) {
     try {
         brls::Logger::setLogLevel(brls::LogLevel::LOG_DEBUG);
 
-        // 1. Initialize Borealis Window IMMEDIATELY (Instant startup under 1 second)
+        // 1. Initialize Settings and Language IMMEDIATELY
+        const char* BundledCatalogPath = "romfs:/catalog/switch_games.json";
+        AppSettings settings("sdmc:/switch/thegoonies/settings.json", BundledCatalogPath);
+        std::string loadError;
+        settings.load(loadError);
+        writeLog("settings.load OK");
+        
+        if (settings.get().language == 1) {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+        } else if (settings.get().language == 2) {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
+        } else if (settings.get().language == 3) {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_PT_BR;
+        } else {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES; // Default to ES initially
+        }
+        
+        // 2. Initialize Borealis Window IMMEDIATELY (Instant startup under 1 second)
         appletSetFocusHandlingMode(AppletFocusHandlingMode_NoSuspend);
         NWindow* win = nwindowGetDefault();
         if (win) {
             nwindowSetDimensions(win, 1280, 720);
         }
 
-        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
         if (!brls::Application::init()) {
             throw std::runtime_error("Unable to init Borealis application");
         }
@@ -170,7 +165,7 @@ int main(int argc, char* argv[]) {
         brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);
         writeLog("createWindow OK");
 
-        // 2. Initialize Sockets & System Services in background after window is visible
+        // 3. Initialize Sockets & System Services in background after window is visible
         if (R_SUCCEEDED(socketInitializeDefault())) {
             socketReady = true;
             writeLog("socketInitialize OK");
@@ -225,30 +220,12 @@ int main(int argc, char* argv[]) {
         setsysReady = R_SUCCEEDED(rc);
         if (setsysReady) {
             writeLog("setsysInitialize OK");
-        }
-
-        // Init Pipensx Services
-        const char* BundledCatalogPath = "romfs:/catalog/switch_games.json";
-        AppSettings settings("sdmc:/switch/thegoonies/settings.json", BundledCatalogPath);
-        std::string loadError;
-        settings.load(loadError);
-        writeLog("settings.load OK");
-        
-        if (setsysReady) {
             setsysSetUsb30EnableFlag(settings.get().enableUsb30);
             if (settings.get().enableUsb30) {
                 writeLog("USB set to 3.0");
             } else {
                 writeLog("USB forced to 2.0");
             }
-        }
-        
-        if (settings.get().language == 1) {
-            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
-        } else if (settings.get().language == 2) {
-            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
-        } else {
-            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES; // Default to ES initially
         }
         
         DownloadManager download_manager("sdmc:/switch/thegoonies");
@@ -258,43 +235,91 @@ int main(int argc, char* argv[]) {
         HomebrewService homebrew_service;
         writeLog("Services constructed OK");
 
-        // Push the activity before loading heavy services so we can pump the UI loop
-        goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(&download_manager, &catalog_service, &metadata_service, &installed_service, &settings, &homebrew_service, &updater);
-        brls::Application::pushActivity(new brls::Activity(rootFrame));
-        writeLog("pushActivity OK");
+        // Push a loading screen to prevent black screen
+        brls::Box* loadingBox = new brls::Box(brls::Axis::COLUMN);
+        loadingBox->setAlignItems(brls::AlignItems::CENTER);
+        loadingBox->setJustifyContent(brls::JustifyContent::CENTER);
         
-        // Show language selection dialog on first run
-        if (settings.get().language == 0) {
-            brls::Dialog* langDialog = new brls::Dialog("Selecciona tu idioma / Select your language");
-            langDialog->addButton("Español", [&settings]() {
-                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
-                auto vals = settings.get();
-                vals.language = 1;
-                std::string err;
-                settings.update(vals, err);
-                brls::Application::notify("Idioma guardado: Español. Reinicia la app para aplicar.");
+        brls::Label* loadingLabel = new brls::Label();
+        loadingLabel->setText(t("Iniciando The Goonies APP...\nCargando catálogo y metadatos...", 
+                                "Starting The Goonies APP...\nLoading catalog and metadata...", 
+                                "Iniciando The Goonies APP...\nCarregando catálogo e metadados..."));
+        loadingLabel->setFontSize(24);
+        loadingLabel->setHorizontalAlign(brls::HorizontalAlign::CENTER);
+        loadingLabel->setMarginBottom(40);
+        
+        brls::ProgressSpinner* spinner = new brls::ProgressSpinner();
+        
+        loadingBox->addView(loadingLabel);
+        loadingBox->addView(spinner);
+        
+        brls::Application::pushActivity(new brls::Activity(loadingBox));
+        writeLog("pushActivity LoadingScreen OK");
+
+        std::thread initThread([&]() {
+            std::string err;
+            {
+                std::lock_guard<std::mutex> lock(logMutex);
+                logOut << "Loading catalog_service..." << std::endl; logOut.flush();
+            }
+            catalog_service.load(err);
+
+            {
+                std::lock_guard<std::mutex> lock(logMutex);
+                logOut << "Loading metadata_service..." << std::endl; logOut.flush();
+            }
+            metadata_service.load(err);
+
+            {
+                std::lock_guard<std::mutex> lock(logMutex);
+                logOut << "Refreshing installed_service..." << std::endl; logOut.flush();
+            }
+            installed_service.refresh(err);
+            
+            {
+                std::lock_guard<std::mutex> lock(logMutex);
+                logOut << "Services initialization COMPLETE." << std::endl; logOut.flush();
+            }
+
+            brls::sync([&]() {
+                brls::Application::popActivity(); // Pop LoadingScreen
+                
+                goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(
+                    &download_manager, &catalog_service, &metadata_service, 
+                    &installed_service, &settings, &homebrew_service, &updater);
+                brls::Application::pushActivity(new brls::Activity(rootFrame));
+                
+                // Show language selection dialog on first run
+                if (settings.get().language == 0) {
+                    brls::Dialog* langDialog = new brls::Dialog("Selecciona tu idioma / Select your language");
+                    langDialog->addButton("Español", [&settings]() {
+                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+                        auto vals = settings.get();
+                        vals.language = 1;
+                        std::string updateErr;
+                        settings.update(vals, updateErr);
+                        brls::Application::notify("Idioma guardado: Español. Reinicia la app para aplicar.");
+                    });
+                    langDialog->addButton("English", [&settings]() {
+                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
+                        auto vals = settings.get();
+                        vals.language = 2;
+                        std::string updateErr;
+                        settings.update(vals, updateErr);
+                        brls::Application::notify("Language saved: English. Restart app to apply.");
+                    });
+                    langDialog->addButton("Português", [&settings]() {
+                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_PT_BR;
+                        auto vals = settings.get();
+                        vals.language = 3;
+                        std::string updateErr;
+                        settings.update(vals, updateErr);
+                        brls::Application::notify("Idioma guardado: Português. Reinicie o aplicativo para aplicar.");
+                    });
+                    langDialog->open();
+                }
             });
-            langDialog->addButton("English", [&settings]() {
-                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
-                auto vals = settings.get();
-                vals.language = 2;
-                std::string err;
-                settings.update(vals, err);
-                brls::Application::notify("Language saved: English. Restart app to apply.");
-            });
-            langDialog->open();
-        }
-
-        std::string err;
-        writeLog("Loading catalog_service...");
-        catalog_service.load(err);
-
-        writeLog("Loading metadata_service...");
-        metadata_service.load(err);
-
-        writeLog("Refreshing installed_service...");
-        installed_service.refresh(err);
-        writeLog("Services initialization COMPLETE.");
+        });
 
         // Run the main loop
         int frameCount = 0;
@@ -305,6 +330,10 @@ int main(int argc, char* argv[]) {
             }
         }
         writeLog("Main loop EXITED. Application closing normally.");
+
+        if (initThread.joinable()) {
+            initThread.join();
+        }
 
         // Gracefully shutdown background threads before local services are destroyed
         // MTP::Exit();

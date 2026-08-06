@@ -18,7 +18,10 @@ extern "C" {
 #include "platform/switch_crashlog.h"
 #include "ui/theme.hpp"
 
-inline const char* t(const char* es, const char* en) {
+inline const char* t(const char* es, const char* en, const char* pt = nullptr) {
+    if (brls::Platform::APP_LOCALE_DEFAULT == brls::LOCALE_PT_BR) {
+        return pt ? pt : es;
+    }
     return brls::Platform::APP_LOCALE_DEFAULT == brls::LOCALE_EN_US ? en : es;
 }
 
