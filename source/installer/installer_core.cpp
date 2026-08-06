@@ -1,12 +1,8 @@
-#include "installer/installer_core.hpp"
+﻿#include "installer/installer_core.hpp"
 #include <stdio.h>
 #include <cstring>
 #include <algorithm>
-#include <mutex>
 #include <stdarg.h>
-
-#include "yati/yati.hpp"
-#include <switch.h>
 
 namespace Installer {
 
@@ -22,153 +18,105 @@ void Core::SafePrintf(const char* format, ...) {
 }
 
 Core::Core() {
-    m_installer_thread = std::thread(&Core::InstallerThreadEntry, this);
 }
 
 Core::~Core() {
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        m_exit_requested = true;
-        m_cv.notify_all();
-    }
-    if (m_installer_thread.joinable()) {
-        m_installer_thread.join();
-    }
+    AbortInstallation();
 }
 
 bool Core::StartInstallation(const std::string& filename) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_file_queue.push_back(filename);
+    m_current_filename = filename;
     m_mtp_bytes_written = 0;
+    m_freed_bytes = 0;
     m_all_finished = false;
     m_error = false;
     m_last_error_code = 0;
+    
+    pipensx::install::InstallStorageTarget target = pipensx::install::InstallStorageTarget::SdCard;
+    m_backend = pipensx::install::createInstallBackend("sdmc:/switch/thegoonies", target);
+    
+    if (!m_backend->beginPackage("local_install", filename)) {
+        m_error = true;
+        m_last_error_code = 1;
+        SafePrintf("Installer Core: Failed to beginPackage\n");
+        return false;
+    }
+
+    pipensx::install::PackageCallbacks cb;
+    cb.beginFile = [this](const std::string& name, uint64_t size) {
+        return m_backend->beginFile(name, size);
+    };
+    cb.setFileSize = [this](uint64_t size) {
+        return m_backend->setFileSize(size);
+    };
+    cb.writeFile = [this](const uint8_t* data, size_t size) {
+        return m_backend->writeFile(data, size);
+    };
+    cb.endFile = [this]() {
+        return m_backend->endFile();
+    };
+    cb.skipFile = [this](const std::string& name) {
+        return m_backend->shouldSkipFile(name);
+    };
+
+    bool compressed = (filename.size() >= 4 && filename.substr(filename.size() - 4) == ".nsz");
+    m_stream = std::make_unique<pipensx::install::PackageStream>(compressed, cb, "local_install");
+
     SafePrintf("Installer Core: Queued for %s\n", filename.c_str());
-    m_cv.notify_all();
     return true;
 }
 
 bool Core::WriteData(const void* data, size_t size) {
-    std::unique_lock<std::mutex> lock(m_mutex);
-    
-    // Wait if queue is getting too big (prevent OOM)
-    const u64 MAX_QUEUE_SIZE = 32 * 1024 * 1024; // 32 MB
-    m_cv.wait(lock, [this, size]() {
-        return m_error || m_exit_requested || (m_data_queue_size + size <= MAX_QUEUE_SIZE);
-    });
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_error || !m_stream) return false;
 
-    if (m_error || m_exit_requested) return false;
+    if (!m_stream->write(static_cast<const uint8_t*>(data), size)) {
+        m_error = true;
+        m_last_error_code = 2;
+        SafePrintf("Installer Core: stream.write failed: %s\n", m_stream->error().c_str());
+        return false;
+    }
 
-
-
-    const u8* u8_data = static_cast<const u8*>(data);
-    m_data_queue.push(std::vector<u8>(u8_data, u8_data + size));
-    m_data_queue_size += size;
     m_mtp_bytes_written += size;
-    m_cv.notify_all();
     return true;
 }
 
 void Core::FinishInstallation() {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_data_queue.push(std::vector<u8>()); // EOF
+    if (m_error || !m_stream) return;
+
+    if (!m_stream->finish()) {
+        m_error = true;
+        m_last_error_code = 3;
+        SafePrintf("Installer Core: stream.finish failed: %s\n", m_stream->error().c_str());
+        return;
+    }
+
+    bool alreadyInstalled = false;
+    if (!m_backend->commitPackage(alreadyInstalled)) {
+        m_error = true;
+        m_last_error_code = 4;
+        SafePrintf("Installer Core: commitPackage failed: %s\n", m_backend->error().c_str());
+        return;
+    }
+
+    m_finished_files.push_back(m_current_filename);
+    m_all_finished = true;
+    m_stream.reset();
+    m_backend.reset();
     SafePrintf("Installer Core: Finished writing to MTP.\n");
-    m_cv.notify_all();
 }
 
 void Core::AbortInstallation() {
     std::lock_guard<std::mutex> lock(m_mutex);
+    if (!m_error && !m_all_finished && m_backend) {
+        m_backend->rollbackPackage();
+    }
     m_error = true;
-    m_last_error_code = MAKERESULT(Module_Libnx, LibnxError_ShouldNotHappen);
-    m_cv.notify_all();
-}
-
-Result Core::MtpSource::ReadChunk(void* buf, s64 size, u64* bytes_read) {
-    if (bytes_read) *bytes_read = 0;
-    
-    if (m_current_chunk_pos >= m_current_chunk.size()) {
-        std::unique_lock<std::mutex> lock(m_core->m_mutex);
-        
-        m_core->m_cv.wait(lock, [this]() {
-            return m_core->m_error || m_core->m_exit_requested || !m_core->m_data_queue.empty();
-        });
-        
-        if (m_core->m_error || m_core->m_exit_requested) return MAKERESULT(Module_Libnx, LibnxError_ShouldNotHappen);
-        
-        m_current_chunk = std::move(m_core->m_data_queue.front());
-        m_core->m_data_queue.pop();
-        m_core->m_data_queue_size -= m_current_chunk.size();
-        m_current_chunk_pos = 0;
-        
-        m_core->m_cv.notify_all();
-        
-        if (m_current_chunk.empty()) {
-            return 0; // EOF
-        }
-    }
-    
-    size_t to_read = std::min((size_t)size, m_current_chunk.size() - m_current_chunk_pos);
-    std::memcpy(buf, m_current_chunk.data() + m_current_chunk_pos, to_read);
-    m_current_chunk_pos += to_read;
-    
-    if (bytes_read) *bytes_read = to_read;
-    return 0;
-}
-
-void Core::InstallerThreadEntry() {
-    SafePrintf("InstallerThreadEntry started\n");
-    while (!m_exit_requested) {
-        std::string filename;
-        {
-            std::unique_lock<std::mutex> lock(m_mutex);
-            m_cv.wait(lock, [this]() {
-                return m_exit_requested || !m_file_queue.empty();
-            });
-            if (m_exit_requested) break;
-            
-            filename = m_file_queue.front();
-            m_file_queue.erase(m_file_queue.begin());
-        }
-        
-        SafePrintf("InstallerThreadEntry popping file: %s\n", filename.c_str());
-        
-        GooniesInstaller::yati::ConfigOverride config;
-        config.sd_card_install = true;
-        config.lower_system_version = false;
-        config.lower_master_key = true;
-        config.convert_to_standard_crypto = true;
-        config.convert_to_common_ticket = true;
-        
-        MtpSource source(this);
-        SafePrintf("InstallerThreadEntry calling InstallFromSource\n");
-        Result rc = GooniesInstaller::yati::InstallFromSource(&source, fs::FsPath{filename.c_str()}, config, &m_freed_bytes);
-        SafePrintf("InstallerThreadEntry InstallFromSource finished with rc: 0x%08x\n", rc);
-        
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (R_FAILED(rc)) {
-            SafePrintf("InstallerThreadEntry Error: 0x%08x\n", rc);
-            m_error = true;
-            m_last_error_code = rc;
-        } else {
-            SafePrintf("InstallerThreadEntry Success!\n");
-        }
-        
-        m_finished_files.push_back(filename);
-        if (m_file_queue.empty()) {
-            m_all_finished = true;
-        }
-        
-        // Drain any remaining chunks for this file to avoid desync
-        while (!m_data_queue.empty()) {
-            bool is_eof = m_data_queue.front().empty();
-            m_data_queue_size -= m_data_queue.front().size();
-            m_data_queue.pop();
-            if (is_eof) break;
-        }
-        m_cv.notify_all();
-        
-        if (m_error) break;
-    }
+    m_last_error_code = 100;
+    m_stream.reset();
+    m_backend.reset();
 }
 
 } // namespace Installer

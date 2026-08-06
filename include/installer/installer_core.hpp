@@ -2,11 +2,10 @@
 #include <switch.h>
 #include <string>
 #include <vector>
-#include <queue>
-#include <thread>
 #include <mutex>
-#include <condition_variable>
-#include "yati/source/stream.hpp"
+#include <memory>
+#include "install/install_backend.hpp"
+#include "install/package_stream.hpp"
 
 namespace Installer {
 
@@ -39,11 +38,6 @@ public:
 
 private:
     std::mutex m_mutex;
-    std::condition_variable m_cv;
-    
-    std::vector<std::string> m_file_queue;
-    std::queue<std::vector<u8>> m_data_queue; // empty vector = EOF
-    u64 m_data_queue_size = 0;
     
     bool m_all_finished = true;
     bool m_error = false;
@@ -51,23 +45,12 @@ private:
     u64 m_mtp_bytes_written = 0;
     u64 m_freed_bytes = 0;
     
-    std::vector<std::string> m_finished_files; // to notify main.cpp
+    std::vector<std::string> m_finished_files;
     
-    std::thread m_installer_thread;
-    bool m_exit_requested = false;
-
-    class MtpSource : public GooniesInstaller::yati::source::Stream {
-    public:
-        MtpSource(Core* core) : m_core(core) {}
-        ~MtpSource() override = default;
-        Result ReadChunk(void* buf, s64 size, u64* bytes_read) override;
-    private:
-        Core* m_core;
-        std::vector<u8> m_current_chunk;
-        size_t m_current_chunk_pos = 0;
-    };
-    
-    void InstallerThreadEntry();
+    std::string m_current_filename;
+    std::unique_ptr<pipensx::install::InstallBackend> m_backend;
+    std::unique_ptr<pipensx::install::PackageStream> m_stream;
 };
 
 } // namespace Installer
+

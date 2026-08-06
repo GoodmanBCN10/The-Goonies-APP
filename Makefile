@@ -39,7 +39,7 @@ ROMFS		:=	romfs
 
 APP_TITLE	:=	The Goonies Installer
 APP_AUTHOR	:=	GoodmanBCN
-APP_VERSION	:=	v2.1.6
+APP_VERSION	:=	v2.1.7
 DEFINES		:=	-DPIPENSX_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------
