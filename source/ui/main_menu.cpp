@@ -486,9 +486,10 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
                                     }
                                     
 #ifdef __SWITCH__
+                                    const std::string staged = updater_->stagedPath();
                                     const std::string target = updater_->targetPath();
-                                    const std::string arguments = "\"" + target + "\"";
-                                    envSetNextLoad(target.c_str(), arguments.c_str());
+                                    const std::string arguments = "\"--finish-update\" \"" + target + "\"";
+                                    envSetNextLoad(staged.c_str(), arguments.c_str());
 #endif
                                     brls::Application::notify(t("Actualización descargada. Reiniciando...", "Update downloaded. Restarting...", "Atualização baixada. Reinicializando..."));
                                     brls::Application::quit();

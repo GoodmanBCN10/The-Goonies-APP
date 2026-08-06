@@ -469,35 +469,8 @@ bool UpdateService::install(const ReleaseInfo& release, std::string& error) cons
         error = "Update checksum does not match GitHub release.";
         return false;
     }
-
-    const std::string backup = targetPath_ + ".previous";
-    unlink(backup.c_str());
-    bool haveBackup = false;
-    if (access(targetPath_.c_str(), F_OK) == 0) {
-        if (rename(targetPath_.c_str(), backup.c_str()) == 0) {
-            haveBackup = true;
-        } else {
-            std::string backupError;
-            if (!copyFileContents(targetPath_, backup, backupError)) {
-                error = "Unable to back up current application: " + backupError;
-                return false;
-            }
-            haveBackup = true;
-        }
-    }
-    if (rename(temporary.c_str(), targetPath_.c_str()) != 0) {
-        int renameErrno = errno;
-        std::string restoreError;
-        if (haveBackup && !copyFileContents(backup, targetPath_, restoreError)) {
-            error = "Unable to replace application with update, and unable to restore from backup: " + restoreError;
-            return false;
-        } else if (haveBackup) {
-            rename(backup.c_str(), targetPath_.c_str());
-        }
-        error = "Unable to replace application with update: " + std::string(std::strerror(renameErrno));
-        return false;
-    }
     
+    // Staged update successfully downloaded to .tmp
     return true;
 }
 

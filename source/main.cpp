@@ -45,6 +45,25 @@ int main(int argc, char* argv[]) {
             nroPath = argv[0];
         }
     }
+    
+    // Check if we are running as the temporary update staging file
+    if (argc >= 3 && std::string(argv[1]) == "--finish-update") {
+        std::string originalPath = argv[2];
+        
+        // Remove the original NRO (it's not locked since we are running the tmp)
+        unlink(originalPath.c_str());
+        
+        // Rename ourselves (.tmp) to the original path
+        rename(nroPath.c_str(), originalPath.c_str());
+        
+        // Tell hbmenu to launch the newly replaced original NRO
+        const std::string arguments = "\"" + originalPath + "\"";
+        envSetNextLoad(originalPath.c_str(), arguments.c_str());
+        
+        // Exit so the system starts the original app
+        return 0;
+    }
+    
     pipensx::UpdateService updater(nroPath);
     updater.discardStaged();
 
