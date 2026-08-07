@@ -16,6 +16,7 @@ extern "C" {
 #include <memory>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "../app_state.hpp"
 
 namespace pipensx {
 namespace {
@@ -144,6 +145,7 @@ bool InstalledTitleService::refresh(std::string& error) {
     next.reserve(records.size());
     auto control = std::make_unique<NsApplicationControlData>();
     for (const NsApplicationRecord& record : records) {
+        if (g_appExiting) break;
         InstalledTitle title;
         title.applicationId = record.application_id;
         title.titleId = formatTitleId(record.application_id);

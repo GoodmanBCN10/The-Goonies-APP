@@ -11,6 +11,8 @@ extern "C" {
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include "catalog_service.hpp"
+#include "../app_state.hpp"
 #include <curl/curl.h>
 #include <fstream>
 #include <borealis/extern/nlohmann/json.hpp>
@@ -150,6 +152,11 @@ bool httpGet(const std::string& url, std::string& body, std::string& error) {
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
     curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+    
+    // Support instant abort
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, global_curl_xferinfo);
+    
     CURLcode result = curl_easy_perform(curl);
     long status = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
@@ -457,13 +464,10 @@ bool CatalogService::loadFile(const std::string& path,
     std::vector<CatalogEntry> parsed;
     if (!parseJson(data, parsed, error))
         return false;
-        
-    brls::sync([this, parsed = std::move(parsed), label]() mutable {
-        this->entries_ = std::move(parsed);
-        this->sourceLabel_ = label;
-    });
-    
-    log_msg("[catalog] loaded entries from %s\n", path.c_str());
+    entries_ = std::move(parsed);
+    sourceLabel_ = label;
+    log_msg("[catalog] loaded %zu entries from %s\n", entries_.size(),
+            path.c_str());
     return true;
 }
 
@@ -481,10 +485,8 @@ bool CatalogService::load(std::string& error) {
 
     // A fresh public install intentionally has no bundled catalog. The UI
     // sees an empty list and starts the trusted live refresh in the background.
-    brls::sync([this]() {
-        this->entries_.clear();
-        this->sourceLabel_.clear();
-    });
+    entries_.clear();
+    sourceLabel_.clear();
     error.clear();
     return true;
 }

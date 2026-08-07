@@ -39,7 +39,7 @@ ROMFS		:=	romfs
 
 APP_TITLE	:=	The Goonies Installer
 APP_AUTHOR	:=	GoodmanBCN
-APP_VERSION	:=	v2.1.7
+APP_VERSION	:=	v2.1.8
 DEFINES		:=	-DPIPENSX_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------
@@ -59,7 +59,7 @@ CXXFLAGS	:= $(CFLAGS) -std=gnu++23 -DBRLS_RESOURCES=\
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:=	$(CURDIR)/vendor/borealis/library/libborealis.a $(CURDIR)/vendor/borealis/library/lib/extern/fmt/libfmt.a $(CURDIR)/vendor/borealis/library/lib/extern/yoga/yoga/libyogacore.a $(CURDIR)/vendor/borealis/library/libtinyxml2.a `pkg-config --libs --static sdl2 SDL2_image SDL2_ttf SDL2_gfx` -lmbedtls -lmbedcrypto -lmbedx509 -lzstd -lusbhsfs -lntfs-3g -llwext4 -lcurl  -lz -ldeko3d -lnsext -lminiupnpc -lnx -lm
+LIBS	:=	$(CURDIR)/vendor/borealis/library/libborealis.a $(CURDIR)/vendor/borealis/library/lib/extern/fmt/libfmt.a $(CURDIR)/vendor/borealis/library/lib/extern/yoga/yoga/libyogacore.a $(CURDIR)/vendor/borealis/library/libtinyxml2.a `pkg-config --libs --static sdl2 SDL2_image SDL2_ttf SDL2_gfx` -lmbedtls -lmbedcrypto -lmbedx509 -lzstd -lusbhsfs -lntfs-3g -llwext4 -lcurl  -lz -ldeko3d -lminiupnpc -lnx -lm
 
 #---------------------------------------------------------------------------------
 LIBDIRS	:= $(PORTLIBS) $(LIBNX)

@@ -9,6 +9,8 @@
 #include <thread>
 #include <atomic>
 #include <fstream>
+#include "app_state.hpp"
+std::atomic<bool> g_appExiting{false};
 #include <mutex>
 #include <usbhsfs.h>
 extern "C" {
@@ -247,78 +249,88 @@ int main(int argc, char* argv[]) {
             }
         }
         
-        DownloadManager download_manager("sdmc:/switch/thegoonies");
-        CatalogService catalog_service("sdmc:/switch/thegoonies", BundledCatalogPath);
-        GameMetadataService metadata_service("sdmc:/switch/thegoonies");
-        InstalledTitleService installed_service("sdmc:/switch/thegoonies");
-        HomebrewService homebrew_service;
+        DownloadManager* download_manager = new DownloadManager("sdmc:/switch/thegoonies");
+        CatalogService* catalog_service = new CatalogService("sdmc:/switch/thegoonies", BundledCatalogPath);
+        GameMetadataService* metadata_service = new GameMetadataService("sdmc:/switch/thegoonies");
+        InstalledTitleService* installed_service = new InstalledTitleService("sdmc:/switch/thegoonies");
+        HomebrewService* homebrew_service = new HomebrewService();
         writeLog("Services constructed OK");
 
-        goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(
-            &download_manager, &catalog_service, &metadata_service, 
-            &installed_service, &settings, &homebrew_service, &updater);
-        brls::Application::pushActivity(new brls::Activity(rootFrame));
-        writeLog("pushActivity MainMenu OK");
+        // Load installed games in the background thread to avoid blocking boot
 
-        // Show language selection dialog on first run
-        if (settings.get().language == 0) {
-            brls::Dialog* langDialog = new brls::Dialog("Selecciona tu idioma / Select your language");
-            langDialog->addButton("Español", [&settings]() {
-                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
-                auto vals = settings.get();
-                vals.language = 1;
-                std::string updateErr;
-                settings.update(vals, updateErr);
-                brls::Application::notify("Idioma guardado: Español. Reinicia la app para aplicar.");
-            });
-            langDialog->addButton("English", [&settings]() {
-                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
-                auto vals = settings.get();
-                vals.language = 2;
-                std::string updateErr;
-                settings.update(vals, updateErr);
-                brls::Application::notify("Language saved: English. Restart app to apply.");
-            });
-            langDialog->addButton("Português", [&settings]() {
-                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_PT_BR;
-                auto vals = settings.get();
-                vals.language = 3;
-                std::string updateErr;
-                settings.update(vals, updateErr);
-                brls::Application::notify("Idioma guardado: Português. Reinicie o aplicativo para aplicar.");
-            });
-            langDialog->open();
-        }
+        // Push a loading screen to prevent black screen
+        brls::Box* loadingBox = new brls::Box(brls::Axis::COLUMN);
+        loadingBox->setAlignItems(brls::AlignItems::CENTER);
+        loadingBox->setJustifyContent(brls::JustifyContent::CENTER);
+        
+        brls::Label* loadingLabel = new brls::Label();
+        loadingLabel->setText(t("Iniciando The Goonies APP...\nBuscando juegos instalados...", 
+                                "Starting The Goonies APP...\nFinding installed games...", 
+                                "Iniciando The Goonies APP...\nBuscando jogos instalados..."));
+        loadingLabel->setFontSize(24);
+        loadingLabel->setHorizontalAlign(brls::HorizontalAlign::CENTER);
+        loadingLabel->setMarginBottom(40);
+        
+        loadingBox->addView(loadingLabel);
+        
+        brls::Application::pushActivity(new brls::Activity(loadingBox));
+        writeLog("pushActivity LoadingScreen OK");
 
         std::thread initThread([&]() {
             std::string err;
-            {
-                std::lock_guard<std::mutex> lock(logMutex);
-                logOut << "Loading catalog_service..." << std::endl; logOut.flush();
-            }
-            catalog_service.load(err);
-
-            {
-                std::lock_guard<std::mutex> lock(logMutex);
-                logOut << "Loading metadata_service..." << std::endl; logOut.flush();
-            }
-            metadata_service.load(err);
-
-            {
-                std::lock_guard<std::mutex> lock(logMutex);
-                logOut << "Refreshing installed_service..." << std::endl; logOut.flush();
-            }
-            installed_service.refresh(err);
-            
-            {
-                std::lock_guard<std::mutex> lock(logMutex);
-                logOut << "Services initialization COMPLETE." << std::endl; logOut.flush();
-            }
+            if (g_appExiting) return;
+            installed_service->refresh(err);
+            if (g_appExiting) return;
 
             brls::sync([&]() {
-                // Notificar que la carga ha terminado
-                brls::Application::notify("Catálogo y metadatos cargados.");
+                if (g_appExiting) return;
+                brls::Application::popActivity(); // Pop LoadingScreen
+                
+                goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(
+                    download_manager, catalog_service, metadata_service, 
+                    installed_service, &settings, homebrew_service, &updater);
+                brls::Application::pushActivity(new brls::Activity(rootFrame));
+                
+                // Show language selection dialog on first run
+                if (settings.get().language == 0) {
+                    brls::Dialog* langDialog = new brls::Dialog("Selecciona tu idioma / Select your language");
+                    langDialog->addButton("Español", [&]() {
+                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+                        auto vals = settings.get();
+                        vals.language = 1;
+                        std::string updateErr;
+                        settings.update(vals, updateErr);
+                        brls::Application::notify("Idioma guardado: Español. Reinicia la app para aplicar.");
+                    });
+                    langDialog->addButton("English", [&]() {
+                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
+                        auto vals = settings.get();
+                        vals.language = 2;
+                        std::string updateErr;
+                        settings.update(vals, updateErr);
+                        brls::Application::notify("Language saved: English. Restart app to apply.");
+                    });
+                    langDialog->addButton("Português", [&]() {
+                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_PT_BR;
+                        auto vals = settings.get();
+                        vals.language = 3;
+                        std::string updateErr;
+                        settings.update(vals, updateErr);
+                        brls::Application::notify("Idioma guardado: Português. Reinicie o aplicativo para aplicar.");
+                    });
+                    langDialog->open();
+                }
             });
+
+            // Load shop catalog and metadata in background after UI appears
+            if (g_appExiting) return;
+            catalog_service->load(err);
+            if (g_appExiting) return;
+            metadata_service->load(err);
+        });
+
+        brls::Application::getExitEvent()->subscribe([] {
+            g_appExiting = true;
         });
 
         // Run the main loop
@@ -329,10 +341,13 @@ int main(int argc, char* argv[]) {
                 writeLog("Main: pumping UI loop, frame " + std::to_string(frameCount));
             }
         }
+        g_appExiting = true;
         writeLog("Main loop EXITED. Application closing normally.");
+        
+        download_manager->shutdown();
 
         if (initThread.joinable()) {
-            initThread.detach();
+            initThread.join();
         }
 
         // Gracefully shutdown background threads before local services are destroyed

@@ -1,4 +1,5 @@
 #include "update_service.hpp"
+#include "../app_state.hpp"
 
 #include <curl/curl.h>
 #include <borealis/extern/nlohmann/json.hpp>
@@ -143,6 +144,11 @@ bool fetchText(const std::string& url, size_t limit, std::string& body,
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
+    
+    // Support instant abort
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, global_curl_xferinfo);
+    
     CURLcode result = curl_easy_perform(curl);
     long status = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
@@ -365,7 +371,7 @@ UpdateService::UpdateService(std::string targetPath,
 UpdateService::~UpdateService() {
     for (std::thread& worker : workers_)
         if (worker.joinable())
-            worker.detach();
+            worker.join();
 }
 
 bool UpdateService::isNewerVersion(const std::string& candidate,

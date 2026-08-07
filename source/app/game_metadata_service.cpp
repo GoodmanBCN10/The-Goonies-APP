@@ -1,4 +1,5 @@
 #include "game_metadata_service.hpp"
+#include "../app_state.hpp"
 
 extern "C" {
 #include "../core/sha1.h"
@@ -168,6 +169,11 @@ bool httpGetOnce(const std::string& url, size_t limit,
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, verifyTls ? 1L : 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, verifyTls ? 2L : 0L);
     curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+    
+    // Support instant abort
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, global_curl_xferinfo);
+    
     CURLcode result = curl_easy_perform(curl);
     long status = 0;
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
@@ -657,10 +663,8 @@ bool GameMetadataService::loadCachedSnapshot(MetadataSnapshot& snapshot,
 }
 
 bool GameMetadataService::load(std::string& error) {
-    brls::sync([this]() {
-        this->byHash_.clear();
-        this->manifest_ = {};
-    });
+    byHash_.clear();
+    manifest_ = {};
 
     std::string cacheError;
     MetadataSnapshot cached;
@@ -689,14 +693,10 @@ bool GameMetadataService::load(std::string& error) {
     std::vector<GameMetadata> items;
     if (!parseIndex(json, items, error))
         return false;
-        
-    brls::sync([this, items = std::move(items)]() mutable {
-        this->byHash_.reserve(items.size());
-        for (GameMetadata& item : items)
-            this->byHash_[item.infoHash] = std::move(item);
-    });
-    
-    log_msg("[metadata] loaded game matches from %s\n",
+    byHash_.reserve(items.size());
+    for (GameMetadata& item : items)
+        byHash_[item.infoHash] = std::move(item);
+    log_msg("[metadata] loaded %zu game matches from %s\n", byHash_.size(),
             bundledPath_.c_str());
     return true;
 }
@@ -706,11 +706,8 @@ void GameMetadataService::adopt(MetadataSnapshot snapshot) {
     next.reserve(snapshot.items.size());
     for (GameMetadata& item : snapshot.items)
         next[item.infoHash] = std::move(item);
-        
-    brls::sync([this, manifest = std::move(snapshot.manifest), byHash = std::move(next)]() mutable {
-        this->manifest_ = std::move(manifest);
-        this->byHash_ = std::move(byHash);
-    });
+    byHash_ = std::move(next);
+    manifest_ = std::move(snapshot.manifest);
 }
 
 bool GameMetadataService::fetchLatest(MetadataSnapshot& snapshot,
