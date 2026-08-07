@@ -254,26 +254,41 @@ int main(int argc, char* argv[]) {
         HomebrewService homebrew_service;
         writeLog("Services constructed OK");
 
-        // Push a loading screen to prevent black screen
-        brls::Box* loadingBox = new brls::Box(brls::Axis::COLUMN);
-        loadingBox->setAlignItems(brls::AlignItems::CENTER);
-        loadingBox->setJustifyContent(brls::JustifyContent::CENTER);
-        
-        brls::Label* loadingLabel = new brls::Label();
-        loadingLabel->setText(t("Iniciando The Goonies APP...\nCargando catálogo y metadatos...", 
-                                "Starting The Goonies APP...\nLoading catalog and metadata...", 
-                                "Iniciando The Goonies APP...\nCarregando catálogo e metadados..."));
-        loadingLabel->setFontSize(24);
-        loadingLabel->setHorizontalAlign(brls::HorizontalAlign::CENTER);
-        loadingLabel->setMarginBottom(40);
-        
-        brls::ProgressSpinner* spinner = new brls::ProgressSpinner();
-        
-        loadingBox->addView(loadingLabel);
-        loadingBox->addView(spinner);
-        
-        brls::Application::pushActivity(new brls::Activity(loadingBox));
-        writeLog("pushActivity LoadingScreen OK");
+        goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(
+            &download_manager, &catalog_service, &metadata_service, 
+            &installed_service, &settings, &homebrew_service, &updater);
+        brls::Application::pushActivity(new brls::Activity(rootFrame));
+        writeLog("pushActivity MainMenu OK");
+
+        // Show language selection dialog on first run
+        if (settings.get().language == 0) {
+            brls::Dialog* langDialog = new brls::Dialog("Selecciona tu idioma / Select your language");
+            langDialog->addButton("Español", [&settings]() {
+                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+                auto vals = settings.get();
+                vals.language = 1;
+                std::string updateErr;
+                settings.update(vals, updateErr);
+                brls::Application::notify("Idioma guardado: Español. Reinicia la app para aplicar.");
+            });
+            langDialog->addButton("English", [&settings]() {
+                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
+                auto vals = settings.get();
+                vals.language = 2;
+                std::string updateErr;
+                settings.update(vals, updateErr);
+                brls::Application::notify("Language saved: English. Restart app to apply.");
+            });
+            langDialog->addButton("Português", [&settings]() {
+                brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_PT_BR;
+                auto vals = settings.get();
+                vals.language = 3;
+                std::string updateErr;
+                settings.update(vals, updateErr);
+                brls::Application::notify("Idioma guardado: Português. Reinicie o aplicativo para aplicar.");
+            });
+            langDialog->open();
+        }
 
         std::thread initThread([&]() {
             std::string err;
@@ -301,42 +316,8 @@ int main(int argc, char* argv[]) {
             }
 
             brls::sync([&]() {
-                brls::Application::popActivity(); // Pop LoadingScreen
-                
-                goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(
-                    &download_manager, &catalog_service, &metadata_service, 
-                    &installed_service, &settings, &homebrew_service, &updater);
-                brls::Application::pushActivity(new brls::Activity(rootFrame));
-                
-                // Show language selection dialog on first run
-                if (settings.get().language == 0) {
-                    brls::Dialog* langDialog = new brls::Dialog("Selecciona tu idioma / Select your language");
-                    langDialog->addButton("Español", [&settings]() {
-                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
-                        auto vals = settings.get();
-                        vals.language = 1;
-                        std::string updateErr;
-                        settings.update(vals, updateErr);
-                        brls::Application::notify("Idioma guardado: Español. Reinicia la app para aplicar.");
-                    });
-                    langDialog->addButton("English", [&settings]() {
-                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
-                        auto vals = settings.get();
-                        vals.language = 2;
-                        std::string updateErr;
-                        settings.update(vals, updateErr);
-                        brls::Application::notify("Language saved: English. Restart app to apply.");
-                    });
-                    langDialog->addButton("Português", [&settings]() {
-                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_PT_BR;
-                        auto vals = settings.get();
-                        vals.language = 3;
-                        std::string updateErr;
-                        settings.update(vals, updateErr);
-                        brls::Application::notify("Idioma guardado: Português. Reinicie o aplicativo para aplicar.");
-                    });
-                    langDialog->open();
-                }
+                // Notificar que la carga ha terminado
+                brls::Application::notify("Catálogo y metadatos cargados.");
             });
         });
 
@@ -351,7 +332,7 @@ int main(int argc, char* argv[]) {
         writeLog("Main loop EXITED. Application closing normally.");
 
         if (initThread.joinable()) {
-            initThread.join();
+            initThread.detach();
         }
 
         // Gracefully shutdown background threads before local services are destroyed

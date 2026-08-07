@@ -457,10 +457,13 @@ bool CatalogService::loadFile(const std::string& path,
     std::vector<CatalogEntry> parsed;
     if (!parseJson(data, parsed, error))
         return false;
-    entries_ = std::move(parsed);
-    sourceLabel_ = label;
-    log_msg("[catalog] loaded %zu entries from %s\n", entries_.size(),
-            path.c_str());
+        
+    brls::sync([this, parsed = std::move(parsed), label]() mutable {
+        this->entries_ = std::move(parsed);
+        this->sourceLabel_ = label;
+    });
+    
+    log_msg("[catalog] loaded entries from %s\n", path.c_str());
     return true;
 }
 
@@ -478,8 +481,10 @@ bool CatalogService::load(std::string& error) {
 
     // A fresh public install intentionally has no bundled catalog. The UI
     // sees an empty list and starts the trusted live refresh in the background.
-    entries_.clear();
-    sourceLabel_.clear();
+    brls::sync([this]() {
+        this->entries_.clear();
+        this->sourceLabel_.clear();
+    });
     error.clear();
     return true;
 }

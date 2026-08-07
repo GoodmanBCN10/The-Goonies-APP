@@ -657,8 +657,10 @@ bool GameMetadataService::loadCachedSnapshot(MetadataSnapshot& snapshot,
 }
 
 bool GameMetadataService::load(std::string& error) {
-    byHash_.clear();
-    manifest_ = {};
+    brls::sync([this]() {
+        this->byHash_.clear();
+        this->manifest_ = {};
+    });
 
     std::string cacheError;
     MetadataSnapshot cached;
@@ -687,10 +689,14 @@ bool GameMetadataService::load(std::string& error) {
     std::vector<GameMetadata> items;
     if (!parseIndex(json, items, error))
         return false;
-    byHash_.reserve(items.size());
-    for (GameMetadata& item : items)
-        byHash_[item.infoHash] = std::move(item);
-    log_msg("[metadata] loaded %zu game matches from %s\n", byHash_.size(),
+        
+    brls::sync([this, items = std::move(items)]() mutable {
+        this->byHash_.reserve(items.size());
+        for (GameMetadata& item : items)
+            this->byHash_[item.infoHash] = std::move(item);
+    });
+    
+    log_msg("[metadata] loaded game matches from %s\n",
             bundledPath_.c_str());
     return true;
 }
@@ -700,8 +706,11 @@ void GameMetadataService::adopt(MetadataSnapshot snapshot) {
     next.reserve(snapshot.items.size());
     for (GameMetadata& item : snapshot.items)
         next[item.infoHash] = std::move(item);
-    byHash_ = std::move(next);
-    manifest_ = std::move(snapshot.manifest);
+        
+    brls::sync([this, manifest = std::move(snapshot.manifest), byHash = std::move(next)]() mutable {
+        this->manifest_ = std::move(manifest);
+        this->byHash_ = std::move(byHash);
+    });
 }
 
 bool GameMetadataService::fetchLatest(MetadataSnapshot& snapshot,

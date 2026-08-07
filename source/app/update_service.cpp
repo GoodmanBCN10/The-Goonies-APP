@@ -365,7 +365,7 @@ UpdateService::UpdateService(std::string targetPath,
 UpdateService::~UpdateService() {
     for (std::thread& worker : workers_)
         if (worker.joinable())
-            worker.join();
+            worker.detach();
 }
 
 bool UpdateService::isNewerVersion(const std::string& candidate,
