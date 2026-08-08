@@ -44,12 +44,12 @@ make -j$(nproc)
 
 El archivo resultante `TheGooniesInstaller.nro` se genera en la raíz del proyecto.
 
-**APOYA ESTE PROYECTO:**
-https://www.paypal.com/paypalme/GoodmanBCN
-
 ## Instalación
 
 Copia `TheGooniesInstaller.nro` a la carpeta `/switch/` de tu microSD.
+
+**APOYA ESTE PROYECTO:**
+https://www.paypal.com/paypalme/GoodmanBCN
 
 ## Créditos
 
