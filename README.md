@@ -3,6 +3,7 @@
 Instalador y gestor de contenido para Nintendo Switch, desarrollado para la comunidad Switch ES — The Goonies OS.
 ---
 Únete a nuestra comunidad en https://t.me/+WWoAIRB3xjAwYTM0
+
 Apoya este proyecto: https://www.paypal.com/paypalme/GoodmanBCN
 
 ## Qué es
