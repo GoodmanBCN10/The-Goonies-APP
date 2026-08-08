@@ -3,6 +3,7 @@
 Instalador y gestor de contenido para Nintendo Switch, desarrollado para la comunidad Switch ES — The Goonies OS.
 ---
 Únete a nuestra comunidad en https://t.me/+WWoAIRB3xjAwYTM0
+Apoya este proyecto: https://www.paypal.com/paypalme/GoodmanBCN
 
 ## Qué es
 
@@ -47,9 +48,6 @@ El archivo resultante `TheGooniesInstaller.nro` se genera en la raíz del proyec
 ## Instalación
 
 Copia `TheGooniesInstaller.nro` a la carpeta `/switch/` de tu microSD.
-
-**APOYA ESTE PROYECTO:**
-https://www.paypal.com/paypalme/GoodmanBCN
 
 ## Créditos
 
