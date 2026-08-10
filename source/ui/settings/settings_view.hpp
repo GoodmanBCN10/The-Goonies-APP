@@ -417,7 +417,7 @@ private:
                 }
                 const std::string temp = updater_->stagedPath();
                 const std::string target = updater_->targetPath();
-                const std::string arguments = "\"--finish-update\" \"" + target + "\"";
+                const std::string arguments = "\"" + temp + "\" \"--finish-update\" \"" + target + "\"";
                 const Result result = envSetNextLoad(temp.c_str(),
                                                      arguments.c_str());
                 if (R_FAILED(result)) {
