@@ -16,7 +16,7 @@ public:
     int StartDownload(const std::string& torrentPathOrUrl, const std::string& outputFolder);
     void StopDownload(int downloadId);
     
-    std::string GetUnlockedLinkFromMagnet(const std::string& magnetLink, std::function<void(const std::string&, float)> progressCallback, const std::atomic<bool>& cancelFlag);
+    std::string GetUnlockedLinkFromMagnet(const std::string& magnetLink, std::function<void(const std::string&, float)> progressCallback, const std::atomic<bool>& cancelFlag, const std::vector<std::string>& selectedPaths = {});
     
     
     // Auth specific methods

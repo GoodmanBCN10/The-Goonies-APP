@@ -379,7 +379,7 @@ void RealDebridProvider::StopDownload(int downloadId) {
     }
 }
 
-std::string RealDebridProvider::GetUnlockedLinkFromMagnet(const std::string& magnetLink, std::function<void(const std::string&, float)> progressCallback, const std::atomic<bool>& cancelFlag) {
+std::string RealDebridProvider::GetUnlockedLinkFromMagnet(const std::string& magnetLink, std::function<void(const std::string&, float)> progressCallback, const std::atomic<bool>& cancelFlag, const std::vector<std::string>& selectedPaths) {
     if (m_accessToken.empty()) {
         if (progressCallback) progressCallback("No autenticado", 0.0f);
         return "";
@@ -414,13 +414,32 @@ std::string RealDebridProvider::GetUnlockedLinkFromMagnet(const std::string& mag
                 if (j.contains("files") && j["files"].is_array()) {
                     int bestId = -1;
                     size_t bestSize = 0;
+                    
+                    bool hasSelection = !selectedPaths.empty();
+                    
                     for (const auto& file : j["files"]) {
                         if (!file.contains("path") || !file.contains("id") || !file.contains("bytes")) continue;
                         std::string path = file["path"].get<std::string>();
-                        std::string lowerPath = path;
-                        for (char& c : lowerPath) c = std::tolower(c);
                         
-                        if (lowerPath.size() >= 4 && (lowerPath.substr(lowerPath.size() - 4) == ".nsp" || lowerPath.substr(lowerPath.size() - 4) == ".nsz")) {
+                        bool isRequested = false;
+                        if (hasSelection) {
+                            for (const auto& sp : selectedPaths) {
+                                // Real-Debrid paths often start with /
+                                if (path.size() >= sp.size() && path.compare(path.size() - sp.size(), sp.size(), sp) == 0) {
+                                    isRequested = true;
+                                    break;
+                                }
+                            }
+                        } else {
+                            // Si no hay seleccion, filtramos por extension (comportamiento original)
+                            std::string lowerPath = path;
+                            for (char& c : lowerPath) c = std::tolower(c);
+                            if (lowerPath.size() >= 4 && (lowerPath.substr(lowerPath.size() - 4) == ".nsp" || lowerPath.substr(lowerPath.size() - 4) == ".nsz")) {
+                                isRequested = true;
+                            }
+                        }
+                        
+                        if (isRequested) {
                             size_t size = file["bytes"].get<size_t>();
                             if (size > bestSize) {
                                 bestSize = size;

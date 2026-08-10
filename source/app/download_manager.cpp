@@ -1928,7 +1928,16 @@ void DownloadManager::workerMain() {
                 }
             };
             
-            std::string url = rd.GetUnlockedLinkFromMagnet(magnet, progressCb, cancelActiveTask_);
+            std::vector<std::string> selectedPaths;
+            if (!fileSelection.empty()) {
+                for (size_t i = 0; i < metainfo.num_files && i < fileSelection.size(); ++i) {
+                    if (fileSelection[i] != 0) {
+                        selectedPaths.push_back(metainfo.files[i].path);
+                    }
+                }
+            }
+            
+            std::string url = rd.GetUnlockedLinkFromMagnet(magnet, progressCb, cancelActiveTask_, selectedPaths);
             
             if (url.empty()) {
                 bool isRemoving = false;
