@@ -58,9 +58,11 @@ int main(int argc, char* argv[]) {
         // Rename ourselves (.tmp) to the original path
         rename(nroPath.c_str(), originalPath.c_str());
         
+        // Wait to allow FAT32 to commit the directory changes
+        svcSleepThread(1000000000ULL); // 1 second
+        
         // Tell hbmenu to launch the newly replaced original NRO
-        const std::string arguments = "\"" + originalPath + "\"";
-        envSetNextLoad(originalPath.c_str(), arguments.c_str());
+        envSetNextLoad(originalPath.c_str(), originalPath.c_str());
         
         // Exit so the system starts the original app
         return 0;
@@ -72,8 +74,10 @@ int main(int argc, char* argv[]) {
         unlink(originalPath.c_str());
         rename(actualTempPath.c_str(), originalPath.c_str());
         
-        const std::string arguments = "\"" + originalPath + "\"";
-        envSetNextLoad(originalPath.c_str(), arguments.c_str());
+        // Wait to allow FAT32 to commit the directory changes
+        svcSleepThread(1000000000ULL); // 1 second
+        
+        envSetNextLoad(originalPath.c_str(), originalPath.c_str());
         
         return 0;
     }
