@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <borealis.hpp>
 #include <string>
+#include <switch/runtime/devices/fs_dev.h>
 #include <vector>
 #include <thread>
 #include <atomic>
@@ -52,19 +53,19 @@ int main(int argc, char* argv[]) {
     if (argc >= 3 && std::string(argv[1]) == "--finish-update") {
         std::string originalPath = argv[2];
         
-        // Remove the original NRO (it's not locked since we are running the tmp)
+        // Remove the original NRO
         unlink(originalPath.c_str());
         
-        // Copy ourselves (.update) to the original path instead of renaming
-        // Renaming a running executable on Switch FAT32 causes a system crash!
-        std::ifstream src(nroPath, std::ios::binary);
-        std::ofstream dst(originalPath, std::ios::binary);
-        dst << src.rdbuf();
-        src.close();
-        dst.close();
+        // Rename ourselves (.update) to the original path
+        rename(nroPath.c_str(), originalPath.c_str());
         
-        // Wait to allow FAT32 to commit the directory changes
-        svcSleepThread(1000000000ULL); // 1 second
+        // Force the Switch OS FAT32 driver to commit changes to the SD card
+        // This is CRITICAL. Without this, nx-hbloader reads stale filesystem cache,
+        // causing the OS to panic (err:f) when loading the next NRO into memory.
+        fsdevCommitDevice("sdmc");
+        
+        // Wait just in case the hardware needs a moment
+        svcSleepThread(500000000ULL); // 0.5 seconds
         
         // Tell hbmenu to launch the newly replaced original NRO
         envSetNextLoad(originalPath.c_str(), originalPath.c_str());
@@ -77,15 +78,10 @@ int main(int argc, char* argv[]) {
         std::string actualTempPath = originalPath + ".update";
         
         unlink(originalPath.c_str());
+        rename(actualTempPath.c_str(), originalPath.c_str());
         
-        std::ifstream src(actualTempPath, std::ios::binary);
-        std::ofstream dst(originalPath, std::ios::binary);
-        dst << src.rdbuf();
-        src.close();
-        dst.close();
-        
-        // Wait to allow FAT32 to commit the directory changes
-        svcSleepThread(1000000000ULL); // 1 second
+        fsdevCommitDevice("sdmc");
+        svcSleepThread(500000000ULL); // 0.5 seconds
         
         envSetNextLoad(originalPath.c_str(), originalPath.c_str());
         
