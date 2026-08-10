@@ -64,6 +64,18 @@ int main(int argc, char* argv[]) {
         
         // Exit so the system starts the original app
         return 0;
+    } else if (argc >= 2 && std::string(argv[0]) == "--finish-update") {
+        // Fallback for older versions (e.g. v2.1.8) that passed incorrect argv[0]
+        std::string originalPath = argv[1];
+        std::string actualTempPath = originalPath + ".tmp";
+        
+        unlink(originalPath.c_str());
+        rename(actualTempPath.c_str(), originalPath.c_str());
+        
+        const std::string arguments = "\"" + originalPath + "\"";
+        envSetNextLoad(originalPath.c_str(), arguments.c_str());
+        
+        return 0;
     }
     
     pipensx::UpdateService updater(nroPath);
