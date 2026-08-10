@@ -56,12 +56,31 @@ public:
 
     void setTitle(const InstalledTitle& title,
                   GameMetadataService* metadata,
+                  CatalogService* catalog,
+                  bool isUpdateList,
                   std::function<void(const InstalledTitle&)> onClick = nullptr) {
         title_->setText(title.name);
         std::string subtitle = title.publisher;
         if (!subtitle.empty())
             subtitle += "   ";
         subtitle += title.titleId;
+
+        if (isUpdateList && metadata && catalog) {
+            auto meta = metadata->findByTitleId(title.titleId);
+            if (meta && meta->latestVersion > 0) {
+                std::string versionStr = "v" + std::to_string(meta->latestVersion / 65536);
+                subtitle += "   (" + versionStr;
+                
+                for (const auto& entry : catalog->entries()) {
+                    if (entry.infoHash == meta->infoHash && entry.size > 0) {
+                        subtitle += " - " + formatBytes(entry.size);
+                        break;
+                    }
+                }
+                subtitle += ")";
+            }
+        }
+
         subtitle_->setText(subtitle);
         setArtworkUrl(image_, metadata, title.iconPath, currentIconPath_,
                       imageState_);
@@ -304,7 +323,7 @@ public:
         
         if (columns_ == 1) {
             auto* cell = static_cast<InstalledCell*>(recycler->dequeueReusableCell("Installed"));
-            cell->setTitle(titles_[index.row], metadata_, onClick_);
+            cell->setTitle(titles_[index.row], metadata_, catalog_, showUpdatesOnly_, onClick_);
             return cell;
         }
 
@@ -420,6 +439,8 @@ public:
             updateViewMode();
             dataSource_->setFilterUpdates(showUpdatesOnly_);
             reload();
+            recycler_->selectRowAt(brls::IndexPath(0, 0), false);
+            brls::Application::giveFocus(recycler_);
             return true;
         });
 
