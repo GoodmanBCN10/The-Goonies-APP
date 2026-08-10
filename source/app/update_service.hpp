@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <nx_thread.hpp>
 
 namespace pipensx {
 
@@ -70,7 +71,7 @@ private:
     MetadataFetcher metadataFetcher_;
     AssetFetcher assetFetcher_;
     ProgressCallback progress_;
-    std::vector<std::thread> workers_;
+    std::vector<nx::thread> workers_;
 };
 
 } // namespace pipensx

@@ -1,0 +1,606 @@
+{
+    "Volver": {
+        "en": "Back",
+        "pt": ""
+    },
+    "Instalar Juegos": {
+        "en": "Install Games",
+        "pt": ""
+    },
+    "Instalar juegos por MTP": {
+        "en": "Install games via MTP",
+        "pt": ""
+    },
+    "Instalar juegos desde microSD": {
+        "en": "Install games from microSD",
+        "pt": ""
+    },
+    "Instalar juegos desde pendrive o disco externo": {
+        "en": "Install games from USB drive",
+        "pt": ""
+    },
+    "No se encontraron dispositivos USB.": {
+        "en": "No USB devices found.",
+        "pt": ""
+    },
+    "No hay pendrive conectado.": {
+        "en": "No USB drive connected.",
+        "pt": ""
+    },
+    "Gestión de Consola": {
+        "en": "Console Management",
+        "pt": ""
+    },
+    "Juegos Instalados": {
+        "en": "Installed Games",
+        "pt": ""
+    },
+    "Partidas Guardadas": {
+        "en": "Save Data",
+        "pt": ""
+    },
+    "Vincular cuentas offline": {
+        "en": "Link accounts offline",
+        "pt": ""
+    },
+    "¿Vincular todas las cuentas offline?\\nEsto creará una vinculación falsa. Si tenías una cuenta NNID vinculada, se sobrescribirá.": {
+        "en": "Link all accounts offline?\\nThis will create a dummy link. If you had a linked NNID account, it will be overwritten.",
+        "pt": ""
+    },
+    "Vincular": {
+        "en": "Link",
+        "pt": ""
+    },
+    "Vinculando cuentas...": {
+        "en": "Linking accounts...",
+        "pt": ""
+    },
+    "¡Cuentas vinculadas con éxito! Para aplicar los cambios y evitar que la consola crasheé, es obligatorio reiniciar.": {
+        "en": "Accounts linked successfully! To apply changes and prevent a system crash, you must reboot.",
+        "pt": ""
+    },
+    "Reiniciar": {
+        "en": "Reboot",
+        "pt": ""
+    },
+    "Aceptar": {
+        "en": "OK",
+        "pt": ""
+    },
+    "Cancelar": {
+        "en": "Cancel",
+        "pt": ""
+    },
+    "Desvincular cuentas": {
+        "en": "Unlink accounts",
+        "pt": ""
+    },
+    "¿Desvincular todas las cuentas?\\nSe eliminará la vinculación local y online de tus perfiles.": {
+        "en": "Unlink all accounts?\\nThis will remove local and online links from your profiles.",
+        "pt": ""
+    },
+    "Desvincular": {
+        "en": "Unlink",
+        "pt": ""
+    },
+    "Desvinculando cuentas...": {
+        "en": "Unlinking accounts...",
+        "pt": ""
+    },
+    "¡Cuentas desvinculadas con éxito! Para aplicar los cambios y evitar que la consola crasheé, es obligatorio reiniciar.": {
+        "en": "Accounts unlinked successfully! To apply changes and prevent a system crash, you must reboot.",
+        "pt": ""
+    },
+    "Restaurar copia de seguridad": {
+        "en": "Restore backup",
+        "pt": ""
+    },
+    "No se encontraron copias de seguridad en la SD.": {
+        "en": "No backups found on the SD card.",
+        "pt": ""
+    },
+    "Restaurar": {
+        "en": "Restore",
+        "pt": ""
+    },
+    "Restaurando copia...": {
+        "en": "Restoring backup...",
+        "pt": ""
+    },
+    "¡Copia restaurada con éxito! Para aplicar los cambios y evitar que la consola crasheé, es obligatorio reiniciar.": {
+        "en": "Backup restored successfully! To apply changes and prevent a system crash, you must reboot.",
+        "pt": ""
+    },
+    "Instalador inteligente para Nintendo Switch": {
+        "en": "Smart installer for Nintendo Switch",
+        "pt": ""
+    },
+    "Descarga de Juegos": {
+        "en": "Download Games",
+        "pt": ""
+    },
+    "Juegos Instalados / Partidas Guardadas": {
+        "en": "Installed Games / Save Data",
+        "pt": ""
+    },
+    "LinkGoonies - Vincular y desvincular cuentas online": {
+        "en": "LinkGoonies - Link and unlink online accounts",
+        "pt": ""
+    },
+    "Crear acceso directo": {
+        "en": "Create Forwarder",
+        "pt": ""
+    },
+    "Desarrollado para la comunidad Switch ES - The Goonies OS por GoodmanBCN": {
+        "en": "Developed for the Switch ES community - The Goonies OS by GoodmanBCN",
+        "pt": ""
+    },
+    "Ajustes": {
+        "en": "Settings",
+        "pt": ""
+    },
+    "Salir": {
+        "en": "Exit",
+        "pt": ""
+    },
+    "Actualizar": {
+        "en": "Update",
+        "pt": ""
+    },
+    "Descargando...": {
+        "en": "Downloading...",
+        "pt": ""
+    },
+    "Error al instalar: ": {
+        "en": "Installation error: ",
+        "pt": ""
+    },
+    "Error al programar el reinicio.": {
+        "en": "Failed to schedule restart.",
+        "pt": ""
+    },
+    "Actualización descargada. Reiniciando...": {
+        "en": "Update downloaded. Restarting...",
+        "pt": ""
+    },
+    "Limpiar": {
+        "en": "Clear",
+        "pt": ""
+    },
+    "Cola Descargas": {
+        "en": "Downloads Queue",
+        "pt": ""
+    },
+    "Selecc. visible": {
+        "en": "Select visible",
+        "pt": ""
+    },
+    "Preparar": {
+        "en": "Prepare",
+        "pt": ""
+    },
+    "Aplicaciones Homebrew": {
+        "en": "Homebrew Applications",
+        "pt": ""
+    },
+    "Buscar": {
+        "en": "Search",
+        "pt": ""
+    },
+    "Buscar homebrew": {
+        "en": "Search homebrew",
+        "pt": ""
+    },
+    "Introduce el nombre del homebrew": {
+        "en": "Enter homebrew name",
+        "pt": ""
+    },
+    "Autor: ": {
+        "en": "Author: ",
+        "pt": ""
+    },
+    "Ruta: ": {
+        "en": "Path: ",
+        "pt": ""
+    },
+    "Lanzar Aplicación": {
+        "en": "Launch Application",
+        "pt": ""
+    },
+    "Crear Acceso Directo (Forwarder)": {
+        "en": "Create Forwarder",
+        "pt": ""
+    },
+    "Creando Forwarder... Espere por favor.": {
+        "en": "Creating forwarder... Please wait.",
+        "pt": ""
+    },
+    "Acceso directo creado con exito!": {
+        "en": "Forwarder successfully created!",
+        "pt": ""
+    },
+    "Error al crear el acceso directo.": {
+        "en": "Error creating forwarder.",
+        "pt": ""
+    },
+    "Hacer Backup a SD": {
+        "en": "Backup to SD",
+        "pt": ""
+    },
+    "Importar \\\"save\\\" desde SD": {
+        "en": "Import save from SD",
+        "pt": ""
+    },
+    "¿Deseas sobreescribir la partida de la consola con la copia de la SD?": {
+        "en": "Overwrite console save with SD copy?",
+        "pt": ""
+    },
+    "Si": {
+        "en": "Yes",
+        "pt": ""
+    },
+    "No": {
+        "en": "No",
+        "pt": ""
+    },
+    "Eliminar backup SD": {
+        "en": "Delete SD backup",
+        "pt": ""
+    },
+    "¿Deseas eliminar la copia de seguridad de la SD?": {
+        "en": "Delete SD backup?",
+        "pt": ""
+    },
+    "No se encontraron aplicaciones instaladas.": {
+        "en": "No installed applications found.",
+        "pt": ""
+    },
+    "Marcar": {
+        "en": "Mark",
+        "pt": ""
+    },
+    "Instalar Marcados": {
+        "en": "Install Marked",
+        "pt": ""
+    },
+    "Explorador de Archivos": {
+        "en": "File Browser",
+        "pt": ""
+    },
+    "Cargando contenido del USB...": {
+        "en": "Loading USB content...",
+        "pt": ""
+    },
+    "Explorador - ": {
+        "en": "Browser - ",
+        "pt": ""
+    },
+    "{} {}?\", t(\"¿Instalar": {
+        "en": "Install",
+        "pt": ""
+    },
+    "Instalar": {
+        "en": "Install",
+        "pt": ""
+    },
+    "Marcar/Desmarcar": {
+        "en": "Mark/Unmark",
+        "pt": ""
+    },
+    "No hay archivos marcados para instalar.": {
+        "en": "No marked files to install.",
+        "pt": ""
+    },
+    "Instalar por Cola Local": {
+        "en": "Local Queue Installer",
+        "pt": ""
+    },
+    "Por favor, no apagues la consola ni extraigas la unidad.": {
+        "en": "Please do not turn off the console or remove the drive.",
+        "pt": ""
+    },
+    "Iniciando...": {
+        "en": "Starting...",
+        "pt": ""
+    },
+    "{} ({})\", t(\"Cola de Instalación": {
+        "en": "Installation Queue",
+        "pt": ""
+    },
+    "Cancelar/Volver": {
+        "en": "Cancel/Back",
+        "pt": ""
+    },
+    "Cancelando instalación actual...": {
+        "en": "Canceling current installation...",
+        "pt": ""
+    },
+    "¡Proceso completado!": {
+        "en": "Process completed!",
+        "pt": ""
+    },
+    "Todas las instalaciones han terminado.": {
+        "en": "All installations have finished.",
+        "pt": ""
+    },
+    "{}: {}\", t(\"Instalando": {
+        "en": "Installing",
+        "pt": ""
+    },
+    "Completado": {
+        "en": "Completed",
+        "pt": ""
+    },
+    "Instalando...": {
+        "en": "Installing...",
+        "pt": ""
+    },
+    "Error": {
+        "en": "Error",
+        "pt": ""
+    },
+    "En cola": {
+        "en": "Queued",
+        "pt": ""
+    },
+    "Instalar por MTP": {
+        "en": "MTP Installer",
+        "pt": ""
+    },
+    "Esperando conexión o arrastra juegos...": {
+        "en": "Waiting for connection or drag games...",
+        "pt": ""
+    },
+    "Archivos recibidos en esta sesión (0)": {
+        "en": "Files received in this session (0)",
+        "pt": ""
+    },
+    "{} ({})\", t(\"Archivos recibidos en esta sesión": {
+        "en": "Files received in this session",
+        "pt": ""
+    },
+    "EXPLORAR MICROSD": {
+        "en": "EXPLORE MICROSD",
+        "pt": ""
+    },
+    "Mira las carpetas en tu PC": {
+        "en": "Look at the folders on your PC",
+        "pt": ""
+    },
+    "Conecta el cable USB a tu PC": {
+        "en": "Connect the USB cable to your PC",
+        "pt": ""
+    },
+    "Buscar partidas": {
+        "en": "Search save data",
+        "pt": ""
+    },
+    "Introduce el nombre del juego": {
+        "en": "Enter game name",
+        "pt": ""
+    },
+    "Gestor de Partidas Guardadas": {
+        "en": "Save Data Manager",
+        "pt": ""
+    },
+    "¿Estas seguro de que quieres sobreescribir la partida actual de la consola con la copia de la SD?": {
+        "en": "Are you sure you want to overwrite the current console save data with the SD copy?",
+        "pt": ""
+    },
+    "Eliminar Backup de SD": {
+        "en": "Delete SD Backup",
+        "pt": ""
+    },
+    "¿Estas seguro de que quieres eliminar la copia de seguridad de la SD?": {
+        "en": "Are you sure you want to delete the SD backup?",
+        "pt": ""
+    },
+    "Versión ": {
+        "en": "Version ",
+        "pt": ""
+    },
+    "Compilado ": {
+        "en": "Built ",
+        "pt": ""
+    },
+    "El instalador y actualizador The Goonies OS.": {
+        "en": "The Goonies OS installer and updater.",
+        "pt": ""
+    },
+    "Visita nuestro canal para soporte.": {
+        "en": "Visit our channel for support.",
+        "pt": ""
+    },
+    "Canal oficial de Telegram": {
+        "en": "Official Telegram Channel",
+        "pt": ""
+    },
+    "Código fuente y actualizaciones": {
+        "en": "Source code and updates",
+        "pt": ""
+    },
+    "Información del Proyecto": {
+        "en": "Project info",
+        "pt": ""
+    },
+    "Catálogo: guardado en SD.\\nRegistro: ": {
+        "en": "Catalog: cached on SD.\\nLog: ",
+        "pt": ""
+    },
+    "\\nAjustes: ": {
+        "en": "\\nSettings: ",
+        "pt": ""
+    },
+    "Compilado con libnx, Borealis, curl, libzip y otras librerias open-source.": {
+        "en": "Built with libnx, Borealis, curl, libzip and other open-source libraries.",
+        "pt": ""
+    },
+    "The Goonies Installer es un proyecto independiente y no está afiliado a Nintendo.": {
+        "en": "The Goonies Installer is an independent project and is not affiliated with Nintendo.",
+        "pt": ""
+    },
+    "Consola": {
+        "en": "Console",
+        "pt": ""
+    },
+    "Idioma / Language": {
+        "en": "Language / Idioma\", \"Idioma / Language",
+        "pt": ""
+    },
+    "Reinicia la app para aplicar el idioma.": {
+        "en": "Restart the app to apply language.\", \"Reinicie o aplicativo para aplicar o idioma.",
+        "pt": ""
+    },
+    "Versión de la App: ": {
+        "en": "App Version: ",
+        "pt": ""
+    },
+    "Almacenamiento (microSD)": {
+        "en": "Storage (microSD)",
+        "pt": ""
+    },
+    "No se pudo leer la SD": {
+        "en": "Could not read SD",
+        "pt": ""
+    },
+    "Capacidad: %.2f GB / Libre: %.2f GB": {
+        "en": "Capacity: %.2f GB / Free: %.2f GB",
+        "pt": ""
+    },
+    "Mantenimiento": {
+        "en": "Maintenance",
+        "pt": ""
+    },
+    "Limpiar archivos huérfanos": {
+        "en": "Clean orphaned files",
+        "pt": ""
+    },
+    "Limpieza completada! Eliminados %d tickets huérfanos y liberados %.2f MB.": {
+        "en": "Cleanup completed! Deleted %d orphan tickets and freed %.2f MB.",
+        "pt": ""
+    },
+    "Error al limpiar archivos.": {
+        "en": "Error cleaning files.",
+        "pt": ""
+    },
+    "Conectividad": {
+        "en": "Connectivity",
+        "pt": ""
+    },
+    "Explorar microSD (Conexión MTP)": {
+        "en": "Explore microSD (MTP Connection)",
+        "pt": ""
+    },
+    "Inicia la conexión MTP para transferir archivos desde tu PC.": {
+        "en": "Starts MTP connection to transfer files from your PC.",
+        "pt": ""
+    },
+    "Motor de Descarga": {
+        "en": "Download Engine",
+        "pt": ""
+    },
+    "Has activado Real-Debrid.": {
+        "en": "Real-Debrid activated.",
+        "pt": ""
+    },
+    "Cerrar sesión en Real-Debrid": {
+        "en": "Log out of Real-Debrid",
+        "pt": ""
+    },
+    "Vincular cuenta de Real-Debrid": {
+        "en": "Link Real-Debrid account",
+        "pt": ""
+    },
+    "Tu cuenta ya está vinculada. Toca para cerrar sesión.": {
+        "en": "Your account is linked. Tap to log out.",
+        "pt": ""
+    },
+    "Inicia sesión en Real-Debrid para descargas de alta velocidad.": {
+        "en": "Log in to Real-Debrid for high-speed downloads.",
+        "pt": ""
+    },
+    "Sesión de Real-Debrid cerrada.": {
+        "en": "Real-Debrid session closed.",
+        "pt": ""
+    },
+    "Modo USB": {
+        "en": "USB Mode",
+        "pt": ""
+    },
+    "USB 3.0 activado. Puede causar interferencias con mandos Bluetooth.": {
+        "en": "USB 3.0 activated. May cause Bluetooth controller interference.",
+        "pt": ""
+    },
+    "USB 2.0 activado (Estable).": {
+        "en": "USB 2.0 activated (Stable).",
+        "pt": ""
+    },
+    "Error al abrir el archivo ZIP.": {
+        "en": "Error opening ZIP file.",
+        "pt": ""
+    },
+    "Descomprimiendo: ": {
+        "en": "Extracting: ",
+        "pt": ""
+    },
+    " de ": {
+        "en": " of ",
+        "pt": ""
+    },
+    "Actualización CFW The Goonies OS": {
+        "en": "The Goonies OS CFW Update",
+        "pt": ""
+    },
+    "Buscando última versión en GitHub...": {
+        "en": "Searching for latest version on GitHub...",
+        "pt": ""
+    },
+    "Selecciona las carpetas a conservar (Nintendo y emuMMC siempre se conservan).": {
+        "en": "Select folders to keep (Nintendo and emuMMC are always kept).",
+        "pt": ""
+    },
+    "Comenzar Actualización": {
+        "en": "Start Update",
+        "pt": ""
+    },
+    "Última versión encontrada. ¿Deseas instalarla?": {
+        "en": "Latest version found. Do you want to install it?",
+        "pt": ""
+    },
+    "Error: Límite de peticiones de GitHub excedido.": {
+        "en": "Error: GitHub API rate limit exceeded.",
+        "pt": ""
+    },
+    "Error: No se encontró un archivo .zip en el release.": {
+        "en": "Error: No .zip file found in release.",
+        "pt": ""
+    },
+    "Error de conexión al buscar actualizaciones.": {
+        "en": "Connection error while checking for updates.",
+        "pt": ""
+    },
+    "Descargando actualización...": {
+        "en": "Downloading update...",
+        "pt": ""
+    },
+    "Limpiando SD e instalando actualización...": {
+        "en": "Cleaning SD and installing update...",
+        "pt": ""
+    },
+    "Extrayendo archivos...": {
+        "en": "Extracting files...",
+        "pt": ""
+    },
+    "¡Actualización completada con éxito!": {
+        "en": "Update completed successfully!",
+        "pt": ""
+    },
+    "Cerrar App": {
+        "en": "Close App",
+        "pt": ""
+    },
+    "Descargando actualización... ": {
+        "en": "Downloading update... ",
+        "pt": ""
+    }
+}

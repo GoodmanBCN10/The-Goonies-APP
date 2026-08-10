@@ -11,6 +11,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <nx_thread.hpp>
 
 namespace pipensx {
 
@@ -143,7 +144,7 @@ private:
         imageRequests_;
     mutable std::unordered_map<std::string, CachedImage> imageCache_;
     mutable std::unordered_map<std::string, uint64_t> imageRetryAfter_;
-    mutable std::vector<std::thread> imageWorkers_;
+    mutable std::vector<nx::thread> imageWorkers_;
     mutable size_t imageCacheBytes_ = 0;
     mutable uint64_t imageAccess_ = 0;
     mutable std::atomic<bool> imageNetworkPaused_{false};

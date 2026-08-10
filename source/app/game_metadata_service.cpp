@@ -498,7 +498,7 @@ GameMetadataService::~GameMetadataService() {
     imageReady_.notify_all();
     for (auto& callback : cancelled)
         callback(nullptr);
-    for (std::thread& worker : imageWorkers_)
+    for (nx::thread& worker : imageWorkers_)
         if (worker.joinable())
             worker.join();
 }

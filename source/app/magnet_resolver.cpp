@@ -822,7 +822,7 @@ bool MagnetResolver::resolveToFile(const std::string& uri,
     std::atomic<bool> stopWorkers{false};
     std::vector<uint8_t> metadata;
     std::vector<uint8_t> verifiedEndpoints;
-    std::vector<std::thread> workers;
+    std::vector<nx::thread> workers;
     uint32_t workerCount = std::min(peerCount, kMaxConcurrentPeers);
     for (uint32_t worker = 0; worker < workerCount; ++worker) {
         workers.emplace_back([&] {
@@ -869,7 +869,7 @@ bool MagnetResolver::resolveToFile(const std::string& uri,
             }
         });
     }
-    for (std::thread& worker : workers)
+    for (nx::thread& worker : workers)
         worker.join();
 
     if (cancelled) {

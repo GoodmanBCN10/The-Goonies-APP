@@ -2017,10 +2017,12 @@ void DownloadManager::workerMain() {
                 const uint64_t CHUNK_SIZE = 16 * 1024 * 1024;
                 uint64_t totalSize = metainfo.files[targetFileIndex].length;
                 
+                std::atomic<bool> allWorkersFinished{false};
+                
                 auto progressThreadFunc = [&]() {
                     uint64_t lastCalcTime = now_ms();
                     uint64_t lastCalcBytes = 0;
-                    while (!stopping_.load() && !cancelActiveTask_.load() && totalDownloadedBytes.load() < totalSize && !downloadFailed.load()) {
+                    while (!stopping_.load() && !cancelActiveTask_.load() && totalDownloadedBytes.load() < totalSize && !downloadFailed.load() && !allWorkersFinished.load()) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(500));
                         uint64_t current = totalDownloadedBytes.load();
                         std::lock_guard<std::mutex> lock(mutex_);
@@ -2125,6 +2127,8 @@ void DownloadManager::workerMain() {
                 for (auto& t : threads) {
                     if (t.joinable()) t.join();
                 }
+                
+                allWorkersFinished = true;
                 if (progressThread.joinable()) progressThread.join();
                 
                 res = downloadFailed.load() ? CURLE_HTTP_RETURNED_ERROR : CURLE_OK;
