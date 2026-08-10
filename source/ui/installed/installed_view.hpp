@@ -302,6 +302,12 @@ public:
             return cell;
         }
         
+        if (columns_ == 1) {
+            auto* cell = static_cast<InstalledCell*>(recycler->dequeueReusableCell("Installed"));
+            cell->setTitle(titles_[index.row], metadata_, onClick_);
+            return cell;
+        }
+
         auto* cell = static_cast<InstalledGridRow*>(recycler->dequeueReusableCell("GridRow"));
         cell->setTitles(titles_, index.row * columns_, columns_, metadata_, catalog_, settings_, manager_, onClick_);
         return cell;
@@ -369,7 +375,25 @@ public:
         recycler_->registerCell("GridRow", [this] { return new InstalledGridRow(columns_); });
         recycler_->registerCell("Message", [] { return new TextMessageCell(); });
         
-        dataSource_ = new InstalledDataSource(metadata, catalog, settings, manager);
+        auto onClick = [this, manager, metadata, catalog, settings](const InstalledTitle& title) {
+            if (showUpdatesOnly_ && metadata) {
+                auto meta = metadata->findByTitleId(title.titleId);
+                if (meta) {
+                    for (const auto& entry : catalog->entries()) {
+                        if (entry.infoHash == meta->infoHash) {
+                            brls::Application::pushActivity(
+                                new GameDetailActivity(entry, "", manager, metadata, this->installed_, settings,
+                                    [](const std::string&, const std::string&){},
+                                    [](){}));
+                            return;
+                        }
+                    }
+                }
+            }
+            brls::Application::pushActivity(new brls::Activity(new InstalledDetailsView(title, metadata)));
+        };
+        
+        dataSource_ = new InstalledDataSource(metadata, catalog, settings, manager, onClick);
         recycler_->setDataSource(dataSource_);
         addView(recycler_);
         
@@ -393,6 +417,7 @@ public:
 
         registerAction(t("Ver Updates", "View Updates", "Ver Atualiz."), brls::BUTTON_Y, [this](brls::View*) {
             showUpdatesOnly_ = !showUpdatesOnly_;
+            updateViewMode();
             dataSource_->setFilterUpdates(showUpdatesOnly_);
             reload();
             return true;
@@ -437,8 +462,13 @@ private:
     }
 
     void updateViewMode() {
-        recycler_->estimatedRowHeight = 230;
-        dataSource_->setGridView(true, columns_);
+        if (showUpdatesOnly_) {
+            recycler_->estimatedRowHeight = 92;
+            dataSource_->setGridView(false, 1);
+        } else {
+            recycler_->estimatedRowHeight = 230;
+            dataSource_->setGridView(true, columns_);
+        }
     }
 
     EmptyStateView* ensureEmptyState() {
