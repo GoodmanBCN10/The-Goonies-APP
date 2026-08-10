@@ -140,6 +140,26 @@ public:
         subtitle_->setText(title.publisher.empty() ? title.titleId : title.publisher);
         setArtworkUrl(image_, metadata, title.iconPath, currentIconPath_, imageState_);
 
+        if (metadata) {
+            auto meta = metadata->findByTitleId(title.titleId);
+            bool hasUpdate = false;
+            if (meta) {
+                // Determine if an update is available.
+                // In game_metadata_service, latestVersion is parsed from update versions (which are > 65536).
+                // If internalVersion is the base game version (which is often 0), and an update exists, it will be greater.
+                // However, some base games might have latestVersion == 0 if no updates exist.
+                // To be safe, if latestVersion > 0 and latestVersion > title.internalVersion, we consider it an update.
+                if (meta->latestVersion > 0 && meta->latestVersion > title.internalVersion) {
+                    hasUpdate = true;
+                }
+            }
+            if (updateBadgeBox_) {
+                updateBadgeBox_->setVisibility(hasUpdate ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
+            }
+        } else {
+            if (updateBadgeBox_) updateBadgeBox_->setVisibility(brls::Visibility::GONE);
+        }
+
         this->registerClickAction([title, metadata, onClick](brls::View* view) {
             if (onClick) {
                 onClick(title);
@@ -237,7 +257,7 @@ public:
                 bool hasUpdate = false;
                 if (metadata_) {
                     auto meta = metadata_->findByTitleId(t.titleId);
-                    if (meta && meta->latestVersion > t.internalVersion) {
+                    if (meta && meta->latestVersion > 0 && meta->latestVersion > t.internalVersion) {
                         hasUpdate = true;
                     }
                 }
@@ -363,7 +383,7 @@ public:
             return true;
         });
 
-        registerAction("Buscar", brls::BUTTON_X, [this](brls::View*) {
+        registerAction("Buscar", brls::BUTTON_BACK, [this](brls::View*) {
             brls::Application::getImeManager()->openForText([this](std::string text) {
                 searchQuery_ = text;
                 reload();
@@ -378,7 +398,7 @@ public:
             return true;
         });
 
-        registerAction("Ordenar", brls::BUTTON_LSB, [this](brls::View*) {
+        registerAction("Ordenar", brls::BUTTON_X, [this](brls::View*) {
             auto current = dataSource_->getSortType();
             if (current == InstalledDataSource::SortType::Alphabetical) {
                 dataSource_->setSortType(InstalledDataSource::SortType::InstallDate);
