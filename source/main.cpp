@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
     } else if (argc >= 2 && std::string(argv[0]) == "--finish-update") {
         // Fallback for older versions (e.g. v2.1.8) that passed incorrect argv[0]
         std::string originalPath = argv[1];
-        std::string actualTempPath = originalPath + ".tmp";
+        std::string actualTempPath = originalPath + ".update";
         
         unlink(originalPath.c_str());
         rename(actualTempPath.c_str(), originalPath.c_str());

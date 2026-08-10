@@ -129,7 +129,7 @@ target_link_libraries(TheGooniesInstaller PRIVATE
 )
 
 if(NOT DEFINED APP_VERSION)
-    set(APP_VERSION "v2.1.11")
+    set(APP_VERSION "v2.1.12")
 endif()
 
 target_compile_definitions(TheGooniesInstaller PRIVATE
