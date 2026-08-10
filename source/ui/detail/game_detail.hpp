@@ -615,15 +615,44 @@ private:
             return;
         }
 
-        // Packages present. Install them silently. On a mixed release (anything
-        // that is not an install package) auto-select packages only; on a clean
-        // package-only release an empty mask means "all files".
+        // Packages present. Install them silently.
+        bool hasBaseGame = installed_ && installed_->contains(titleId_);
+        std::string lowerTitleId = catalogLower(titleId_);
+        
         uint32_t extras = preview.fileCount - preview.packageCount;
         std::vector<uint8_t> mask;
-        if (extras > 0) {
-            mask.reserve(preview.files.size());
-            for (const auto& file : preview.files)
-                mask.push_back(file.package ? 1 : 0);
+        mask.reserve(preview.files.size());
+        
+        bool anySelected = false;
+        
+        for (const auto& file : preview.files) {
+            if (!file.package) {
+                mask.push_back(0);
+                continue;
+            }
+            
+            bool skip = false;
+            if (hasBaseGame) {
+                std::string lowerPath = catalogLower(file.path);
+                // Si contiene el TitleID del juego base o "[v0]", es el juego base
+                if (lowerPath.find(lowerTitleId) != std::string::npos || lowerPath.find("[v0]") != std::string::npos) {
+                    skip = true;
+                }
+            }
+            
+            if (!skip) {
+                mask.push_back(1);
+                anySelected = true;
+            } else {
+                mask.push_back(0);
+            }
+        }
+        
+        if (!anySelected) {
+            // Todos los paquetes fueron omitidos (por ejemplo, solo estaba el juego base y ya estaba instalado)
+            // Abrimos el selector manual en lugar de fallar silenciosamente.
+            openSelection(path, std::move(preview), std::move(initialPeers));
+            return;
         }
 
         std::string id;
