@@ -2224,7 +2224,9 @@ void DownloadManager::workerMain() {
                             task->status = DownloadStatus::Error;
                             task->error = coordinator ? coordinator->error() : "Error instalando";
                         } else {
-                            task->status = DownloadStatus::Completed;
+                            task->status = mode == TransferMode::StreamInstall
+                                ? DownloadStatus::Installed
+                                : DownloadStatus::Completed;
                             task->completedBytes = task->totalBytes;
                         }
                         std::string ignored;
