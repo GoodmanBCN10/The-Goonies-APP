@@ -55,8 +55,13 @@ int main(int argc, char* argv[]) {
         // Remove the original NRO (it's not locked since we are running the tmp)
         unlink(originalPath.c_str());
         
-        // Rename ourselves (.tmp) to the original path
-        rename(nroPath.c_str(), originalPath.c_str());
+        // Copy ourselves (.update) to the original path instead of renaming
+        // Renaming a running executable on Switch FAT32 causes a system crash!
+        std::ifstream src(nroPath, std::ios::binary);
+        std::ofstream dst(originalPath, std::ios::binary);
+        dst << src.rdbuf();
+        src.close();
+        dst.close();
         
         // Wait to allow FAT32 to commit the directory changes
         svcSleepThread(1000000000ULL); // 1 second
@@ -72,7 +77,12 @@ int main(int argc, char* argv[]) {
         std::string actualTempPath = originalPath + ".update";
         
         unlink(originalPath.c_str());
-        rename(actualTempPath.c_str(), originalPath.c_str());
+        
+        std::ifstream src(actualTempPath, std::ios::binary);
+        std::ofstream dst(originalPath, std::ios::binary);
+        dst << src.rdbuf();
+        src.close();
+        dst.close();
         
         // Wait to allow FAT32 to commit the directory changes
         svcSleepThread(1000000000ULL); // 1 second
@@ -80,6 +90,12 @@ int main(int argc, char* argv[]) {
         envSetNextLoad(originalPath.c_str(), originalPath.c_str());
         
         return 0;
+    }
+    
+    // If we just updated, clean up the temporary update file
+    std::string tempUpdatePath = nroPath + ".update";
+    if (access(tempUpdatePath.c_str(), F_OK) == 0) {
+        unlink(tempUpdatePath.c_str());
     }
     
     pipensx::UpdateService updater(nroPath);
