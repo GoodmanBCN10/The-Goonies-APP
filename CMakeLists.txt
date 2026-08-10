@@ -67,7 +67,7 @@ add_executable(TheGooniesInstaller
     source/RealDebridProvider.cpp
     vendor/dht/dht.c
     vendor/qrcodegen/qrcodegen.cpp
-    vendor/libnx-ext/libnx-ipcext/source/es.c
+    vendor/libnx-ext/libnx-ipcext/source/es_vendor.c
     vendor/libnx-ext/libnx-ipcext/source/ns-ext.c
     vendor/borealis/library/lib/platforms/switch/switch_wrapper.c
     ${GOONIES_SOURCES}

@@ -54,12 +54,17 @@ bool readUnsigned(const Json& root, const char* key, uint64_t& value,
                   std::string& error) {
     if (!root.contains(key))
         return true;
-    if (!root[key].is_number_unsigned()) {
+    if (!root[key].is_number_integer()) {
         error = std::string("Setting '") + key +
                 "' must be an unsigned number.";
         return false;
     }
-    value = root[key].get<uint64_t>();
+    int64_t val = root[key].get<int64_t>();
+    if (val < 0) {
+        error = std::string("Setting '") + key + "' must be positive.";
+        return false;
+    }
+    value = static_cast<uint64_t>(val);
     return true;
 }
 

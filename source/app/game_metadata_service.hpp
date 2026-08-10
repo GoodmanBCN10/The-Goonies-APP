@@ -27,6 +27,7 @@ struct GameMetadata {
     std::string bannerUrl;
     std::vector<std::string> screenshots;
     std::vector<std::string> categories;
+    uint32_t latestVersion = 0;
 };
 
 struct MetadataManifest {
@@ -77,6 +78,7 @@ public:
     bool fetchLatest(MetadataSnapshot& snapshot, std::string& error) const;
     void adopt(MetadataSnapshot snapshot);
     const GameMetadata* findByInfoHash(const std::string& infoHash) const;
+    const GameMetadata* findByTitleId(const std::string& titleId) const;
     bool refreshDetails(const std::string& titleId, GameMetadata& metadata,
                         std::string& error) const;
     bool loadImage(const std::string& url, std::vector<uint8_t>& bytes,

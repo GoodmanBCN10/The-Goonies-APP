@@ -147,7 +147,7 @@ namespace goonies {
 
             buttonsBox->addView(createMenuButton(t("Juegos Instalados", "Installed Games", "Jogos instalados"), [installed, manager, metadata]() {
                 brls::Application::pushActivity(new brls::Activity(
-                    new pipensx::ui::InstalledView(installed, manager, metadata)));
+                    new pipensx::ui::InstalledView(installed, manager, metadata, nullptr, nullptr)));
             }));
 
             buttonsBox->addView(createMenuButton(t("Partidas Guardadas", "Save Data", "Jogos salvos"), [installed, metadata]() {
@@ -395,9 +395,9 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
     }));
 
     // 3. Juegos Instalados / Partidas Guardadas
-    buttonsBox->addView(createMenuButton(t("Juegos Instalados / Partidas Guardadas", "Installed Games / Save Data", "Jogos instalados/jogos salvos"), [this, m_installed, m_manager, m_metadata]() {
+    buttonsBox->addView(createMenuButton(t("Juegos Instalados / Partidas Guardadas", "Installed Games / Save Data", "Jogos instalados/jogos salvos"), [this, m_installed, m_manager, m_metadata, m_catalog, m_settings]() {
         brls::Application::pushActivity(new brls::Activity(
-            new pipensx::ui::InstalledView(m_installed, m_manager, m_metadata)));
+            new pipensx::ui::InstalledView(m_installed, m_manager, m_metadata, m_catalog, m_settings)));
     }));
 
     // 4. LinkGoonies - Vincular y desvincular cuentas online

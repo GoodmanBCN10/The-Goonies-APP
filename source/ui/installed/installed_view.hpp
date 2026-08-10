@@ -14,6 +14,10 @@
 #include "ui/theme.hpp"
 #include "ui/installed/installed_details_view.hpp"
 #include "ui/common/message_cells.hpp"
+#include "app/catalog_service.hpp"
+#include "app/app_settings.hpp"
+#include "ui/detail/game_detail.hpp"
+#include <algorithm>
 #include <algorithm>
 
 namespace pipensx::ui {
@@ -77,6 +81,8 @@ private:
     AsyncRgbaImage* image_ = nullptr;
     brls::Label* title_ = nullptr;
     brls::Label* subtitle_ = nullptr;
+    brls::Box* updateBadgeBox_ = nullptr;
+    brls::Label* updateBadgeLabel_ = nullptr;
     std::string currentIconPath_;
     std::shared_ptr<ImageRequestState> imageState_ =
         std::make_shared<ImageRequestState>();
@@ -128,7 +134,7 @@ public:
         addView(subtitle_);
     }
 
-    void setTitle(const InstalledTitle& title, GameMetadataService* metadata, std::function<void(const InstalledTitle&)> onClick = nullptr) {
+    void setTitle(const InstalledTitle& title, GameMetadataService* metadata, CatalogService* catalog, AppSettings* settings, DownloadManager* manager, std::function<void(const InstalledTitle&)> onClick = nullptr) {
         this->setVisibility(brls::Visibility::VISIBLE);
         title_->setText(title.name);
         subtitle_->setText(title.publisher.empty() ? title.titleId : title.publisher);
@@ -170,6 +176,8 @@ private:
     AsyncRgbaImage* image_ = nullptr;
     brls::Label* title_ = nullptr;
     brls::Label* subtitle_ = nullptr;
+    brls::Box* updateBadgeBox_ = nullptr;
+    brls::Label* updateBadgeLabel_ = nullptr;
     std::string currentIconPath_;
     std::shared_ptr<ImageRequestState> imageState_ = std::make_shared<ImageRequestState>();
 };
@@ -192,10 +200,10 @@ public:
         }
     }
 
-    void setTitles(const std::vector<InstalledTitle>& titles, size_t offset, int columns, GameMetadataService* metadata, std::function<void(const InstalledTitle&)> onClick = nullptr) {
+    void setTitles(const std::vector<InstalledTitle>& titles, size_t offset, int columns, GameMetadataService* metadata, CatalogService* catalog, AppSettings* settings, DownloadManager* manager, std::function<void(const InstalledTitle&)> onClick = nullptr) {
         for (int i = 0; i < columns; i++) {
             if (offset + i < titles.size()) {
-                items_[i]->setTitle(titles[offset + i], metadata, onClick);
+                items_[i]->setTitle(titles[offset + i], metadata, catalog, settings, manager, onClick);
                 items_[i]->setFocusable(true);
             } else {
                 items_[i]->clear();
@@ -212,23 +220,39 @@ class InstalledDataSource : public brls::RecyclerDataSource {
 public:
     enum class SortType { Alphabetical, LastPlayed, InstallDate };
 
-    explicit InstalledDataSource(GameMetadataService* metadata, std::function<void(const InstalledTitle&)> onClick = nullptr)
-        : metadata_(metadata), onClick_(onClick) {}
+    explicit InstalledDataSource(GameMetadataService* metadata, CatalogService* catalog, AppSettings* settings, DownloadManager* manager, std::function<void(const InstalledTitle&)> onClick = nullptr)
+        : metadata_(metadata), catalog_(catalog), settings_(settings), manager_(manager), onClick_(onClick) {}
+
+    void setFilterUpdates(bool filter) {
+        showUpdatesOnly_ = filter;
+    }
 
     void setTitles(std::vector<InstalledTitle> titles, const std::string& query = "") {
-        if (query.empty()) {
-            titles_ = std::move(titles);
-        } else {
-            titles_.clear();
-            std::string q = query;
-            std::transform(q.begin(), q.end(), q.begin(), ::tolower);
-            for (const auto& t : titles) {
+        titles_.clear();
+        std::string q = query;
+        std::transform(q.begin(), q.end(), q.begin(), ::tolower);
+        
+        for (const auto& t : titles) {
+            if (showUpdatesOnly_) {
+                bool hasUpdate = false;
+                if (metadata_) {
+                    auto meta = metadata_->findByTitleId(t.titleId);
+                    if (meta && meta->latestVersion > t.internalVersion) {
+                        hasUpdate = true;
+                    }
+                }
+                if (!hasUpdate) continue;
+            }
+            
+            if (!q.empty()) {
                 std::string n = t.name;
                 std::transform(n.begin(), n.end(), n.begin(), ::tolower);
-                if (n.find(q) != std::string::npos || t.titleId.find(q) != std::string::npos) {
-                    titles_.push_back(t);
+                if (n.find(q) == std::string::npos && t.titleId.find(q) == std::string::npos) {
+                    continue;
                 }
             }
+            
+            titles_.push_back(t);
         }
         applySort();
     }
@@ -259,7 +283,7 @@ public:
         }
         
         auto* cell = static_cast<InstalledGridRow*>(recycler->dequeueReusableCell("GridRow"));
-        cell->setTitles(titles_, index.row * columns_, columns_, metadata_, onClick_);
+        cell->setTitles(titles_, index.row * columns_, columns_, metadata_, catalog_, settings_, manager_, onClick_);
         return cell;
     }
 
@@ -281,18 +305,22 @@ private:
     }
 
     GameMetadataService* metadata_;
+    CatalogService* catalog_;
+    AppSettings* settings_;
+    DownloadManager* manager_;
     std::vector<InstalledTitle> titles_;
     int columns_ = 6;
     std::function<void(const InstalledTitle&)> onClick_;
     SortType sortType_ = SortType::Alphabetical;
+    bool showUpdatesOnly_ = false;
 };
 
 class InstalledView : public brls::Box {
 public:
     InstalledView(InstalledTitleService* installed, DownloadManager* manager,
-                  GameMetadataService* metadata)
+                  GameMetadataService* metadata, CatalogService* catalog, AppSettings* settings)
         : brls::Box(brls::Axis::COLUMN), installed_(installed),
-          manager_(manager), alive_(std::make_shared<std::atomic<bool>>(true)) {
+          manager_(manager), metadata_(metadata), catalog_(catalog), settings_(settings), alive_(std::make_shared<std::atomic<bool>>(true)) {
         status_ = new brls::Label();
         status_->setFontSize(15);
         status_->setMarginTop(10);
@@ -321,7 +349,7 @@ public:
         recycler_->registerCell("GridRow", [this] { return new InstalledGridRow(columns_); });
         recycler_->registerCell("Message", [] { return new TextMessageCell(); });
         
-        dataSource_ = new InstalledDataSource(metadata);
+        dataSource_ = new InstalledDataSource(metadata, catalog, settings, manager);
         recycler_->setDataSource(dataSource_);
         addView(recycler_);
         
@@ -335,16 +363,22 @@ public:
             return true;
         });
 
-        registerAction("Buscar", brls::BUTTON_Y, [this](brls::View*) {
+        registerAction("Buscar", brls::BUTTON_X, [this](brls::View*) {
             brls::Application::getImeManager()->openForText([this](std::string text) {
                 searchQuery_ = text;
                 reload();
-                brls::Application::giveFocus(this);
-            }, "Buscar juegos", "Introduce el nombre o TitleID", 100, searchQuery_, 0);
+            }, "Buscar juegos instalados...", "", 256, searchQuery_, brls::KEYBOARD_DISABLE_NONE);
             return true;
         });
 
-        registerAction("Ordenar", brls::BUTTON_X, [this](brls::View*) {
+        registerAction(t("Ver Updates", "View Updates", "Ver Atualiz."), brls::BUTTON_Y, [this](brls::View*) {
+            showUpdatesOnly_ = !showUpdatesOnly_;
+            dataSource_->setFilterUpdates(showUpdatesOnly_);
+            reload();
+            return true;
+        });
+
+        registerAction("Ordenar", brls::BUTTON_LSB, [this](brls::View*) {
             auto current = dataSource_->getSortType();
             if (current == InstalledDataSource::SortType::Alphabetical) {
                 dataSource_->setSortType(InstalledDataSource::SortType::InstallDate);
@@ -463,15 +497,19 @@ private:
 
     InstalledTitleService* installed_;
     DownloadManager* manager_;
-    brls::Label* status_ = nullptr;
-    brls::Label* sortLabel_ = nullptr;
-    EmptyStateView* emptyState_ = nullptr;
-    brls::RecyclerFrame* recycler_ = nullptr;
-    InstalledDataSource* dataSource_ = nullptr;
+    GameMetadataService* metadata_;
+    CatalogService* catalog_;
+    AppSettings* settings_;
     std::shared_ptr<std::atomic<bool>> alive_;
+    brls::Label* status_;
+    brls::Label* sortLabel_;
+    brls::RecyclerFrame* recycler_;
+    InstalledDataSource* dataSource_;
+    EmptyStateView* emptyState_ = nullptr;
     bool refreshing_ = false;
     int columns_ = 6;
     std::string searchQuery_ = "";
+    bool showUpdatesOnly_ = false;
 };
 
 }  // namespace pipensx::ui

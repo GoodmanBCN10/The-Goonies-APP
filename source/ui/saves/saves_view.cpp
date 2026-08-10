@@ -31,7 +31,7 @@ SavesView::SavesView(InstalledTitleService* installedService, GameMetadataServic
         brls::Application::pushActivity(new brls::Activity(new SaveDetailsView(title, metadata)));
     };
     
-    dataSource_ = new InstalledDataSource(metadata, onClick);
+    dataSource_ = new InstalledDataSource(metadata, nullptr, nullptr, nullptr, onClick);
     dataSource_->setGridView(true, 6);
     recycler_->setDataSource(dataSource_);
     

@@ -108,6 +108,7 @@ bool InstalledTitleService::refresh(std::string& error) {
     
     Result pdm_rc = pdmqryInitialize();
     bool has_pdm = R_SUCCEEDED(pdm_rc);
+    bool has_ncm = R_SUCCEEDED(ncmInitialize());
     std::vector<NsApplicationRecord> records;
     constexpr s32 PageSize = 64;
     s32 offset = 0;
@@ -163,6 +164,7 @@ bool InstalledTitleService::refresh(std::string& error) {
                 control.get(), sizeof(*control), &actualSize);
         }
         if (R_SUCCEEDED(rc)) {
+            title.displayVersion = boundedText(control->nacp.display_version, sizeof(control->nacp.display_version));
             NacpLanguageEntry* language = nullptr;
             if (R_SUCCEEDED(nacpGetLanguageEntry(&control->nacp, &language)) &&
                 language) {
@@ -184,6 +186,28 @@ bool InstalledTitleService::refresh(std::string& error) {
                              "event=control_data result=0x%08x", rc);
         }
         
+        if (has_ncm) {
+            u64 update_id = record.application_id + 0x800;
+            auto getVersion = [&](NcmStorageId storage) -> uint32_t {
+                uint32_t v = 0;
+                NcmContentMetaDatabase db;
+                if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storage))) {
+                    NcmContentMetaKey key;
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, update_id))) {
+                        v = key.version;
+                    } else if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, record.application_id))) {
+                        v = key.version;
+                    }
+                    ncmContentMetaDatabaseClose(&db);
+                }
+                return v;
+            };
+            title.internalVersion = getVersion(NcmStorageId_SdCard);
+            if (title.internalVersion == 0) {
+                title.internalVersion = getVersion(NcmStorageId_BuiltInUser);
+            }
+        }
+        
         if (has_pdm) {
             PdmPlayStatistics stats;
             if (R_SUCCEEDED(pdmqryQueryPlayStatisticsByApplicationId(record.application_id, false, &stats))) {
@@ -198,6 +222,9 @@ bool InstalledTitleService::refresh(std::string& error) {
 
     if (has_pdm) {
         pdmqryExit();
+    }
+    if (has_ncm) {
+        ncmExit();
     }
 
     std::stable_sort(next.begin(), next.end(),

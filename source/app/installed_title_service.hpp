@@ -17,6 +17,8 @@ struct InstalledTitle {
     uint64_t playtimeMinutes = 0;
     uint64_t lastPlayedTimestamp = 0;
     uint64_t installTimestamp = 0;
+    uint32_t internalVersion = 0;
+    std::string displayVersion;
 };
 
 class InstalledTitleService {

@@ -32,7 +32,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	TheGooniesInstaller
 BUILD		:=	build
-SOURCES		:=	vendor/qrcodegen source source/app source/ui source/ui/catalog source/ui/downloads source/ui/forwarders source/ui/installed source/ui/mtp source/ui/saves source/ui/settings source/ui/updater source/ui/detail source/install source/platform  source/installer source/utils source/yati source/yati/container source/yati/nx source/yati/nx/nxdumptool source/yati/source source/minini source/libhaze source/mtp source/core
+SOURCES		:=	vendor/qrcodegen vendor/dht vendor/libnx-ext/libnx-ext/source vendor/libnx-ext/libnx-ipcext/source source source/app source/ui source/ui/catalog source/ui/downloads source/ui/forwarders source/ui/installed source/ui/mtp source/ui/saves source/ui/settings source/ui/updater source/ui/detail source/install source/platform  source/installer source/utils source/yati source/yati/container source/yati/nx source/yati/nx/nxdumptool source/yati/source source/minini source/libhaze source/mtp source/core
 DATA		:=	data
 INCLUDES	:=	vendor source vendor/libnx-ext/libnx-ipcext/include vendor/libnx-ext/libnx-ext/include include include/minini include/yati/nx/nxdumptool include/libhaze vendor/borealis/library/include vendor/borealis/library/include/borealis/extern vendor/borealis/library/include/borealis/extern/nanovg vendor/borealis/library/lib/extern/nanovg vendor/borealis/library/lib/extern/fmt/include vendor/borealis/library/lib/extern/yoga vendor/borealis/library/lib/extern/tweeny/include
 ROMFS		:=	romfs

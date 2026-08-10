@@ -526,6 +526,14 @@ bool GameMetadataService::parseIndex(const std::string& json,
         parseMetadataObject(item, metadata);
         if (metadata.titleId.empty() || metadata.name.empty())
             continue;
+        std::string latestVersionStr = stringValue(item, "latestVersion");
+        if (!latestVersionStr.empty()) {
+            try {
+                metadata.latestVersion = std::stoul(latestVersionStr);
+            } catch (...) {
+                metadata.latestVersion = 0;
+            }
+        }
         items.push_back(std::move(metadata));
     }
     if (items.empty()) {
@@ -788,6 +796,21 @@ GameMetadataService::findByInfoHash(const std::string& infoHash) const {
     });
     auto it = byHash_.find(key);
     return it == byHash_.end() ? nullptr : &it->second;
+}
+
+const GameMetadata*
+GameMetadataService::findByTitleId(const std::string& titleId) const {
+    if (titleId.empty()) return nullptr;
+    std::string lowerTitleId = titleId;
+    std::transform(lowerTitleId.begin(), lowerTitleId.end(), lowerTitleId.begin(), ::tolower);
+    for (const auto& pair : byHash_) {
+        std::string lowerMeta = pair.second.titleId;
+        std::transform(lowerMeta.begin(), lowerMeta.end(), lowerMeta.begin(), ::tolower);
+        if (lowerMeta == lowerTitleId) {
+            return &pair.second;
+        }
+    }
+    return nullptr;
 }
 
 bool GameMetadataService::refreshDetails(const std::string& titleId,
