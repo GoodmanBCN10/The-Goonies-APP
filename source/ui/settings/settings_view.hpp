@@ -417,6 +417,7 @@ private:
                 }
                 const std::string temp = updater_->stagedPath();
                 const std::string target = updater_->targetPath();
+                // hbloader REQUIRES argv to start with the executable path!
                 const std::string arguments = "\"" + temp + "\" \"--finish-update\" \"" + target + "\"";
                 const Result result = envSetNextLoad(temp.c_str(),
                                                      arguments.c_str());

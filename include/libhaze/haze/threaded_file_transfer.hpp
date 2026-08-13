@@ -9,8 +9,8 @@ namespace sphaira::thread {
 
 using Result = ams::Result;
 
-static constexpr u64 BUFFER_SIZE_READ = 1024*1024*1;
-static constexpr u64 BUFFER_SIZE_WRITE = 1024*1024*1;
+static constexpr u64 BUFFER_SIZE_READ = 1024*1024*4;
+static constexpr u64 BUFFER_SIZE_WRITE = 1024*1024*1; // 1 MB to prevent Join() blocking > 60s
 
 enum class Mode {
     // default, always multi-thread.

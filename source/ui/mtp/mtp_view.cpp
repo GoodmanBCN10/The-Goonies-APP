@@ -261,8 +261,9 @@ void MTPView::updateStatus() {
         auto now = std::chrono::steady_clock::now();
         auto msPassed = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastTime_).count();
         
-        if (msPassed >= 1000) {
-            currentSpeed_ = ((double)diff / 1024.0 / 1024.0) / (msPassed / 1000.0);
+        if (msPassed >= 250) {
+            double instantSpeed = ((double)diff / 1024.0 / 1024.0) / (msPassed / 1000.0);
+            currentSpeed_ = (currentSpeed_ * 0.7) + (instantSpeed * 0.3); // moving average
             lastBytesWritten_ = written;
             lastTime_ = now;
         }

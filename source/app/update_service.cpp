@@ -369,7 +369,7 @@ UpdateService::UpdateService(std::string targetPath,
 }
 
 UpdateService::~UpdateService() {
-    for (nx::thread& worker : workers_)
+    for (auto& worker : workers_)
         if (worker.joinable())
             worker.join();
 }

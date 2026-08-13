@@ -5,7 +5,6 @@
 #include <stdexcept>
 #include <borealis.hpp>
 #include <string>
-#include <switch/runtime/devices/fs_dev.h>
 #include <vector>
 #include <thread>
 #include <atomic>
@@ -50,45 +49,66 @@ int main(int argc, char* argv[]) {
     }
     
     // Check if we are running as the temporary update staging file
-    if (argc >= 3 && std::string(argv[1]) == "--finish-update") {
-        std::string originalPath = argv[2];
+    bool isUpdateLaunch = false;
+    std::string originalPath = "";
+    
+    for (int i = 0; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg.find("--finish-update") != std::string::npos) {
+            isUpdateLaunch = true;
+            // Target path is either the next argument, or part of this one if badly parsed
+            if (i + 1 < argc) {
+                originalPath = argv[i + 1];
+            } else if (argc == 2 && i == 0) {
+                 // In case argv[0] is --finish-update and argv[1] is target
+                 originalPath = argv[1];
+            }
+            break;
+        }
+    }
+    
+    // Strip quotes from originalPath if they exist
+    if (!originalPath.empty() && originalPath.front() == '"' && originalPath.back() == '"') {
+        originalPath = originalPath.substr(1, originalPath.length() - 2);
+    }
+    
+    if (isUpdateLaunch && !originalPath.empty()) {
         
-        // Remove the original NRO
+        // Remove the original NRO (it's not locked since we are running the tmp)
         unlink(originalPath.c_str());
         
-        // Rename ourselves (.update) to the original path
-        rename(nroPath.c_str(), originalPath.c_str());
+        // Copy ourselves (.update) to the original path instead of renaming
+        // We cannot trust nroPath (argv[0]) because v2.1.8 passed the wrong argv[0] (.updater)
+        std::string actualSrcPath = originalPath + ".update";
+        std::string tmpPath = originalPath + ".tmp";
+        
+        // Copy to .tmp using a fast buffered read/write to avoid 20 second hang
+        std::ifstream src(actualSrcPath, std::ios::binary | std::ios::ate);
+        if (src) {
+            std::streamsize size = src.tellg();
+            src.seekg(0, std::ios::beg);
+            std::vector<char> buffer(size);
+            if (src.read(buffer.data(), size)) {
+                std::ofstream dst(tmpPath, std::ios::binary);
+                dst.write(buffer.data(), size);
+                dst.close();
+            }
+            src.close();
+        }
+        
+        // Safely rename the .tmp to the original path (tmp is not the running executable)
+        rename(tmpPath.c_str(), originalPath.c_str());
         
         // Force the Switch OS FAT32 driver to commit changes to the SD card
-        // This is CRITICAL. Without this, nx-hbloader reads stale filesystem cache,
-        // causing the OS to panic (err:f) when loading the next NRO into memory.
         fsdevCommitDevice("sdmc");
+        svcSleepThread(1000000000ULL); // 1 second
         
-        // Wait just in case the hardware needs a moment
-        svcSleepThread(500000000ULL); // 0.5 seconds
-        
-        // Tell hbmenu to launch the newly replaced original NRO
-        envSetNextLoad(originalPath.c_str(), originalPath.c_str());
-        
-        // Exit so the system starts the original app
-        return 0;
-    } else if (argc >= 2 && std::string(argv[0]) == "--finish-update") {
-        // Fallback for older versions (e.g. v2.1.8) that passed incorrect argv[0]
-        std::string originalPath = argv[1];
-        std::string actualTempPath = originalPath + ".update";
-        
-        unlink(originalPath.c_str());
-        rename(actualTempPath.c_str(), originalPath.c_str());
-        
-        fsdevCommitDevice("sdmc");
-        svcSleepThread(500000000ULL); // 0.5 seconds
-        
-        envSetNextLoad(originalPath.c_str(), originalPath.c_str());
-        
+        // Exit to hbmenu cleanly. Do NOT use envSetNextLoad, as it causes system panic
+        // when trying to launch a freshly overwritten NRO from an .update instance.
         return 0;
     }
     
-    // If we just updated, clean up the temporary update file
+    // If we just updated, clean up the temporary update file on normal launch
     std::string tempUpdatePath = nroPath + ".update";
     if (access(tempUpdatePath.c_str(), F_OK) == 0) {
         unlink(tempUpdatePath.c_str());

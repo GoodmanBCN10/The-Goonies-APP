@@ -133,8 +133,8 @@ private:
     CondVar can_write{};
 
     // ajdust if needed.
-    // using 1 as internally its triple buffered anyway (r/w have their own buffers).
-    RingBuf<1> write_buffers{};
+    // using 4 as internally its triple buffered anyway (r/w have their own buffers).
+    RingBuf<4> write_buffers{};
 
     const u64 read_buffer_size;
     const s64 write_size;
@@ -263,7 +263,7 @@ Result ThreadData::readFuncInternal() {
         s64 read_size = this->read_buffer_size;
         if (slow_mode) {
             // reduce transfer rate in order to prevent windows from freezing.
-            read_size = 2048; // UsbBulkSlowModePacketBufferSize.
+            read_size = 32 * 1024; // 32 KB. Very slow to allow the SD card to catch up with highly compressed padding without dropping the connection.
         }
 
         const auto buf_offset = buf.size();
@@ -279,7 +279,6 @@ Result ThreadData::readFuncInternal() {
         buf.resize(buf_offset + bytes_read);
 
         // when we have left slow mode, flush.
-        // todo: check buffer size so that it doesn't grow too large.
         if (!slow_mode) {
             R_TRY(this->SetWriteBuf(buf, buf.size()));
             buf.clear();
