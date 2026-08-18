@@ -68,7 +68,16 @@ public:
         langToggle->detail->setFontSize(20);
         content->addView(langToggle);
 
-
+        auto* bgmToggle = new brls::BooleanCell();
+        bgmToggle->init(t("Música de fondo", "Background music", "Música de fundo"), settings_->get().enableBackgroundMusic, [settings](bool value) {
+            auto vals = settings->get();
+            vals.enableBackgroundMusic = value;
+            std::string err;
+            settings->update(vals, err);
+            // The main loop will pick up this change automatically
+        });
+        bgmToggle->title->setFontSize(20);
+        content->addView(bgmToggle);
 
         // System Firmware Version
         SetSysFirmwareVersion fw;
@@ -133,6 +142,12 @@ public:
                     brls::Application::notify(t("Error al limpiar archivos.", "Error cleaning files.", "Erro ao limpar arquivos."));
                 }
             }));
+
+        updateAction_ = actionCell(t("Buscar actualizaciones", "Check for updates", "Verificar atualizações"),
+            t("Comprueba si hay una nueva versión de la app.", "Check if there is a new app version.", "Verifique se há uma nova versão do aplicativo."),
+            [this] { checkForUpdateNow(); });
+        content->addView(updateAction_);
+
 
         addSection(content, t("Conectividad", "Connectivity", "Conectividade"));
 
@@ -356,7 +371,7 @@ private:
                 }
                 if (!result.updateAvailable) {
                     updateAction_->setDetailText("Up to date");
-                    brls::Application::notify("pipensx is up to date.");
+                    brls::Application::notify("The Goonies APP is up to date.");
                     return;
                 }
                 updateAction_->setDetailText("Version " + result.release.version);

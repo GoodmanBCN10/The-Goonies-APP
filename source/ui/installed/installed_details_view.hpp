@@ -14,6 +14,9 @@
 #include "ui/theme.hpp"
 #include "ui/common/async_image.hpp"
 #include "ui/saves/save_manager.hpp"
+#include "ui/installed/cheat_downloader_view.hpp"
+#include <cheats/cheat_manager.hpp>
+#include <borealis/views/cells/cell_bool.hpp>
 
 namespace pipensx::ui {
 
@@ -374,6 +377,77 @@ public:
         saveButtonsBox->addView(deleteBtn);
         listBox->addView(saveButtonsBox);
 
+        // --- Cheats Section ---
+        brls::Label* cheatsLabel = new brls::Label();
+        cheatsLabel->setText("Trucos (Cheats)");
+        cheatsLabel->setFontSize(24);
+        cheatsLabel->setMarginTop(30);
+        cheatsLabel->setMarginBottom(10);
+        
+        brls::Box* cheatsBox = new brls::Box(brls::Axis::COLUMN);
+        cheatsBox->setMargins(20, 20, 20, 20);
+        
+        std::string titleIdStr = InstalledTitleService::formatTitleId(title.applicationId);
+
+        auto cheatsState = std::make_shared<std::vector<cheats::CheatEntry>>();
+        auto renderCheats = std::make_shared<std::function<void()>>();
+        uint64_t titleId = title.applicationId;
+        
+        *renderCheats = [cheatsBox, titleId, titleIdStr, renderCheats, cheatsState]() {
+            cheatsBox->clearViews();
+            
+            // Build ID would normally be read from the binary, using placeholder here
+            std::string buildId = "0000000000000000"; 
+            
+            auto& manager = cheats::CheatManager::getInstance();
+            if (!manager.hasMasterDatabase()) {
+                brls::Button* downloadBtn = new brls::Button();
+                downloadBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
+                downloadBtn->setText("Descargar Base de Datos de Trucos");
+                downloadBtn->setMargins(10, 10, 10, 10);
+                
+                downloadBtn->registerClickAction([cheatsBox, renderCheats, titleIdStr](brls::View*) {
+                    brls::AppletFrame* frame = new brls::AppletFrame(CheatDownloaderView::create(titleIdStr, [renderCheats]() {
+                        (*renderCheats)();
+                    }));
+                    brls::Application::pushActivity(new brls::Activity(frame));
+                    return true;
+                });
+                cheatsBox->addView(downloadBtn);
+                return;
+            }
+
+            // Get available cheats if not already loaded
+            if (cheatsState->empty()) {
+                *cheatsState = manager.getAvailableCheats(titleId, buildId);
+            }
+            
+            if (cheatsState->empty()) {
+                brls::Label* noCheats = new brls::Label();
+                noCheats->setText("No hay trucos disponibles para esta version.");
+                noCheats->setFontSize(20);
+                noCheats->setTextColor(theme::textTertiary());
+                noCheats->setMargins(10, 10, 10, 10);
+                cheatsBox->addView(noCheats);
+            } else {
+                for (size_t i = 0; i < cheatsState->size(); ++i) {
+                    brls::BooleanCell* cb = new brls::BooleanCell();
+                    cb->init((*cheatsState)[i].name, (*cheatsState)[i].enabled, [cheatsState, i](bool state) {
+                        (*cheatsState)[i].enabled = state;
+                    });
+                    cb->setMargins(5, 5, 5, 5);
+                    cheatsBox->addView(cb);
+                }
+            }
+        };
+
+        // Initial render
+        (*renderCheats)();
+        
+        listBox->addView(cheatsLabel);
+        listBox->addView(cheatsBox);
+        // --- End Cheats Section ---
+
         list->setContentView(listBox);
 
         brls::Box* listContainer = new brls::Box(brls::Axis::COLUMN);
@@ -396,6 +470,32 @@ public:
             brls::Application::popActivity();
             return true;
         }, false, false, brls::SOUND_BACK);
+        
+        this->registerAction("Aplicar Trucos", brls::BUTTON_X, [cheatsState, titleId](brls::View*) {
+            if (cheatsState->empty()) return true;
+            std::map<std::string, std::vector<cheats::CheatEntry>> byBuildId;
+            for (const auto& c : *cheatsState) {
+                if (c.name.size() > 18 && c.name[0] == '[' && c.name[17] == ']') {
+                    std::string bId = c.name.substr(1, 16);
+                    cheats::CheatEntry cleanCheat = c;
+                    cleanCheat.name = c.name.substr(19); // strip "[BUILDID] "
+                    byBuildId[bId].push_back(cleanCheat);
+                }
+            }
+            
+            auto& mgr = cheats::CheatManager::getInstance();
+            int savedCount = 0;
+            for (const auto& kv : byBuildId) {
+                if (mgr.saveAtmosphereCheats(titleId, kv.first, kv.second)) {
+                    savedCount++;
+                }
+            }
+            
+            brls::Dialog* dialog = new brls::Dialog(savedCount > 0 ? "Trucos aplicados correctamente." : "Error al aplicar trucos.");
+            dialog->addButton("Aceptar", [dialog]() { dialog->dismiss(); });
+            dialog->open();
+            return true;
+        }, false, false, brls::SOUND_CLICK);
     }
 };
 

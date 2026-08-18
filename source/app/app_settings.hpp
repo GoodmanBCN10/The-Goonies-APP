@@ -38,6 +38,7 @@ struct AppSettingsData {
     int language = 0; // 0=unset, 1=es, 2=en
     int downloadProvider = 0; // 0=Torrent, 1=Real-Debrid
     bool enableUsb30 = false;
+    bool enableBackgroundMusic = true;
 
     bool operator==(const AppSettingsData& other) const;
     bool operator!=(const AppSettingsData& other) const {

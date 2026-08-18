@@ -32,14 +32,14 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	TheGooniesInstaller
 BUILD		:=	build
-SOURCES		:=	vendor/qrcodegen vendor/dht vendor/libnx-ext/libnx-ext/source vendor/libnx-ext/libnx-ipcext/source source source/app source/ui source/ui/catalog source/ui/downloads source/ui/forwarders source/ui/installed source/ui/mtp source/ui/saves source/ui/settings source/ui/updater source/ui/detail source/install source/platform  source/installer source/utils source/yati source/yati/container source/yati/nx source/yati/nx/nxdumptool source/yati/source source/minini source/libhaze source/mtp source/core
+SOURCES		:=	vendor/qrcodegen vendor/dht vendor/libnx-ext/libnx-ext/source vendor/libnx-ext/libnx-ipcext/source source source/app source/ui source/ui/catalog source/ui/downloads source/ui/forwarders source/ui/installed source/ui/mtp source/ui/saves source/ui/settings source/ui/updater source/ui/detail source/install source/platform  source/installer source/utils source/yati source/yati/container source/yati/nx source/yati/nx/nxdumptool source/yati/source source/minini source/libhaze source/mtp source/core source/cheats
 DATA		:=	data
-INCLUDES	:=	vendor source vendor/libnx-ext/libnx-ipcext/include vendor/libnx-ext/libnx-ext/include include include/minini include/yati/nx/nxdumptool include/libhaze vendor/borealis/library/include vendor/borealis/library/include/borealis/extern vendor/borealis/library/include/borealis/extern/nanovg vendor/borealis/library/lib/extern/nanovg vendor/borealis/library/lib/extern/fmt/include vendor/borealis/library/lib/extern/yoga vendor/borealis/library/lib/extern/tweeny/include
+INCLUDES	:=	vendor source vendor/libnx-ext/libnx-ext/include vendor/libnx-ext/libnx-ipcext/include include include/minini include/yati/nx/nxdumptool include/libhaze vendor/borealis/library/include vendor/borealis/library/include/borealis/extern vendor/borealis/library/include/borealis/extern/nanovg vendor/borealis/library/lib/extern/nanovg vendor/borealis/library/lib/extern/fmt/include vendor/borealis/library/lib/extern/yoga vendor/borealis/library/lib/extern/tweeny/include
 ROMFS		:=	romfs
 
 APP_TITLE	:=	The Goonies Installer
 APP_AUTHOR	:=	GoodmanBCN
-APP_VERSION	:=	v2.1.8
+APP_VERSION	:=	v2.1.14-BETA
 DEFINES		:=	-DPIPENSX_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------
@@ -48,18 +48,18 @@ ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 # Ensure we use portlibs pkg-config
 export PKG_CONFIG_PATH := $(PORTLIBS)/lib/pkgconfig
 
-CFLAGS	:=	-g -Wall -O2 -ffunction-sections \
+CFLAGS	:=	-Wall -Os -ffunction-sections -fdata-sections \
 			$(ARCH) $(DEFINES)
 
 # We use pkg-config to get SDL2 flags
-CFLAGS	+=	$(INCLUDE) -D__SWITCH__ `pkg-config --cflags sdl2 SDL2_image SDL2_ttf`
+CFLAGS	+=	$(INCLUDE) -D__SWITCH__ `pkg-config --cflags sdl2 SDL2_image SDL2_ttf SDL2_mixer`
 
-CXXFLAGS	:= $(CFLAGS) -std=gnu++23 -DBRLS_RESOURCES=\ 
+CXXFLAGS	:= $(CFLAGS) -std=gnu++23 -DBRLS_RESOURCES=\"romfs:/\"
 
-ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+ASFLAGS	:=	$(ARCH)
+LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) -Wl,--gc-sections -s -Wl,-Map,$(notdir $*.map)
 
-LIBS	:=	$(CURDIR)/vendor/borealis/library/libborealis.a $(CURDIR)/vendor/borealis/library/lib/extern/fmt/libfmt.a $(CURDIR)/vendor/borealis/library/lib/extern/yoga/yoga/libyogacore.a $(CURDIR)/vendor/borealis/library/libtinyxml2.a `pkg-config --libs --static sdl2 SDL2_image SDL2_ttf SDL2_gfx` -lmbedtls -lmbedcrypto -lmbedx509 -lzstd -lusbhsfs -lntfs-3g -llwext4 -lcurl  -lz -ldeko3d -lminiupnpc -lnx -lm
+LIBS	:=	$(TOPDIR)/vendor/borealis/library/libborealis.a $(TOPDIR)/vendor/borealis/library/lib/extern/fmt/libfmt.a $(TOPDIR)/vendor/borealis/library/lib/extern/yoga/yoga/libyogacore.a $(TOPDIR)/vendor/borealis/library/libtinyxml2.a `pkg-config --libs --static sdl2 SDL2_image SDL2_ttf SDL2_gfx SDL2_mixer` -lmbedtls -lmbedcrypto -lmbedx509 -lzstd -lusbhsfs -lntfs-3g -llwext4 -lcurl -lminizip -lz -ldeko3d -lminiupnpc -lnx -lm
 
 #---------------------------------------------------------------------------------
 LIBDIRS	:= $(PORTLIBS) $(LIBNX)
@@ -68,7 +68,7 @@ LIBDIRS	:= $(PORTLIBS) $(LIBNX)
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 #---------------------------------------------------------------------------------
 
-export OUTPUT	:=	$(CURDIR)/$(TARGET)
+export OUTPUT	:=	$(CURDIR)/$(BUILD)/$(TARGET)
 export TOPDIR	:=	$(CURDIR)
 
 export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
@@ -100,7 +100,7 @@ export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
 export APP_ICON := $(TOPDIR)/icon.jpg
 
-export NROFLAGS += --icon=$(APP_ICON) --nacp=$(CURDIR)/$(TARGET).nacp
+export NROFLAGS += --icon=$(APP_ICON) --nacp=$(CURDIR)/$(BUILD)/$(TARGET).nacp
 
 ifneq ($(ROMFS),)
 	export NROFLAGS += --romfsdir=$(CURDIR)/$(ROMFS)

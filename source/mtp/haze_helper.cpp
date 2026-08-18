@@ -473,7 +473,9 @@ struct FsProxySdCard : FsProxyBase {
     }
 
     Result DeleteFile(const char* path) override {
-        if (remove(GetSdPath(path).c_str()) != 0) return 0x202;
+        std::string sdPath = GetSdPath(path);
+        chmod(sdPath.c_str(), 0777);
+        if (remove(sdPath.c_str()) != 0) return 0x202;
         return 0;
     }
 
@@ -536,8 +538,12 @@ struct FsProxySdCard : FsProxyBase {
     }
 
     Result DeleteDirectoryRecursively(const char* path) override {
+        std::string sdPath = GetSdPath(path);
+        if (R_SUCCEEDED(fsdevDeleteDirectoryRecursively(sdPath.c_str()))) {
+            return 0;
+        }
         try {
-            std::filesystem::remove_all(GetSdPath(path));
+            std::filesystem::remove_all(sdPath);
             return 0;
         } catch (...) {
             return 0x202;

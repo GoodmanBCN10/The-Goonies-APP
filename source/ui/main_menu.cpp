@@ -449,7 +449,11 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
     // Auto-update check at startup
     if (updater_) {
         updater_->checkAsync([this](pipensx::UpdateCheckResult result) {
-            if (result.ok && result.updateAvailable) {
+            if (!result.ok) {
+                brls::sync([this, error = result.error]() {
+                    brls::Application::notify("Update error: " + error);
+                });
+            } else if (result.updateAvailable) {
                 brls::sync([this, release = result.release]() {
                     std::string esText = "Hay una nueva versión de The Goonies APP disponible (" + release.version + "). ¿Deseas descargarla e instalarla ahora?";
                     std::string enText = "A new version of The Goonies APP is available (" + release.version + "). Do you want to download and install it now?";

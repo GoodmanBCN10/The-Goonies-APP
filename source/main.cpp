@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdexcept>
 #include <borealis.hpp>
+#include <SDL2/SDL_mixer.h>
 #include <string>
 #include <vector>
 #include <thread>
@@ -180,6 +181,12 @@ int main(int argc, char* argv[]) {
         writeLog("romfsInit FAILED");
     }
 
+    if (R_SUCCEEDED(plInitialize(PlServiceType_User))) {
+        writeLog("plInitialize OK");
+    } else {
+        writeLog("plInitialize FAILED");
+    }
+
     bool nvReady = false;
     Result nvRc = nvInitialize();
     if (R_SUCCEEDED(nvRc)) {
@@ -226,6 +233,27 @@ int main(int argc, char* argv[]) {
             throw std::runtime_error("Unable to init Borealis application");
         }
         writeLog("brls::Application::init OK");
+
+        bool mixerInit = false;
+        if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+            writeLog(std::string("Mix_OpenAudio failed: ") + Mix_GetError());
+        } else {
+            mixerInit = true;
+            writeLog("Mix_OpenAudio OK");
+        }
+        
+        Mix_Music *bgmMusic = nullptr;
+        if (mixerInit) {
+            bgmMusic = Mix_LoadMUS("romfs:/bgm.mp3");
+            if (bgmMusic) {
+                writeLog("bgm.mp3 loaded");
+                if (settings.get().enableBackgroundMusic) {
+                    Mix_PlayMusic(bgmMusic, -1);
+                }
+            } else {
+                writeLog(std::string("Failed to load bgm.mp3: ") + Mix_GetError());
+            }
+        }
 
         pipensx::ui::theme::registerColors();
 
@@ -383,16 +411,41 @@ int main(int argc, char* argv[]) {
 
         // Run the main loop
         int frameCount = 0;
+        bool wasBgmEnabled = settings.get().enableBackgroundMusic;
         while (brls::Application::mainLoop()) {
             frameCount++;
             if (frameCount % 60 == 1) {
                 writeLog("Main: pumping UI loop, frame " + std::to_string(frameCount));
+            }
+            
+            if (mixerInit && bgmMusic) {
+                bool isBgmEnabled = settings.get().enableBackgroundMusic;
+                if (isBgmEnabled != wasBgmEnabled) {
+                    if (isBgmEnabled) {
+                        if (Mix_PlayingMusic() == 0) {
+                            Mix_PlayMusic(bgmMusic, -1);
+                        } else {
+                            Mix_ResumeMusic();
+                        }
+                    } else {
+                        Mix_PauseMusic();
+                    }
+                    wasBgmEnabled = isBgmEnabled;
+                }
             }
         }
         g_appExiting = true;
         writeLog("Main loop EXITED. Application closing normally.");
         
         download_manager->shutdown();
+
+        if (bgmMusic) {
+            Mix_FreeMusic(bgmMusic);
+            bgmMusic = nullptr;
+        }
+        if (mixerInit) {
+            Mix_CloseAudio();
+        }
 
         if (initThread.joinable()) {
             initThread.join();
@@ -457,6 +510,7 @@ int main(int argc, char* argv[]) {
     if (setsysReady) setsysExit();
     if (curlReady) curl_global_cleanup();
     if (socketReady) socketExit();
+    plExit();
     romfsExit();
 
     // Exit

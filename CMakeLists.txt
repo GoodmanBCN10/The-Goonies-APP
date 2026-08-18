@@ -13,11 +13,14 @@ set(BRLS_UNITY_BUILD OFF CACHE BOOL "" FORCE)
 include(${BOREALIS_LIBRARY}/cmake/commonOption.cmake)
 include(${BOREALIS_LIBRARY}/cmake/toolchain.cmake)
 
-project(TheGooniesInstaller VERSION 2.1.1 LANGUAGES C CXX)
+project(TheGooniesInstaller VERSION 2.1.14 LANGUAGES C CXX)
 set(APP_TITLE "The Goonies APP")
 set(APP_AUTHOR "GoodmanBCN")
 set(APP_ICON ${CMAKE_CURRENT_SOURCE_DIR}/icon.jpg)
 set(ROMFS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/romfs)
+
+# Crucial for reducing final NRO size from 15MB down to 6MB
+add_compile_options(-ffunction-sections -fdata-sections)
 
 add_subdirectory(vendor/borealis/library)
 target_include_directories(borealis PRIVATE
@@ -44,6 +47,7 @@ file(GLOB_RECURSE GOONIES_SOURCES
     source/app/*.cpp source/app/*.c
     source/core/*.cpp source/core/*.c
     source/install/*.cpp source/install/*.c
+    source/cheats/*.cpp source/cheats/*.c
 )
 
 list(APPEND GOONIES_SOURCES
@@ -126,17 +130,32 @@ target_link_libraries(TheGooniesInstaller PRIVATE
     z
     minizip
     miniupnpc
+    SDL2_mixer
+    SDL2
+    EGL
+    glapi
+    drm_nouveau
+    pthread
+    vorbisidec
+    modplug
+    mpg123
+    m
+    opusfile
+    ogg
+    opus
 )
 
 if(NOT DEFINED APP_VERSION)
-    set(APP_VERSION "v2.1.13")
+    set(APP_VERSION "v2.1.14")
 endif()
 
 target_compile_definitions(TheGooniesInstaller PRIVATE
     PIPENSX_VERSION="${APP_VERSION}"
 )
 
-if (PLATFORM_SWITCH)
+target_link_options(TheGooniesInstaller PRIVATE -Wl,--gc-sections -s)
+
+if(PLATFORM_SWITCH)
     target_link_libraries(TheGooniesInstaller PRIVATE nx)
     
     add_custom_target(TheGooniesInstaller_nro ALL

@@ -16,31 +16,48 @@ bool CleanupHelper::cleanSystem(std::string& errorOut, u64& outFreedBytes, int& 
     outFreedBytes = 0;
     outDeletedTickets = 0;
 #ifdef __SWITCH__
-    // 1. Clean Placeholders
-    NcmContentStorage cs;
-    if (R_SUCCEEDED(ncmOpenContentStorage(&cs, NcmStorageId_SdCard))) {
-        s64 initialFree = 0;
-        s64 finalFree = 0;
-        ncmContentStorageGetFreeSpaceSize(&cs, &initialFree);
-        ncmContentStorageCleanupAllPlaceHolder(&cs);
-        ncmContentStorageGetFreeSpaceSize(&cs, &finalFree);
-        if (finalFree > initialFree) {
-            outFreedBytes += (finalFree - initialFree);
+    auto cleanStorage = [&outFreedBytes](NcmStorageId storage_id) {
+        NcmContentStorage cs;
+        if (R_SUCCEEDED(ncmOpenContentStorage(&cs, storage_id))) {
+            s64 initialFree = 0;
+            s64 finalFree = 0;
+            ncmContentStorageGetFreeSpaceSize(&cs, &initialFree);
+            
+            // 1. Clean Placeholders
+            ncmContentStorageCleanupAllPlaceHolder(&cs);
+            
+            // 2. Clean Orphaned Contents (NCAs)
+            NcmContentMetaDatabase db;
+            if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storage_id))) {
+                s32 contentCount = 0;
+                if (R_SUCCEEDED(ncmContentStorageGetContentCount(&cs, &contentCount)) && contentCount > 0) {
+                    std::vector<NcmContentId> contentIds(contentCount);
+                    s32 outCount = 0;
+                    if (R_SUCCEEDED(ncmContentStorageListContentId(&cs, contentIds.data(), contentCount, &outCount, 0)) && outCount > 0) {
+                        bool* orphaned = new bool[outCount];
+                        if (R_SUCCEEDED(ncmContentMetaDatabaseLookupOrphanContent(&db, orphaned, contentIds.data(), outCount))) {
+                            for (s32 i = 0; i < outCount; i++) {
+                                if (orphaned[i]) {
+                                    ncmContentStorageDelete(&cs, &contentIds[i]);
+                                }
+                            }
+                        }
+                        delete[] orphaned;
+                    }
+                }
+                ncmContentMetaDatabaseClose(&db);
+            }
+            
+            ncmContentStorageGetFreeSpaceSize(&cs, &finalFree);
+            if (finalFree > initialFree) {
+                outFreedBytes += (finalFree - initialFree);
+            }
+            ncmContentStorageClose(&cs);
         }
-        ncmContentStorageClose(&cs);
-    }
-    
-    if (R_SUCCEEDED(ncmOpenContentStorage(&cs, NcmStorageId_BuiltInUser))) {
-        s64 initialFree = 0;
-        s64 finalFree = 0;
-        ncmContentStorageGetFreeSpaceSize(&cs, &initialFree);
-        ncmContentStorageCleanupAllPlaceHolder(&cs);
-        ncmContentStorageGetFreeSpaceSize(&cs, &finalFree);
-        if (finalFree > initialFree) {
-            outFreedBytes += (finalFree - initialFree);
-        }
-        ncmContentStorageClose(&cs);
-    }
+    };
+
+    cleanStorage(NcmStorageId_SdCard);
+    cleanStorage(NcmStorageId_BuiltInUser);
 
     // 2. Clean Orphan Tickets
     std::set<u64> installedBaseTids;
