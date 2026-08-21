@@ -446,7 +446,14 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
     }, false);
     
     this->registerAction("Actualizar CFW", brls::BUTTON_Y, [this](brls::View* view) {
-        brls::Application::pushActivity(new brls::Activity(new goonies::ui::UpdaterView()));
+        brls::Dialog* dialog = new brls::Dialog(t("Es muy recomendable hacer una copia de seguridad de la carpeta 'Saves' (desde Ajustes > Cuentas) antes de actualizar el CFW.\n\n¿Deseas continuar con la actualización?",
+                                                  "It is highly recommended to make a backup of the 'Saves' folder (from Settings > Accounts) before updating the CFW.\n\nDo you want to continue?",
+                                                  "É altamente recomendável fazer um backup da pasta 'Saves' (em Configurações > Contas) antes de atualizar o CFW.\n\nDeseja continuar?"));
+        dialog->addButton(t("Continuar", "Continue", "Continuar"), []() {
+            brls::Application::pushActivity(new brls::Activity(new goonies::ui::UpdaterView()));
+        });
+        dialog->addButton(t("Cancelar", "Cancel", "Cancelar"), []() {});
+        dialog->open();
         return true;
     }, false);
 
