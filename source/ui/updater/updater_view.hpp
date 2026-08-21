@@ -2,32 +2,38 @@
 
 #include <borealis.hpp>
 #include <borealis/views/cells/cell_bool.hpp>
+extern "C" {
+#include <ipcext/amssu.h>
+}
 #include <string>
 #include <vector>
 #include <curl/curl.h>
 
 namespace goonies::ui {
 
+enum class UpdateMode {
+    CFW,
+    Firmware
+};
+
 class UpdaterView : public brls::Box {
 public:
-    UpdaterView();
+    UpdaterView(UpdateMode mode = UpdateMode::CFW);
     ~UpdaterView();
 
-    static brls::View* create();
+    static brls::View* create(UpdateMode mode = UpdateMode::CFW);
 
 private:
     brls::Label* status_label;
     brls::Button* update_button;
-    brls::Box* checkboxes_box;
-    brls::ScrollingFrame* scroll_frame;
     brls::Box* centerBox;
     
     brls::Box* progress_bar_bg;
     brls::Rectangle* progress_bar_fill;
     
-    std::vector<brls::BooleanCell*> folder_toggles;
     int last_progress_percent = -1;
     
+    UpdateMode current_mode;
     std::string download_url;
     bool is_fetching;
     bool is_updating;

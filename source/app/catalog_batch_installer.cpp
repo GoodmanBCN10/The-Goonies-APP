@@ -91,7 +91,7 @@ BatchPreparation CatalogBatchInstaller::prepare(
 
         const uint64_t serial = gBatchTempSerial.fetch_add(1);
         const std::string hash = lowerAscii(entry.infoHash);
-        const std::string path = rootPath_ + "/_catalog_batch_" +
+        const std::string path = rootPath_ + "/downloads/_catalog_batch_" +
                                  (hash.empty() ? "unknown" : hash) + "_" +
                                  std::to_string(serial) + ".torrent";
         auto forwardProgress = [&, index](const MagnetProgress& magnet) {
@@ -189,3 +189,4 @@ BatchEnqueueResult CatalogBatchInstaller::enqueue(
 }
 
 } // namespace pipensx
+

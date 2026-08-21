@@ -89,6 +89,22 @@ struct TorrentPreview {
     std::vector<File> files;
 };
 
+struct QueueSummary {
+    uint32_t downloading = 0;
+    uint32_t installing = 0;
+    uint32_t queued = 0;
+    uint32_t paused = 0;
+    uint32_t completed = 0;
+    uint32_t errors = 0;
+    uint64_t downloadSpeedBps = 0;
+    uint64_t installSpeedBps = 0;
+    uint64_t totalRemainingBytes = 0;
+    uint64_t etaSeconds = 0;
+};
+
+QueueSummary summarizeQueue(const std::vector<DownloadTask>& tasks,
+                            uint64_t nowMs);
+
 class DownloadManager {
 public:
     explicit DownloadManager(std::string rootPath, bool startWorker = true);
@@ -121,6 +137,8 @@ public:
     }
     bool pause(const std::string& taskId);
     bool resume(const std::string& taskId);
+    bool moveToFront(const std::string& taskId, std::string& error);
+    bool moveTask(const std::string& taskId, bool up, std::string& error);
     bool retry(const std::string& taskId);
     bool verify(const std::string& taskId);
     bool remove(const std::string& taskId, bool deleteData,
@@ -175,3 +193,4 @@ private:
 const char* statusName(DownloadStatus status);
 
 } // namespace pipensx
+

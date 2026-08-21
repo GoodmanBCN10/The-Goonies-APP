@@ -38,11 +38,35 @@ public:
         titleLabel->setMarginBottom(20);
         centerBox->addView(titleLabel);
 
+        summary_ = new brls::Label();
+        summary_->setFontSize(15);
+        summary_->setMarginTop(10);
+        summary_->setMarginBottom(4);
+        summary_->setTextColor(brls::Application::getTheme().getColor("brls/text_disabled"));
+        summary_->setVisibility(brls::Visibility::GONE);
+        centerBox->addView(summary_);
+
         scrollFrame_ = new brls::ScrollingFrame();
+        summary_ = new brls::Label();
+        summary_->setFontSize(15);
+        summary_->setMarginTop(10);
+        summary_->setMarginBottom(4);
+        summary_->setTextColor(brls::Application::getTheme().getColor("brls/text_disabled"));
+        summary_->setVisibility(brls::Visibility::GONE);
+        centerBox->addView(summary_);
+
         scrollFrame_->setGrow(1);
         
         list_ = new brls::Box(brls::Axis::COLUMN);
         list_->setPadding(6, 32, 6, 32);
+        summary_ = new brls::Label();
+        summary_->setFontSize(15);
+        summary_->setMarginTop(10);
+        summary_->setMarginBottom(4);
+        summary_->setTextColor(brls::Application::getTheme().getColor("brls/text_disabled"));
+        summary_->setVisibility(brls::Visibility::GONE);
+        centerBox->addView(summary_);
+
         scrollFrame_->setContentView(list_);
         
         centerBox->addView(scrollFrame_);
@@ -67,6 +91,8 @@ public:
             return true;
         });
         startRefreshing();
+        registerAction("Pausar/Reanudar", brls::BUTTON_Y, [this](brls::View*) { pauseResumeAll(); return true; });
+        registerAction("Limpiar finalizadas", brls::BUTTON_LB, [this](brls::View*) { clearCompleted(); return true; });
     }
 
     ~MainView() override {
@@ -126,6 +152,35 @@ public:
                 manager_->verify(taskId);
                 startRefreshing(true);
             });
+        if (task.status == DownloadStatus::Queued) {
+            std::vector<std::string> queuedIds;
+            for (const auto& candidate : manager_->snapshot())
+                if (candidate.status == DownloadStatus::Queued)
+                    queuedIds.push_back(candidate.id);
+            size_t pos = 0;
+            bool found = false;
+            for (size_t i = 0; i < queuedIds.size(); ++i) {
+                if (queuedIds[i] == taskId) { pos = i; found = true; break; }
+            }
+            if (found) {
+                if (pos > 0) {
+                    add("Subir en la cola", [this, taskId] {
+                        std::string error; manager_->moveTask(taskId, true, error);
+                        startRefreshing(true);
+                    });
+                    add("Mover al principio", [this, taskId] {
+                        std::string error; manager_->moveToFront(taskId, error);
+                        startRefreshing(true);
+                    });
+                }
+                if (pos + 1 < queuedIds.size()) {
+                    add("Bajar en la cola", [this, taskId] {
+                        std::string error; manager_->moveTask(taskId, false, error);
+                        startRefreshing(true);
+                    });
+                }
+            }
+        }
         add("Remove", [this, taskId] { openRemoveDialog(taskId); });
 
         auto* dropdown = new brls::Dropdown(
@@ -173,6 +228,13 @@ public:
     GameMetadataService* metadataService() const { return metadata_; }
 
 private:
+    bool isPausable(DownloadStatus status) const { return status == DownloadStatus::Queued || status == DownloadStatus::Checking || status == DownloadStatus::Downloading || status == DownloadStatus::Installing || status == DownloadStatus::Committing || status == DownloadStatus::Verifying; }
+    bool hasPausableTask(const std::vector<DownloadTask>& tasks) const { for (const auto& t : tasks) if (isPausable(t.status)) return true; return false; }
+    void pauseAll() { for (const auto& t : manager_->snapshot()) if (isPausable(t.status)) manager_->pause(t.id); startRefreshing(true); }
+    void resumeAll() { for (const auto& t : manager_->snapshot()) if (t.status == DownloadStatus::Paused || t.status == DownloadStatus::Error) manager_->resume(t.id); startRefreshing(true); }
+    void pauseResumeAll() { if (hasPausableTask(manager_->snapshot())) pauseAll(); else resumeAll(); }
+    void clearCompleted() { std::vector<std::string> ids; for (const auto& t : manager_->snapshot()) if (t.status == DownloadStatus::Completed || t.status == DownloadStatus::Installed) ids.push_back(t.id); if (ids.empty()) { brls::Application::notify("No hay descargas finalizadas para limpiar."); return; } for (const auto& id : ids) { std::string err; manager_->remove(id, true, err); } startRefreshing(true); }
+    std::string summaryText(const std::vector<DownloadTask>& tasks) const { if (tasks.empty()) return ""; const pipensx::QueueSummary s = pipensx::summarizeQueue(tasks, now_ms()); std::string t = "Descargando: " + std::to_string(s.downloading) + " | En cola: " + std::to_string(s.queued) + " | Instalando: " + std::to_string(s.installing); if (s.paused) t += " | Pausadas: " + std::to_string(s.paused); if (s.errors) t += " | Errores: " + std::to_string(s.errors); const uint64_t speed = s.downloadSpeedBps + s.installSpeedBps; if (speed) t += "\nVelocidad: " + formatSpeed(speed); if (s.etaSeconds) t += " | ETA: " + formatEta(s.totalRemainingBytes, speed); return t; }
     bool containsFocus(brls::View* focused) const {
         for (brls::View* view = focused; view; view = view->getParent())
             if (view == this)
@@ -240,6 +302,11 @@ private:
                 }
             }
         }
+        std::string st = summaryText(next);
+        if (!st.empty()) { summary_->setText(st); summary_->setVisibility(brls::Visibility::VISIBLE); }
+        else summary_->setVisibility(brls::Visibility::GONE);
+        updateActionHint(brls::BUTTON_Y, hasPausableTask(next) ? "Pausar todo" : "Reanudar todo");
+
         if (!changed)
             return;
             
@@ -271,6 +338,8 @@ private:
         if (structureChanged) {
             list_->clearViews();
             emptyState_ = nullptr;
+            
+
             
             if (next.empty()) {
                 ensureEmptyState()->setVisibility(brls::Visibility::VISIBLE);
@@ -321,6 +390,7 @@ private:
     GameMetadataService* metadata_;
     AppSettings* settings_;
 
+    brls::Label* summary_ = nullptr;
     brls::ScrollingFrame* scrollFrame_;
     brls::Box* list_;
     EmptyStateView* emptyState_ = nullptr;
@@ -334,3 +404,13 @@ private:
 };
 
 } // namespace pipensx::ui
+
+
+
+
+
+
+
+
+
+

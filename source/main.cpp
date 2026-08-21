@@ -10,6 +10,8 @@
 #include <thread>
 #include <atomic>
 #include <fstream>
+#include <unordered_map>
+#include <unordered_set>
 #include "app_state.hpp"
 std::atomic<bool> g_appExiting{false};
 #include <mutex>
@@ -156,8 +158,11 @@ int main(int argc, char* argv[]) {
     bool esReady = false;
     bool socketReady = false;
     bool setsysReady = false;
+    bool nifmReady = false;
+    bool psmReady = false;
 
-    std::ofstream logOut("sdmc:/switch/thegoonies/debug_log.txt", std::ios::out | std::ios::trunc);
+    mkdir("sdmc:/switch/thegoonies/logs", 0777);
+    std::ofstream logOut("sdmc:/switch/thegoonies/logs/debug_log.txt", std::ios::out | std::ios::trunc);
     std::mutex logMutex;
     auto writeLog = [&](const std::string& msg) {
         std::lock_guard<std::mutex> lock(logMutex);
@@ -196,7 +201,21 @@ int main(int argc, char* argv[]) {
         writeLog("nvInitialize FAILED (non-fatal)");
     }
 
-    std::FILE* borealisLogFile = std::fopen("sdmc:/switch/thegoonies/borealis_log.txt", "w");
+    if (R_SUCCEEDED(nifmInitialize(NifmServiceType_User))) {
+        nifmReady = true;
+        writeLog("nifmInitialize OK");
+    } else {
+        writeLog("nifmInitialize FAILED (non-fatal)");
+    }
+
+    if (R_SUCCEEDED(psmInitialize())) {
+        psmReady = true;
+        writeLog("psmInitialize OK");
+    } else {
+        writeLog("psmInitialize FAILED (non-fatal)");
+    }
+
+    std::FILE* borealisLogFile = std::fopen("sdmc:/switch/thegoonies/logs/borealis_log.txt", "w");
     if (borealisLogFile) {
         setvbuf(borealisLogFile, NULL, _IONBF, 0);
         brls::Logger::setLogOutput(borealisLogFile);
@@ -412,10 +431,42 @@ int main(int argc, char* argv[]) {
         // Run the main loop
         int frameCount = 0;
         bool wasBgmEnabled = settings.get().enableBackgroundMusic;
+        std::unordered_map<std::string, pipensx::DownloadStatus> lastTaskStatus;
+        uint64_t lastDownloadScanMs = 0;
+
         while (brls::Application::mainLoop()) {
             frameCount++;
             if (frameCount % 60 == 1) {
                 writeLog("Main: pumping UI loop, frame " + std::to_string(frameCount));
+            }
+
+            uint64_t frameNowMs = brls::getCPUTimeUsec() / 1000;
+            if (frameNowMs - lastDownloadScanMs >= 1000) {
+                lastDownloadScanMs = frameNowMs;
+                std::unordered_set<std::string> seen;
+                for (const pipensx::DownloadTask& task : download_manager->snapshot()) {
+                    seen.insert(task.id);
+                    auto previous = lastTaskStatus.find(task.id);
+                    if (previous == lastTaskStatus.end()) {
+                        lastTaskStatus[task.id] = task.status;
+                        continue;
+                    }
+                    if (previous->second == task.status)
+                        continue;
+                    lastTaskStatus[task.id] = task.status;
+                    if (task.status == pipensx::DownloadStatus::Completed)
+                        brls::Application::notify("Descarga completada: " + task.name);
+                    else if (task.status == pipensx::DownloadStatus::Installed)
+                        brls::Application::notify("Instalacion finalizada: " + task.name);
+                    else if (task.status == pipensx::DownloadStatus::Error)
+                        brls::Application::notify("Error en la descarga: " + task.name);
+                }
+                for (auto it = lastTaskStatus.begin(); it != lastTaskStatus.end();) {
+                    if (seen.count(it->first) == 0)
+                        it = lastTaskStatus.erase(it);
+                    else
+                        ++it;
+                }
             }
             
             if (mixerInit && bgmMusic) {
@@ -463,7 +514,7 @@ int main(int argc, char* argv[]) {
         printf("====================================================\n\n");
         printf(" Details: %s\n\n", e.what());
         printf(" Log guardado en / Log file saved at:\n");
-        printf(" sdmc:/switch/thegoonies/debug_log.txt\n\n");
+        printf(" sdmc:/switch/thegoonies/logs/debug_log.txt\n\n");
         printf(" Pulsa + o HOME para salir / Press + or HOME to exit.\n");
         printf("====================================================\n");
         consoleUpdate(NULL);
@@ -484,7 +535,7 @@ int main(int argc, char* argv[]) {
         printf(" ERROR DESCONOCIDO / UNKNOWN FATAL ERROR\n");
         printf("====================================================\n\n");
         printf(" Log guardado en / Log file saved at:\n");
-        printf(" sdmc:/switch/thegoonies/debug_log.txt\n\n");
+        printf(" sdmc:/switch/thegoonies/logs/debug_log.txt\n\n");
         printf(" Pulsa + o HOME para salir / Press + or HOME to exit.\n");
         printf("====================================================\n");
         consoleUpdate(NULL);
@@ -502,6 +553,8 @@ int main(int argc, char* argv[]) {
 
     // Cleanup
     if (nvReady) nvExit();
+    if (psmReady) psmExit();
+    if (nifmReady) nifmExit();
     usbHsFsExit();
     if (nsReady) nsExit();
     if (ncmReady) ncmExit();

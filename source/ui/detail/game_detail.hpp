@@ -506,7 +506,7 @@ private:
         auto alive = alive_;
         auto cancelled = cancelled_;
         uint32_t serial = gCatalogTempSerial.fetch_add(1);
-        std::string tmp = manager_->rootPath() + "/_catalog_tmp_" +
+        std::string tmp = manager_->rootPath() + "/downloads/_catalog_tmp_" +
                           catalogLower(entry_.infoHash) + "_" +
                           std::to_string(serial) + ".torrent";
         std::string magnet = entry_.magnetUri;
@@ -721,3 +721,4 @@ private:
 };
 
 }  // namespace pipensx::ui
+

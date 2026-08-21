@@ -444,6 +444,11 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
         brls::Application::quit();
         return true;
     }, false);
+    
+    this->registerAction("Actualizar CFW", brls::BUTTON_Y, [this](brls::View* view) {
+        brls::Application::pushActivity(new brls::Activity(new goonies::ui::UpdaterView()));
+        return true;
+    }, false);
 
 
     // Auto-update check at startup

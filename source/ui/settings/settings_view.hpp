@@ -28,6 +28,7 @@
 #include "linkuser.hpp"
 #include "ui/mtp/mtp_view.hpp"
 #include "ui/settings/rd_auth_dialog.hpp"
+#include "../updater/updater_view.hpp"
 
 namespace pipensx::ui {
 
@@ -91,8 +92,18 @@ public:
         fwLabel->setText(fwStr);
         fwLabel->setFontSize(20);
         fwLabel->setMarginTop(12);
-        fwLabel->setMarginBottom(8);
         content->addView(fwLabel);
+
+        auto* firmwareBtn = new brls::Button();
+        firmwareBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
+        firmwareBtn->setText(t("Actualizar Firmware (Daybreak)", "Update Firmware (Daybreak)", "Atualizar Firmware (Daybreak)"));
+        firmwareBtn->setMarginTop(8);
+        firmwareBtn->setMarginBottom(8);
+        firmwareBtn->registerClickAction([this](brls::View* view) {
+            brls::Application::pushActivity(new brls::Activity(goonies::ui::UpdaterView::create(goonies::ui::UpdateMode::Firmware)));
+            return true;
+        });
+        content->addView(firmwareBtn);
 
         // App Version
         auto* appVerLabel = new brls::Label();

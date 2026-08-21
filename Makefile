@@ -37,9 +37,9 @@ DATA		:=	data
 INCLUDES	:=	vendor source vendor/libnx-ext/libnx-ext/include vendor/libnx-ext/libnx-ipcext/include include include/minini include/yati/nx/nxdumptool include/libhaze vendor/borealis/library/include vendor/borealis/library/include/borealis/extern vendor/borealis/library/include/borealis/extern/nanovg vendor/borealis/library/lib/extern/nanovg vendor/borealis/library/lib/extern/fmt/include vendor/borealis/library/lib/extern/yoga vendor/borealis/library/lib/extern/tweeny/include
 ROMFS		:=	romfs
 
-APP_TITLE	:=	The Goonies Installer
+APP_TITLE	:=	The Goonies App
 APP_AUTHOR	:=	GoodmanBCN
-APP_VERSION	:=	v2.1.14
+APP_VERSION	:=	v2.1.15
 DEFINES		:=	-DPIPENSX_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------

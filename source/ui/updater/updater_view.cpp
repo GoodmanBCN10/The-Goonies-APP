@@ -48,7 +48,7 @@ static void remove_recursive(const std::string& path) {
     }
 }
 
-static void ExtractZip(const std::string& temp_zip, brls::Label* status_label, brls::Rectangle* progress_fill) {
+static void ExtractZip(const std::string& temp_zip, const std::string& target_dir, brls::Label* status_label, brls::Rectangle* progress_fill) {
     unzFile uf = unzOpen64(temp_zip.c_str());
     if (uf == NULL) {
         brls::sync([status_label]() { status_label->setText(t("Error al abrir el archivo ZIP.", "Error opening ZIP file.", "Erro ao abrir arquivo ZIP.")); });
@@ -69,7 +69,7 @@ static void ExtractZip(const std::string& temp_zip, brls::Label* status_label, b
             break;
         }
 
-        std::string out_path = std::string("sdmc:/") + filename_inzip;
+        std::string out_path = target_dir + "/" + filename_inzip;
         
         std::error_code ec;
         if (out_path.back() == '/') {
@@ -106,7 +106,7 @@ static void ExtractZip(const std::string& temp_zip, brls::Label* status_label, b
     unzClose(uf);
 }
 
-UpdaterView::UpdaterView() : brls::Box(brls::Axis::COLUMN), is_fetching(true), is_updating(false) {
+UpdaterView::UpdaterView(UpdateMode mode) : brls::Box(brls::Axis::COLUMN), is_fetching(true), is_updating(false), current_mode(mode) {
     this->setAlignItems(brls::AlignItems::STRETCH);
 
     centerBox = new brls::Box(brls::Axis::COLUMN);
@@ -115,7 +115,11 @@ UpdaterView::UpdaterView() : brls::Box(brls::Axis::COLUMN), is_fetching(true), i
     centerBox->setGrow(1.0f);
 
     brls::Label* title = new brls::Label();
-    title->setText(t("Actualización CFW The Goonies OS", "The Goonies OS CFW Update", "Atualização do sistema operacional CFW The Goonies"));
+    if (current_mode == UpdateMode::Firmware) {
+        title->setText(t("Actualización de Firmware", "Firmware Update", "Atualização de Firmware"));
+    } else {
+        title->setText(t("Actualización CFW The Goonies OS", "The Goonies OS CFW Update", "Atualização do sistema operacional CFW The Goonies"));
+    }
     title->setFontSize(48);
     title->setMarginBottom(40);
     centerBox->addView(title);
@@ -125,23 +129,6 @@ UpdaterView::UpdaterView() : brls::Box(brls::Axis::COLUMN), is_fetching(true), i
     status_label->setFontSize(24);
     status_label->setMarginBottom(30);
     centerBox->addView(status_label);
-
-    scroll_frame = new brls::ScrollingFrame();
-    scroll_frame->setMarginBottom(40);
-    scroll_frame->setHeight(300);
-    scroll_frame->setWidth(600);
-
-    checkboxes_box = new brls::Box(brls::Axis::COLUMN);
-    checkboxes_box->setWidth(600);
-    
-    brls::Label* info_label = new brls::Label();
-    info_label->setText(t("Selecciona las carpetas a conservar (Nintendo y emuMMC siempre se conservan).", "Select folders to keep (Nintendo and emuMMC are always kept).", "Selecione as pastas a serem mantidas (Nintendo e emuMMC são sempre mantidas)."));
-    info_label->setFontSize(20);
-    info_label->setMarginBottom(10);
-    checkboxes_box->addView(info_label);
-    
-    scroll_frame->setContentView(checkboxes_box);
-    // Do not add to centerBox yet
 
     progress_bar_bg = new brls::Box(brls::Axis::ROW);
     progress_bar_bg->setHeight(20);
@@ -187,13 +174,16 @@ UpdaterView::UpdaterView() : brls::Box(brls::Axis::COLUMN), is_fetching(true), i
 
 UpdaterView::~UpdaterView() {}
 
-brls::View* UpdaterView::create() { return new UpdaterView(); }
+brls::View* UpdaterView::create(UpdateMode mode) { return new UpdaterView(mode); }
 
 void UpdaterView::FetchLatestVersion() {
     CURL* curl = curl_easy_init();
     if (curl) {
         std::string readBuffer;
-        curl_easy_setopt(curl, CURLOPT_URL, "https://api.github.com/repos/GoodmanBCN10/The-Goonies-OS-for-Switch/releases/latest");
+        std::string target_url = (current_mode == UpdateMode::Firmware) ? 
+            "https://api.github.com/repos/GoodmanBCN10/NS_Firmware/releases/latest" : 
+            "https://api.github.com/repos/GoodmanBCN10/The-Goonies-OS-for-Switch/releases/latest";
+        curl_easy_setopt(curl, CURLOPT_URL, target_url.c_str());
         curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Nintendo Switch; WifiWebAuthApplet) AppleWebKit/606.4 (KHTML, like Gecko) NF/6.0.1.15.4 NintendoBrowser/5.1.0.22443");
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
@@ -227,47 +217,10 @@ void UpdaterView::FetchLatestVersion() {
                         brls::sync([this]() {
                             status_label->setText(t("Última versión encontrada. ¿Deseas instalarla?", "Latest version found. Do you want to install it?", "Última versão encontrada. Você quer instalá-lo?"));
                             
-                            centerBox->removeView(update_button, false);
-                            centerBox->addView(scroll_frame);
-                            centerBox->addView(update_button);
-                            
-                            std::vector<std::string> default_keep = {"Nintendo", "emuMMC", "switch", "System Volume Information", "goonies_update.zip"};
-                            DIR* dir = opendir("sdmc:/");
-                            if (dir) {
-                                struct dirent* ent;
-                                while ((ent = readdir(dir)) != NULL) {
-                                    if (ent->d_type == DT_DIR) {
-                                        std::string dirname = ent->d_name;
-                                        if (dirname == "." || dirname == "..") continue;
-                                        bool is_default = false;
-                                        for (const auto& d : default_keep) {
-                                            if (d == dirname) is_default = true;
-                                        }
-                                        if (!is_default) {
-                                            brls::BooleanCell* cell = new brls::BooleanCell();
-                                            cell->init(dirname, false, [](bool){});
-                                            checkboxes_box->addView(cell);
-                                            folder_toggles.push_back(cell);
-                                        }
-                                    }
-                                }
-                                closedir(dir);
-                            }
-
-                            if (!folder_toggles.empty()) {
-                                folder_toggles.back()->setCustomNavigationRoute(brls::FocusDirection::DOWN, update_button);
-                                update_button->setCustomNavigationRoute(brls::FocusDirection::UP, folder_toggles.back());
-                                brls::Application::giveFocus(folder_toggles.front());
-                            } else {
-                                update_button->setCustomNavigationRoute(brls::FocusDirection::UP, nullptr);
-                                brls::Application::giveFocus(update_button);
-                            }
-
-                            scroll_frame->invalidate();
-                            checkboxes_box->invalidate();
                             this->invalidate();
 
                             update_button->setState(brls::ButtonState::ENABLED);
+                            brls::Application::giveFocus(update_button);
                         });
                         return;
                     }
@@ -340,62 +293,217 @@ void UpdaterView::PerformUpdate() {
         }
         
         brls::sync([this]() { 
-            status_label->setText(t("Limpiando SD e instalando actualización...", "Cleaning SD and installing update...", "Limpando SD e instalando atualização...")); 
-            centerBox->removeView(scroll_frame, false);
+            if (current_mode == UpdateMode::Firmware) {
+                status_label->setText(t("Preparando firmware...", "Preparing firmware...", "Preparando firmware...")); 
+            } else {
+                status_label->setText(t("Limpiando SD e instalando actualización...", "Cleaning SD and installing update...", "Limpando SD e instalando atualização...")); 
+            }
             centerBox->removeView(update_button, false);
             centerBox->addView(progress_bar_bg);
         });
-        
-        std::vector<std::string> keep_folders = {"Nintendo", "emuMMC", "switch", "goonies_update.zip", "System Volume Information"};
-        for (auto* toggle : folder_toggles) {
-            if (toggle->isOn()) {
-                keep_folders.push_back(toggle->title->getFullText());
-            }
-        }
-        
-        DIR* dir = opendir("sdmc:/");
-        if (dir) {
-            struct dirent* ent;
-            while ((ent = readdir(dir)) != NULL) {
-                std::string filename = ent->d_name;
-                if (filename == "." || filename == "..") continue;
-                
-                bool keep = false;
-                for (const auto& k : keep_folders) {
-                    if (strcasecmp(filename.c_str(), k.c_str()) == 0) {
-                        keep = true;
-                        break;
+
+        std::error_code ec;
+
+        if (current_mode == UpdateMode::Firmware) {
+            fs::remove_all("sdmc:/firmware", ec);
+            fs::create_directories("sdmc:/firmware", ec);
+            
+            brls::sync([this]() { status_label->setText(t("Extrayendo archivos de firmware...", "Extracting firmware files...", "Extraindo arquivos de firmware...")); });
+            ExtractZip(temp_zip, "sdmc:/firmware", status_label, progress_bar_fill);
+            
+            fs::remove(temp_zip, ec);
+        } else {
+            fs::remove_all("sdmc:/switch_old", ec);
+            fs::rename("sdmc:/switch", "sdmc:/switch_old", ec);
+            
+            std::vector<std::string> keep_folders = {"Nintendo", "emuMMC", "bootloader", "goonies_update.zip", "System Volume Information", "firmware"};
+            
+            DIR* dir = opendir("sdmc:/");
+            if (dir) {
+                struct dirent* ent;
+                while ((ent = readdir(dir)) != NULL) {
+                    std::string filename = ent->d_name;
+                    if (filename == "." || filename == "..") continue;
+                    
+                    bool keep = false;
+                    for (const auto& k : keep_folders) {
+                        if (strcasecmp(filename.c_str(), k.c_str()) == 0) {
+                            keep = true;
+                            break;
+                        }
+                    }
+                    if (!keep) {
+                        std::string full_path = "sdmc:/" + filename;
+                        remove_recursive(full_path);
                     }
                 }
-                if (!keep) {
-                    std::string full_path = "sdmc:/" + filename;
-                    remove_recursive(full_path);
-                }
+                closedir(dir);
             }
-            closedir(dir);
+
+            // Rename atmosphere/contents and exefs_patches to avoid locked sysmodule issues causing 0xffe on reboot
+            fs::remove_all("sdmc:/atmosphere/contents_old", ec);
+            fs::rename("sdmc:/atmosphere/contents", "sdmc:/atmosphere/contents_old", ec);
+            fs::remove_all("sdmc:/atmosphere/exefs_patches_old", ec);
+            fs::rename("sdmc:/atmosphere/exefs_patches", "sdmc:/atmosphere/exefs_patches_old", ec);
+            fs::remove("sdmc:/atmosphere/stratosphere.romfs_old", ec);
+            fs::rename("sdmc:/atmosphere/stratosphere.romfs", "sdmc:/atmosphere/stratosphere.romfs_old", ec);
+            fs::remove("sdmc:/atmosphere/package3_old", ec);
+            fs::rename("sdmc:/atmosphere/package3", "sdmc:/atmosphere/package3_old", ec);
+
+            // Backup hekate_ipl.ini to preserve emuMMC config
+            if (fs::exists("sdmc:/bootloader/hekate_ipl.ini")) {
+                fs::copy_file("sdmc:/bootloader/hekate_ipl.ini", "sdmc:/bootloader/hekate_ipl.ini.bak", fs::copy_options::overwrite_existing, ec);
+            }
+
+            brls::sync([this]() { status_label->setText(t("Extrayendo archivos...", "Extracting files...", "Extraindo arquivos...")); });
+            ExtractZip(temp_zip, "sdmc:", status_label, progress_bar_fill);
+
+            // Restore hekate_ipl.ini
+            if (fs::exists("sdmc:/bootloader/hekate_ipl.ini.bak")) {
+                fs::copy_file("sdmc:/bootloader/hekate_ipl.ini.bak", "sdmc:/bootloader/hekate_ipl.ini", fs::copy_options::overwrite_existing, ec);
+                fs::remove("sdmc:/bootloader/hekate_ipl.ini.bak", ec);
+            }
+
+            fs::remove(temp_zip, ec);
         }
-
-        // Explicitly clean legacy sysmodules/themes to prevent 010041544D530000 ams_mitm crash on new HOS firmware
-        remove_recursive("sdmc:/atmosphere/contents");
-
-        brls::sync([this]() { status_label->setText(t("Extrayendo archivos...", "Extracting files...", "Extraindo arquivos...")); });
-        ExtractZip(temp_zip, status_label, progress_bar_fill);
-
-        fs::remove(temp_zip);
 
         appletSetMediaPlaybackState(false);
 
-        brls::sync([this]() {
-            centerBox->removeView(progress_bar_bg, false);
-            centerBox->addView(update_button);
-            status_label->setText(t("¡Actualización completada con éxito!", "Update completed successfully!", "Atualização concluída com sucesso!"));
-            update_button->setText(t("Cerrar App", "Close App", "Fechar aplicativo"));
-            update_button->setState(brls::ButtonState::ENABLED);
-            update_button->registerClickAction([](brls::View* view) {
-                brls::Application::quit();
-                return true;
+        if (current_mode == UpdateMode::Firmware) {
+            brls::sync([this]() { status_label->setText(t("Instalando firmware con Daybreak...", "Installing firmware...", "Instalando firmware...")); });
+            
+            Result rc = amssuInitialize();
+            if (R_FAILED(rc)) {
+                brls::sync([this]() { status_label->setText("Error: amssuInitialize falló"); });
+                return;
+            }
+            
+            std::string fw_path = "/firmware/";
+            DIR* dir = opendir("sdmc:/firmware");
+            if (dir) {
+                struct dirent* ent;
+                while ((ent = readdir(dir)) != NULL) {
+                    if (ent->d_type == DT_DIR) {
+                        std::string dirname = ent->d_name;
+                        if (dirname == "." || dirname == "..") continue;
+                        
+                        std::string subpath = "sdmc:/firmware/" + dirname;
+                        DIR* subdir = opendir(subpath.c_str());
+                        if (subdir) {
+                            struct dirent* subent;
+                            bool has_nca = false;
+                            while ((subent = readdir(subdir)) != NULL) {
+                                std::string fname = subent->d_name;
+                                if (fname.length() > 4 && fname.substr(fname.length() - 4) == ".nca") {
+                                    has_nca = true;
+                                    break;
+                                }
+                            }
+                            closedir(subdir);
+                            if (has_nca) {
+                                fw_path = "/firmware/" + dirname + "/";
+                                break;
+                            }
+                        }
+                    } else {
+                        // Directly inside /firmware?
+                        std::string fname = ent->d_name;
+                        if (fname.length() > 4 && fname.substr(fname.length() - 4) == ".nca") {
+                            fw_path = "/firmware/";
+                            break; // Stop looking, it's right here!
+                        }
+                    }
+                }
+                closedir(dir);
+            }
+
+            AmsSuUpdateInformation info{};
+            rc = amssuGetUpdateInformation(fw_path.c_str(), &info);
+            if (R_FAILED(rc)) {
+                amssuExit();
+                brls::sync([this]() { status_label->setText("Error: amssuGetUpdateInformation falló"); });
+                return;
+            }
+
+            AmsSuUpdateValidationInfo validation{};
+            Result out_rc = 0;
+            Result out_exfat_rc = 0;
+            rc = amssuValidateUpdate(fw_path.c_str(), &validation, &out_rc, &out_exfat_rc);
+            if (R_FAILED(rc) || R_FAILED(out_rc)) {
+                amssuExit();
+                brls::sync([this]() { status_label->setText("Error: Firmware corrupto o inválido"); });
+                return;
+            }
+
+            bool use_exfat = info.exfat_supported && R_SUCCEEDED(out_exfat_rc);
+
+            rc = amssuSetupUpdate(NULL, 0x100000, fw_path.c_str(), use_exfat);
+            if (R_FAILED(rc)) {
+                amssuExit();
+                brls::sync([this]() { status_label->setText("Error: amssuSetupUpdate falló"); });
+                return;
+            }
+            
+            AsyncResult prepare{};
+            rc = amssuRequestPrepareUpdate(&prepare);
+            if (R_FAILED(rc)) {
+                amssuExit();
+                brls::sync([this]() { status_label->setText("Error: amssuRequestPrepareUpdate falló"); });
+                return;
+            }
+            
+            while (true) {
+                rc = asyncResultWait(&prepare, 0);
+                if (R_FAILED(rc) && rc != 0xea01) break;
+                if (R_SUCCEEDED(rc)) {
+                    asyncResultGet(&prepare);
+                    asyncResultClose(&prepare);
+                    break;
+                }
+                bool prepared = false;
+                amssuHasPreparedUpdate(&prepared);
+                if (prepared) break;
+                
+                NsSystemUpdateProgress progress{};
+                if (R_SUCCEEDED(amssuGetPrepareUpdateProgress(&progress))) {
+                    float pct = 0.0f;
+                    if (progress.total_size > 0) {
+                        pct = (float)progress.current_size / (float)progress.total_size;
+                    }
+                    brls::sync([this, pct]() {
+                        status_label->setText(t("Preparando sistema: ", "Preparing system: ", "Preparando sistema: ") + std::to_string((int)(pct * 100)) + "%");
+                        progress_bar_fill->setWidth(600.0f * pct);
+                    });
+                }
+                svcSleepThread(100'000'000ULL);
+            }
+            
+            rc = amssuApplyPreparedUpdate();
+            amssuExit();
+            if (R_FAILED(rc)) {
+                brls::sync([this]() { status_label->setText("Error: amssuApplyPreparedUpdate falló"); });
+                return;
+            }
+        }
+
+        auto show_success_screen = [this]() {
+            brls::sync([this]() {
+                centerBox->removeView(progress_bar_bg, false);
+                centerBox->addView(update_button);
+                status_label->setText(t("¡Actualización completada con éxito!", "Update completed successfully!", "Atualização concluída com sucesso!"));
+                update_button->setText(t("Reiniciar", "Reboot", "Reiniciar"));
+                update_button->setState(brls::ButtonState::ENABLED);
+                update_button->registerClickAction([](brls::View* view) {
+                    Result rc = spsmInitialize();
+                    if (R_SUCCEEDED(rc)) {
+                        spsmShutdown(true);
+                        spsmExit();
+                    }
+                    return true;
+                });
             });
-        });
+        };
+        show_success_screen();
     });
 }
 
