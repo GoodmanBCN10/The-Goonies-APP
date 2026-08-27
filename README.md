@@ -1,46 +1,46 @@
 # The Goonies Ports 🏴‍☠️
 
-The Goonies Ports is a custom Homebrew application for the Nintendo Switch designed to browse, download, and install game ports directly to your console. Built with a sleek, native-feeling user interface powered by the Borealis engine.
+The Goonies Ports es una aplicación Homebrew personalizada para Nintendo Switch diseñada para explorar, descargar e instalar ports de juegos directamente en tu consola. Construida con una interfaz de usuario nativa, fluida y elegante utilizando el motor gráfico Borealis.
 
-## ✨ Features
+## ✨ Características
 
-- 🎮 **Direct Downloads & Installs:** Download and automatically extract game ports directly to your SD card (`/switch/`).
-- 🗂️ **Dynamic Categories:** Games are automatically grouped by categories (with real-time counters) pulled directly from the cloud catalog.
-- 🎵 **Background Music:** Enjoy immersive background music while browsing the store.
-- 🌍 **Bilingual Support:** Fully translated native interface in both Spanish (Castellano) and English.
-- ⚡ **Background Processing:** Safe background extraction that prevents the console from sleeping during large downloads.
-- 🎨 **Native Switch UI:** Clean, dark-mode interface perfectly integrated with the Switch ecosystem, using native button hints and navigation.
+- 🎮 **Descargas e Instalaciones Directas:** Descarga y extrae automáticamente los ports de juegos directamente en tu tarjeta SD (`/switch/`).
+- 🗂️ **Categorías Dinámicas:** Los juegos se agrupan automáticamente en categorías (con contadores en tiempo real) obtenidas directamente desde el catálogo en la nube.
+- 🎵 **Música de Fondo:** Disfruta de música ambiental inmersiva mientras exploras la tienda.
+- 🌍 **Soporte Bilingüe:** Interfaz nativa completamente traducida al Castellano y al Inglés.
+- ⚡ **Procesamiento Inteligente:** Extracción segura en segundo plano que evita que la consola entre en suspensión durante descargas pesadas.
+- 🎨 **Interfaz Nativa de Switch:** Diseño limpio con modo oscuro perfectamente integrado en el ecosistema de Switch, utilizando la navegación y botones nativos.
 
-## 🚀 Installation
+## 🚀 Instalación
 
-1. Download the latest `TheGooniesPorts.nro` from the [Releases](#) page.
-2. Copy the `.nro` file to the `/switch/TheGooniesPorts/` folder on your Nintendo Switch SD card.
-3. Launch it via the Homebrew Menu. *(Note: Full memory access/Title Takeover is highly recommended for large extractions).*
+1. Descarga el último archivo `TheGooniesPorts.nro` desde la pestaña de [Releases](#).
+2. Cópialo en la ruta `/switch/TheGooniesPorts/` de la tarjeta SD de tu Nintendo Switch.
+3. Inicia la aplicación a través del menú Homebrew (HBL). *(Nota: Se recomienda iniciarlo usando el acceso completo a la memoria abriendo un juego manteniendo pulsado 'R' para instalaciones grandes).*
 
-## 🛠️ Build Instructions
+## 🛠️ Instrucciones de Compilación
 
-To build this project from source, you will need to set up the standard Switch homebrew development environment.
+Para compilar este proyecto desde el código fuente, necesitarás configurar el entorno de desarrollo habitual para Nintendo Switch.
 
-### Requirements:
-- [devkitPro](https://devkitpro.org/) with `devkitA64` and `libnx`
-- [Borealis](https://github.com/natinusala/borealis) (Included in the `vendor/borealis` submodule/folder)
-- Standard Switch portlibs (`sdl2`, `curl`, etc.)
+### Requisitos:
+- [devkitPro](https://devkitpro.org/) con `devkitA64` y `libnx`
+- [Borealis](https://github.com/natinusala/borealis) (Ya incluido en la carpeta `vendor/borealis`)
+- Librerías estándar (`sdl2`, `curl`, etc.)
 
-### Compilation:
+### Compilación:
 ```bash
-# Clone the repository
-git clone https://github.com/GoodmanBCN10/The-Goonies-Ports.git
-cd The-Goonies-Ports
+# Clonar el repositorio
+git clone https://github.com/GoodmanBCN10/The-Goonies-Ports-Shop.git
+cd The-Goonies-Ports-Shop
 
-# Build the project
+# Compilar el proyecto
 make -j8
 ```
-The compiled `TheGooniesPorts.nro` will be placed in the `build/` directory.
+El archivo ejecutable `TheGooniesPorts.nro` aparecerá en la carpeta `build/`.
 
-## 📦 Catalog System
+## 📦 Sistema de Catálogo
 
-The application fetches its game list from a remote `catalog.json` file hosted on GitHub. It uses a robust downloading manager that handles chunked zip files and direct `.nro` injections.
+La aplicación carga su lista de juegos desde un archivo `catalog.json` remoto alojado en GitHub. Utiliza un gestor de descargas robusto capaz de manejar archivos zip grandes, zips divididos en partes, y descargas directas de archivos `.nro`.
 
-## 📄 License
+## 📄 Créditos y Licencia
 
-This project is created for the homebrew community. Please respect the licenses of the individual ports and the Borealis engine used in this project.
+Este proyecto ha sido creado por GoodmanBCN10 para la comunidad homebrew. Por favor, respeta los derechos y licencias de los desarrolladores originales de los ports y del motor Borealis utilizado en este proyecto.
