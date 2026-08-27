@@ -1,63 +1,46 @@
-# The Goonies App
+# The Goonies Ports 🏴‍☠️
 
-Instalador y gestor de contenido para Nintendo Switch, desarrollado para la comunidad Switch ES — The Goonies OS.
----
-Únete a nuestra comunidad en https://t.me/+WWoAIRB3xjAwYTM0
+The Goonies Ports is a custom Homebrew application for the Nintendo Switch designed to browse, download, and install game ports directly to your console. Built with a sleek, native-feeling user interface powered by the Borealis engine.
 
-Apoya este proyecto: https://www.paypal.com/paypalme/GoodmanBCN
+## ✨ Features
 
-## Qué es
+- 🎮 **Direct Downloads & Installs:** Download and automatically extract game ports directly to your SD card (`/switch/`).
+- 🗂️ **Dynamic Categories:** Games are automatically grouped by categories (with real-time counters) pulled directly from the cloud catalog.
+- 🎵 **Background Music:** Enjoy immersive background music while browsing the store.
+- 🌍 **Bilingual Support:** Fully translated native interface in both Spanish (Castellano) and English.
+- ⚡ **Background Processing:** Safe background extraction that prevents the console from sleeping during large downloads.
+- 🎨 **Native Switch UI:** Clean, dark-mode interface perfectly integrated with the Switch ecosystem, using native button hints and navigation.
 
-The Goonies App es una aplicación homebrew para Nintendo Switch con interfaz propia, diseñada para simplificar la gestión de contenido en consolas con CFW. Todo desde una interfaz en español (con opción de inglés).
+## 🚀 Installation
 
-*   **Descarga de Juegos:** Soporte integrado para descargar contenido a través de red (Torrents y enlaces Magnet) directamente desde la consola.
-*   **Instalar por MTP:** Conecta el cable USB al PC y transfiere archivos directamente, sin necesidad de software adicional en el PC.
-*   **Instalar desde un pendrive o un disco externo:** Conecta el USB o el disco externo a la consola y transfiere archivos directamente.  Admite discos duros y pendrives formateados en NTFS, exFAT y FAT32
-*   **Juegos Instalados:** Visualiza, gestiona y elimina títulos instalados en la consola.
-*   **Partidas Guardadas:** Administra las saves de tus juegos.
-*   **Crea Forwarders:** Crea accesos directos de tus apps de Homebrew favoritas.
-*   **Explorar microSD desde MTP:** Navegador de archivos de la tarjeta SD.
-  
-## Componentes de terceros
+1. Download the latest `TheGooniesPorts.nro` from the [Releases](#) page.
+2. Copy the `.nro` file to the `/switch/TheGooniesPorts/` folder on your Nintendo Switch SD card.
+3. Launch it via the Homebrew Menu. *(Note: Full memory access/Title Takeover is highly recommended for large extractions).*
 
-Este proyecto utiliza los siguientes componentes de código abierto:
+## 🛠️ Build Instructions
 
-*   **yati:** Motor de instalación de NCAs (del proyecto sphaira de ITotalJustice).
-*   **libhaze:** Librería MTP del proyecto Atmosphere.
-*   **pipensx:** Herramientas y funciones base (de i3sey).
-*   **minini:** Librería para archivos de configuración INI.
+To build this project from source, you will need to set up the standard Switch homebrew development environment.
 
-La interfaz gráfica, el módulo de instalación y la arquitectura general son código original de este proyecto.
+### Requirements:
+- [devkitPro](https://devkitpro.org/) with `devkitA64` and `libnx`
+- [Borealis](https://github.com/natinusala/borealis) (Included in the `vendor/borealis` submodule/folder)
+- Standard Switch portlibs (`sdl2`, `curl`, etc.)
 
-## Compilación
-
-### Requisitos
-
-*   devkitPro con el toolchain de Switch (devkitA64)
-*   Librerías (instalables con pacman de devkitPro)
-
-### Pasos
-
+### Compilation:
 ```bash
-git clone https://github.com/GoodmanBCN10/The-Goonies-Installer.git
-cd The-Goonies-Installer
-make -j$(nproc)
+# Clone the repository
+git clone https://github.com/GoodmanBCN10/The-Goonies-Ports.git
+cd The-Goonies-Ports
+
+# Build the project
+make -j8
 ```
+The compiled `TheGooniesPorts.nro` will be placed in the `build/` directory.
 
-El archivo resultante `TheGooniesInstaller.nro` se genera en la raíz del proyecto.
+## 📦 Catalog System
 
-## Instalación
+The application fetches its game list from a remote `catalog.json` file hosted on GitHub. It uses a robust downloading manager that handles chunked zip files and direct `.nro` injections.
 
-Copia `TheGooniesInstaller.nro` a la carpeta `/switch/` de tu microSD.
+## 📄 License
 
-## Créditos
-
-*   **ITotalJustice** — Autor de yati (motor de instalación) y sphaira.
-*   **Atmosphere-NX** — Autores de libhaze (librería MTP).
-*   **i3sey** — Autor de pipensx.
-*   **GoodmanBCN** — Desarrollo, interfaz y mantenimiento.
-*   **Comunidad Switch ES — The Goonies OS** — Testing y feedback.
-
-## Licencia
-
-Este proyecto se distribuye bajo la licencia GPLv2+ (debido a la inclusión de pipensx). Consulta el archivo `LICENSE_GPLv2+.md` para los términos completos.
+This project is created for the homebrew community. Please respect the licenses of the individual ports and the Borealis engine used in this project.

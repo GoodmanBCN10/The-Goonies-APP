@@ -23,7 +23,7 @@ std::vector<std::string> mergeScreenshotUrls(
     };
     if (metadata)
         append(metadata->screenshots);
-    append(entry.screenshots);
+    
     return result;
 }
 
@@ -89,7 +89,7 @@ CatalogPresentation resolveCatalogPresentation(
         result.iconPreserveAspect = false;
     } else {
         result.iconUrl = entry.posterUrl;
-        result.iconPreserveAspect = !result.iconUrl.empty();
+        result.iconPreserveAspect = false; // Always false for Switchbru so they render as 180x180 squares
     }
     if (metadata && !metadata->bannerUrl.empty())
         result.coverUrl = metadata->bannerUrl;
@@ -103,11 +103,11 @@ CatalogPresentation resolveCatalogPresentation(
         result.description = entry.description;
     result.developer = entry.developer;
     result.publisher = metadata && !metadata->publisher.empty()
-        ? metadata->publisher : entry.publisher;
+        ? metadata->publisher : entry.developer;
     result.releaseDate = metadata && !metadata->releaseDate.empty()
-        ? metadata->releaseDate : entry.year;
+        ? metadata->releaseDate : entry.version;
     result.genre = metadata && !metadata->categories.empty()
-        ? join(metadata->categories) : entry.genre;
+        ? join(metadata->categories) : entry.category;
     result.screenshots = mergeScreenshotUrls(metadata, entry, 6);
     return result;
 }

@@ -354,6 +354,7 @@ private:
                         openRowMenu(taskId);
                         return true;
                     });
+                    cell->registerAction("Borrar", brls::BUTTON_X, [this, taskId](brls::View*) { openRemoveDialog(taskId); return true; });
                     list_->addView(cell);
                     
                     if (task.id == focusedTaskId && ownsFocus) {

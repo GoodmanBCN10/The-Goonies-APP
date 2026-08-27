@@ -13,7 +13,7 @@ set(BRLS_UNITY_BUILD OFF CACHE BOOL "" FORCE)
 include(${BOREALIS_LIBRARY}/cmake/commonOption.cmake)
 include(${BOREALIS_LIBRARY}/cmake/toolchain.cmake)
 
-project(TheGooniesInstaller VERSION 2.1.14 LANGUAGES C CXX)
+project(TheGooniesInstaller VERSION 2.1.17 LANGUAGES C CXX)
 set(APP_TITLE "The Goonies APP")
 set(APP_AUTHOR "GoodmanBCN")
 set(APP_ICON ${CMAKE_CURRENT_SOURCE_DIR}/icon.jpg)
@@ -146,7 +146,7 @@ target_link_libraries(TheGooniesInstaller PRIVATE
 )
 
 if(NOT DEFINED APP_VERSION)
-    set(APP_VERSION "v2.1.15-BETA")
+    set(APP_VERSION "v1.0.0")
 endif()
 
 target_compile_definitions(TheGooniesInstaller PRIVATE

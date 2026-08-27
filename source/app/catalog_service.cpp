@@ -1,4 +1,4 @@
-#include "catalog_service.hpp"
+﻿#include "catalog_service.hpp"
 #include "magnet_resolver.hpp"
 
 extern "C" {
@@ -19,6 +19,7 @@ extern "C" {
 #include <set>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <minizip/unzip.h>
 
 namespace pipensx {
 namespace {
@@ -35,6 +36,9 @@ constexpr const char* kCatalogSourceUrl =
     "https://raw.githubusercontent.com/Langegen/switch-games/"
     "refs/heads/main/switch_games.json";
 
+constexpr const char* kSwitchbruSourceUrl =
+    "https://github.com/GoodmanBCN10/GooniesPorts-Data/releases/download/juegos/catalog.json";
+
 int base64Value(char c) {
     if (c >= 'A' && c <= 'Z') return c - 'A';
     if (c >= 'a' && c <= 'z') return c - 'a' + 26;
@@ -42,6 +46,12 @@ int base64Value(char c) {
     if (c == '+') return 62;
     if (c == '/') return 63;
     return -1;
+}
+
+std::string lowerAscii(std::string_view s) {
+    std::string result(s);
+    for (char& c : result) if (c >= 'A' && c <= 'Z') c += 32;
+    return result;
 }
 
 bool decodeBase64(const std::string& text, std::vector<uint8_t>& out) {
@@ -96,7 +106,12 @@ bool makeDirectories(const std::string& path) {
     if (path.empty() || path.size() >= sizeof(buffer))
         return false;
     std::snprintf(buffer, sizeof(buffer), "%s", path.c_str());
-    for (char* cursor = buffer + 1; *cursor; ++cursor) {
+    char* cursor = buffer + 1;
+    char* colon = strchr(buffer, ':');
+    if (colon && *(colon + 1) == '/') {
+        cursor = colon + 2;
+    }
+    for (; *cursor; ++cursor) {
         if (*cursor != '/')
             continue;
         *cursor = '\0';
@@ -204,28 +219,6 @@ bool writeAtomic(const std::string& path, const std::string& data,
     return true;
 }
 
-CatalogHealth parseHealth(const nlohmann::json& item) {
-    if (!item.contains("health") || !item["health"].is_string())
-        return CatalogHealth::Unknown;
-    std::string value = item["health"].get<std::string>();
-    std::transform(value.begin(), value.end(), value.begin(),
-                   [](unsigned char c) {
-                       return static_cast<char>(std::tolower(c));
-                   });
-    if (value == "ok")
-        return CatalogHealth::Ok;
-    if (value == "no_peers")
-        return CatalogHealth::NoPeers;
-    if (value == "metadata_timeout")
-        return CatalogHealth::MetadataTimeout;
-    if (value == "tracker_not_registered")
-        return CatalogHealth::TrackerNotRegistered;
-    if (value == "replaced")
-        return CatalogHealth::Replaced;
-    if (value == "dead")
-        return CatalogHealth::Dead;
-    return CatalogHealth::Unknown;
-}
 
 uint64_t readUnsigned(const nlohmann::json& item, const char* key) {
     if (!item.contains(key))
@@ -337,201 +330,337 @@ uint64_t readFlexibleSize(const nlohmann::json& item, const char* key) {
 
 CatalogService::CatalogService(std::string rootPath, std::string bundledPath)
     : rootPath_(std::move(rootPath)),
-      catalogRoot_(rootPath_ + "/catalog"),
-      cachePath_(catalogRoot_ + "/catalog.json"),
+      cachePath_(rootPath_ + "/catalog.json"),
       bundledPath_(std::move(bundledPath)) {
-    makeDirectories(catalogRoot_);
+    makeDirectories(rootPath_);
 }
 
-bool CatalogService::parseJson(const std::string& json,
-                               std::vector<CatalogEntry>& entries,
-                               std::string& error) {
-    entries.clear();
-    nlohmann::json root = nlohmann::json::parse(json, nullptr, false);
-    if (root.is_discarded() || !root.is_array()) {
-        error = "Catalog JSON is not a valid array.";
-        return false;
-    }
-    if (root.empty() || root.size() > kMaxCatalogEntries) {
-        error = "Catalog contains an invalid number of entries.";
-        return false;
-    }
 
-    std::set<std::string> hashes;
-    entries.reserve(root.size());
-    for (const auto& item : root) {
-        // The Langegen source names the magnet "magnet" and the cover "cover";
-        // the older bqio dumps used "magnetURI" and "poster". Accept either so
-        // a cached bqio snapshot still parses.
-        const char* magnetKey = item.contains("magnet") ? "magnet" : "magnetURI";
-        if (!item.is_object() ||
-            !item.contains("title") || !item["title"].is_string() ||
-            !item.contains(magnetKey) || !item[magnetKey].is_string())
-            continue;
-        CatalogEntry entry;
-        entry.title = item["title"].get<std::string>();
-        entry.magnetUri = item[magnetKey].get<std::string>();
-        if (entry.title.empty() || entry.title.size() > 1024 ||
-            entry.magnetUri.size() > 2048)
-            continue;
-        MagnetSpec magnet;
-        std::string magnetError;
-        if (!MagnetResolver::parse(entry.magnetUri, magnet, magnetError))
-            continue;
-        entry.infoHash = magnet.infoHashHex;
-        entry.trackerUrl = magnet.trackerUrl;
-        entry.posterUrl = item.contains("cover")
-                              ? readString(item, "cover", 2048)
-                              : readString(item, "poster", 2048);
-        if (item.contains("screenshots") && item["screenshots"].is_array()) {
-            for (const auto& value : item["screenshots"]) {
-                if (!value.is_string() || entry.screenshots.size() >= 6)
-                    continue;
-                std::string url = value.get<std::string>();
-                if (!url.empty() && url.size() <= 2048)
-                    entry.screenshots.push_back(std::move(url));
-            }
+class GooniesSax : public nlohmann::json::json_sax_t {
+public:
+    std::vector<CatalogEntry>& entries;
+    CatalogEntry current;
+    std::string current_key;
+    int object_depth = 0;
+    bool in_array = false;
+
+    GooniesSax(std::vector<CatalogEntry>& e) : entries(e) {}
+
+    bool null() override { return true; }
+    bool boolean(bool val) override { return true; }
+    bool number_integer(number_integer_t val) override { 
+        if (in_array && object_depth == 1 && current_key == "size") {
+            current.size = static_cast<uint64_t>(val);
         }
-        entry.size = readFlexibleSize(item, "size");
-        entry.topicId = readFlexibleUnsigned(item, "topic_id");
-        // Langegen inline metadata: shown on the detail card, which never
-        // matches these entries in the bundled game_metadata_index.
-        entry.year = readString(item, "year", 32);
-        entry.genre = readString(item, "genre", 256);
-        entry.developer = readString(item, "developer", 256);
-        entry.publisher = readString(item, "publisher", 256);
-        entry.description = readString(item, "description", 4096);
-        entry.forumId = static_cast<uint32_t>(readUnsigned(item, "forum_id"));
-        entry.trackerId =
-            static_cast<uint32_t>(readUnsigned(item, "tracker_id"));
-        entry.peerCount =
-            static_cast<uint32_t>(readUnsigned(item, "peer_count"));
-        entry.publishedAt = readSigned(item, "published_date");
-        entry.sourceUpdatedAt = readSigned(item, "source_updated_at");
-        entry.catalogGeneratedAt = readSigned(item, "catalog_generated_at");
-        entry.lastCheckedAt = readSigned(item, "last_checked_at");
-        entry.health = parseHealth(item);
-        if (item.contains("metadata_ok") && item["metadata_ok"].is_boolean())
-            entry.metadataOk = item["metadata_ok"].get<bool>();
-        if (item.contains("failure_reason") &&
-            item["failure_reason"].is_string()) {
-            entry.healthReason = item["failure_reason"].get<std::string>();
-            if (entry.healthReason.size() > 512)
-                entry.healthReason.resize(512);
-        }
-        /* Pre-resolved info dictionary (RF_ACCESS_PLAN П2.1). A dictionary
-           that fails to decode or does not hash to the magnet's btih is
-           dropped here, so entry.infoDict non-empty always means verified;
-           the entry itself stays usable through the network resolve. */
-        if (item.contains("info_dict") && item["info_dict"].is_string()) {
-            const std::string& encoded =
-                item["info_dict"].get_ref<const std::string&>();
-            if (encoded.size() <= kMaxInfoDictBytes / 3 * 4 + 4 &&
-                decodeBase64(encoded, entry.infoDict)) {
-                uint8_t digest[20];
-                sha1(entry.infoDict.data(), entry.infoDict.size(), digest);
-                if (entry.infoDict.size() > kMaxInfoDictBytes ||
-                    std::memcmp(digest, magnet.infoHash, 20) != 0) {
-                    log_msg("[catalog] info_dict for %s rejected\n",
-                            entry.infoHash.c_str());
-                    entry.infoDict.clear();
-                }
-            } else {
-                entry.infoDict.clear();
-            }
-        }
-        if (!hashes.insert(entry.infoHash).second)
-            continue;
-        entries.push_back(std::move(entry));
+        return true; 
     }
-    if (entries.empty()) {
-        error = "Catalog does not contain usable RuTracker magnets.";
+    bool number_unsigned(number_unsigned_t val) override { 
+        if (in_array && object_depth == 1 && current_key == "size") {
+            current.size = static_cast<uint64_t>(val);
+        }
+        return true; 
+    }
+    bool number_float(number_float_t val, const string_t& s) override { return true; }
+    bool string(string_t& val) override { 
+        if (in_array && object_depth == 1) {
+            if (current_key == "title") current.title = val.substr(0, 1024);
+            else if (current_key == "name") current.name = val.substr(0, 1024);
+            else if (current_key == "category") current.category = val.substr(0, 256);
+            else if (current_key == "version") current.version = val.substr(0, 256);
+            else if (current_key == "author") current.developer = val.substr(0, 256);
+            else if (current_key == "url") current.directDownloadUrl = val.substr(0, 1024);
+            else if (current_key == "icon") current.posterUrl = val.substr(0, 1024);
+            else if (current_key == "description") current.description = val.substr(0, 2048);
+        }
+        return true; 
+    }
+    bool start_object(std::size_t elements) override {
+        object_depth++;
+        if (in_array && object_depth == 1) {
+            current = CatalogEntry{};
+        }
+        return true;
+    }
+    bool end_object() override {
+        if (in_array && object_depth == 1) {
+            if (!current.title.empty() && !current.directDownloadUrl.empty()) {
+                entries.push_back(current);
+            }
+        }
+        object_depth--;
+        return true;
+    }
+    bool start_array(std::size_t elements) override {
+        if (object_depth == 0) in_array = true;
+        return true;
+    }
+    bool end_array() override {
+        if (object_depth == 0) in_array = false;
+        return true;
+    }
+    bool key(string_t& val) override {
+        current_key = val;
+        return true;
+    }
+    bool binary(nlohmann::json::binary_t& val) override { return true; }
+    bool parse_error(std::size_t position, const std::string& last_token, const nlohmann::json::exception& ex) override { return false; }
+};
+
+bool CatalogService::parseJson(const std::string& json_str, std::vector<CatalogEntry>& entries, std::string& error) {
+    entries.clear();
+    try {
+        auto j = nlohmann::json::parse(json_str);
+        if (j.is_array()) {
+            for (auto& item : j) {
+                CatalogEntry entry;
+                if (item.contains("title") && item["title"].is_string()) entry.title = item["title"];
+                if (item.contains("name") && item["name"].is_string()) entry.name = item["name"];
+                if (item.contains("category") && item["category"].is_string()) entry.category = item["category"];
+                if (item.contains("version") && item["version"].is_string()) entry.version = item["version"];
+                if (item.contains("developer") && item["developer"].is_string()) entry.developer = item["developer"];
+                if (item.contains("directDownloadUrl") && item["directDownloadUrl"].is_string()) entry.directDownloadUrl = item["directDownloadUrl"];
+                if (item.contains("posterUrl") && item["posterUrl"].is_string()) entry.posterUrl = item["posterUrl"];
+                if (item.contains("description") && item["description"].is_string()) entry.description = item["description"];
+                
+                if (!entry.title.empty() && !entry.directDownloadUrl.empty()) {
+                    entries.push_back(entry);
+                }
+            }
+        } else {
+            error = "JSON root is not an array";
+            return false;
+        }
+    } catch (const std::exception& e) {
+        error = std::string("JSON parse error: ") + e.what();
         return false;
     }
-    std::stable_sort(entries.begin(), entries.end(),
-                     [](const CatalogEntry& left, const CatalogEntry& right) {
-                         return left.publishedAt > right.publishedAt;
-                     });
     return true;
 }
 
 bool CatalogService::loadFile(const std::string& path,
                               const std::string& label,
                               std::string& error) {
-    std::string data;
-    if (!readFile(path, data, error))
+    std::string body;
+    if (!readFile(path, body, error))
         return false;
     std::vector<CatalogEntry> parsed;
-    if (!parseJson(data, parsed, error))
+    if (!parseJson(body, parsed, error))
         return false;
-    entries_ = std::move(parsed);
+        
+    adopt(std::move(parsed));
     sourceLabel_ = label;
     log_msg("[catalog] loaded %zu entries from %s\n", entries_.size(),
             path.c_str());
     return true;
 }
 
+
 bool CatalogService::load(std::string& error) {
-    std::string cacheError;
-    if (loadFile(cachePath_, "cached catalog", cacheError))
+    if (loadFile(cachePath_, "cached catalog", error))
         return true;
-    if (!bundledPath_.empty()) {
-        if (loadFile(bundledPath_, "bundled catalog", error))
-            return true;
-        if (!cacheError.empty())
-            error = cacheError + " " + error;
-        return false;
-    }
-
-    // A fresh public install intentionally has no bundled catalog. The UI
-    // sees an empty list and starts the trusted live refresh in the background.
-    entries_.clear();
-    sourceLabel_.clear();
-    error.clear();
-    return true;
-}
-
-bool CatalogService::isTrustedSource(const std::string& url) {
-    // Host (with path prefix) allowed to serve catalog bytes. Only the Langegen
-    // switch-games repo on GitHub's raw host; every network fetch is gated on
-    // this so a redirect or MITM to another host is refused before any parse.
-    static const char* const kPrefixes[] = {
-        "https://raw.githubusercontent.com/Langegen/switch-games/",
-    };
-    for (const char* prefix : kPrefixes)
-        if (url.rfind(prefix, 0) == 0)
-            return true;
     return false;
 }
 
-bool CatalogService::fetchLatest(std::vector<CatalogEntry>& parsed,
-                                 std::string& error) {
-    // Single source: the Langegen switch_games.json on GitHub's raw host. Runs
-    // on a worker thread: network fetch + parse + cache write only, so it never
-    // touches entries_. The cached catalogue in memory survives a failure —
-    // the caller keeps showing it on error.
-    parsed.clear();
-    if (!isTrustedSource(kCatalogSourceUrl)) {
-        error = "Catalog URL is not on the trusted host list.";
+
+
+struct ZipProgressData {
+    std::atomic<bool>* cancelled;
+    std::function<void(uint64_t, uint64_t)> progressCb;
+};
+
+static size_t zipWriteCb(void* ptr, size_t size, size_t nmemb, FILE* stream) {
+    return fwrite(ptr, size, nmemb, stream);
+}
+
+static int zipProgressCb(void* clientp, curl_off_t dltotal, curl_off_t dlnow, curl_off_t ultotal, curl_off_t ulnow) {
+    ZipProgressData* data = static_cast<ZipProgressData*>(clientp);
+    if (data->cancelled && data->cancelled->load()) {
+        return 1;
+    }
+    if (data->progressCb && dltotal > 0) {
+        data->progressCb(dltotal, dlnow);
+    }
+    return 0;
+}
+
+bool CatalogService::downloadAndExtractZip(const std::string& url, const std::string& entryName,
+                                  const std::string& targetDir,
+                                  std::atomic<bool>* cancelled,
+                                  std::function<void(uint64_t, uint64_t)> progressCb, std::function<void(uint64_t, uint64_t)> extractProgressCb,
+                                  std::string& error) {
+    
+    bool isNro = (url.find(".nro") != std::string::npos);
+    std::string tempZip = targetDir + (isNro ? ("/switch/" + entryName + "/" + entryName + ".nro") : "/temp_port.zip");
+    
+    if (isNro) {
+        makeDirectories(targetDir + "/switch/" + entryName);
+    }
+
+    FILE* fp = fopen(tempZip.c_str(), "wb");
+    if (!fp) {
+        error = "Cannot create temp zip file.";
         return false;
     }
-    std::string catalogBody;
-    if (!httpGet(kCatalogSourceUrl, catalogBody, error))
+
+    CURL* curl = curl_easy_init();
+    if (!curl) {
+        fclose(fp);
+        error = "Cannot initialize curl.";
         return false;
-    if (!parseJson(catalogBody, parsed, error))
+    }
+
+    ZipProgressData pdata{cancelled, progressCb};
+
+    // Aceleracion extrema de lectura y escritura para Nintendo Switch
+    setvbuf(fp, NULL, _IOFBF, 1024 * 1024); // 1MB de buffer de escritura en tarjeta SD
+
+    curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 512 * 1024L); // 512KB de buffer de red curl
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, zipWriteCb);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, zipProgressCb);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &pdata);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "pipensx/0.4");
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long status = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
+    fclose(fp);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK || status >= 400) {
+        if (status >= 400) {
+            error = "HTTP Error " + std::to_string(status);
+        } else
+        if (res == CURLE_ABORTED_BY_CALLBACK) {
+            error = "Download cancelled.";
+        } else {
+            error = curl_easy_strerror(res);
+        }
+        unlink(tempZip.c_str());
         return false;
-    if (!writeAtomic(cachePath_, catalogBody, error))
+    }
+
+    if (isNro) {
+        // Direct NRO download completed
+        return true;
+    }
+
+    uint64_t zipSize = 0;
+    struct stat st;
+    if (stat(tempZip.c_str(), &st) == 0) zipSize = st.st_size;
+    uint64_t extractedBytes = 0;
+    unzFile uf = unzOpen64(tempZip.c_str());
+    if (uf == NULL) {
+        error = "Invalid zip file.";
+        unlink(tempZip.c_str());
         return false;
+    }
+
+    unz_global_info64 global_info;
+    if (unzGetGlobalInfo64(uf, &global_info) != UNZ_OK) {
+        error = "Cannot read zip global info.";
+        unzClose(uf);
+        unlink(tempZip.c_str());
+        return false;
+    }
+
+    for (uLong i = 0; i < global_info.number_entry; ++i) {
+        if (cancelled && cancelled->load()) {
+            error = "Extraction cancelled.";
+            unzClose(uf);
+            unlink(tempZip.c_str());
+            return false;
+        }
+
+        char filename_inzip[256];
+        unz_file_info64 file_info;
+        if (unzGetCurrentFileInfo64(uf, &file_info, filename_inzip, sizeof(filename_inzip), NULL, 0, NULL, 0) != UNZ_OK) {
+            unzClose(uf);
+            unlink(tempZip.c_str());
+            error = "Cannot read file info in zip.";
+            return false;
+        }
+
+        std::string fname(filename_inzip);
+        if (fname == "info.json" || fname == "manifest.install" || fname == "icon.png" || fname.find("screen") == 0) {
+            if (i < global_info.number_entry - 1) {
+                if (unzGoToNextFile(uf) != UNZ_OK) break;
+            }
+            continue;
+        }
+
+        std::string out_path = targetDir + "/" + filename_inzip;
+        static std::string last_created_dir = ""; // Cache para no hacer mkdir miles de veces
+        
+        if (filename_inzip[strlen(filename_inzip) - 1] == '/') {
+            if (last_created_dir != out_path) {
+                makeDirectories(out_path);
+                last_created_dir = out_path;
+            }
+        } else {
+            size_t slash_pos = out_path.find_last_of('/');
+            if (slash_pos != std::string::npos) {
+                std::string dir_path = out_path.substr(0, slash_pos);
+                if (last_created_dir != dir_path) {
+                    makeDirectories(dir_path);
+                    last_created_dir = dir_path;
+                }
+            }
+            
+            if (unzOpenCurrentFile(uf) == UNZ_OK) {
+                FILE* out = fopen(out_path.c_str(), "wb");
+                if (out) {
+                    std::vector<char> buf(256 * 1024); // 256KB es el tama�o �ptimo de cluster FAT32/exFAT
+                    int len;
+                    while ((len = unzReadCurrentFile(uf, buf.data(), buf.size())) > 0) {
+                        fwrite(buf.data(), 1, len, out);
+                        extractedBytes += len;
+                        if (extractProgressCb) extractProgressCb(extractedBytes, zipSize);
+                    }
+                    fclose(out);
+                }
+                unzCloseCurrentFile(uf);
+            }
+        }
+
+        if (i < global_info.number_entry - 1) {
+            if (unzGoToNextFile(uf) != UNZ_OK) break;
+        }
+    }
+    unzClose(uf);
+    unlink(tempZip.c_str());
     return true;
 }
 
-void CatalogService::adopt(std::vector<CatalogEntry> parsed) {
-    // UI thread only: entries() is read unsynchronised by the render thread, so
-    // this swap must never happen on the fetch worker (data race → UAF).
-    entries_ = std::move(parsed);
-    sourceLabel_ = "Langegen switch-games";
-    log_msg("[catalog] refreshed %zu entries from %s\n", entries_.size(),
-            sourceLabel_.c_str());
-}
+bool CatalogService::fetchLatest(std::vector<CatalogEntry>& parsed,
+                                     std::string& error) {
+        parsed.clear();
+        std::string body;
+        std::string fetchError;
+        // The Goonies Ports official catalog
+        std::string catalogUrl = "https://github.com/GoodmanBCN10/GooniesPorts-Data/releases/download/juegos/catalog.json";
+        if (!httpGet(catalogUrl, body, fetchError)) {
+            error = fetchError;
+            return false;
+        }
+        if (!parseJson(body, parsed, fetchError)) {
+            error = fetchError;
+            return false;
+        }
+        writeAtomic(cachePath_, body, fetchError);
+        return true;
+    }
 
-} // namespace pipensx
+    void CatalogService::adopt(std::vector<CatalogEntry> parsed) {
+        entries_ = std::move(parsed);
+        sourceLabel_ = "The Goonies Ports";
+        log_msg("[catalog] refreshed %zu entries from %s\n", entries_.size(),
+                sourceLabel_.c_str());
+    }
+
+    } // namespace pipensx

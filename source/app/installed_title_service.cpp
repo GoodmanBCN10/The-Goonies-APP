@@ -113,7 +113,7 @@ bool InstalledTitleService::refresh(std::string& error) {
     constexpr s32 PageSize = 64;
     s32 offset = 0;
 
-    std::ofstream logOut("sdmc:/switch/thegoonies/debug_log.txt", std::ios::app);
+    std::ofstream logOut("sdmc:/switch/thegoonies/logs/debug_log.txt", std::ios::app);
     auto writeLog = [&](const std::string& msg) {
         logOut << msg << std::endl;
     };
@@ -248,6 +248,22 @@ bool InstalledTitleService::refresh(std::string& error) {
                   "event=refresh count=%zu duration_ms=%llu", count,
                   static_cast<unsigned long long>(now_ms() - startedMs));
     return true;
+}
+
+bool InstalledTitleService::launchTitle(uint64_t applicationId) {
+    Result rc = appletRequestLaunchApplication(applicationId, NULL);
+    return R_SUCCEEDED(rc);
+}
+
+bool InstalledTitleService::deleteTitle(uint64_t applicationId) {
+    if (R_SUCCEEDED(ncmInitialize())) {
+        nsInitialize();
+        nsDeleteApplicationCompletely(applicationId);
+        nsExit();
+        ncmExit();
+        return true;
+    }
+    return false;
 }
 
 } // namespace pipensx

@@ -32,6 +32,8 @@ public:
     uint64_t generation() const;
 
     static std::string formatTitleId(uint64_t applicationId);
+    static bool launchTitle(uint64_t applicationId);
+    static bool deleteTitle(uint64_t applicationId);
 
 private:
     std::string rootPath_;

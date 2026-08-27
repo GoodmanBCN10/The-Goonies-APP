@@ -1,3 +1,4 @@
+#include <borealis.hpp>
 #include "download_manager.hpp"
 #include "request_gate.hpp"
 #include "stream_ram_budget.hpp"
@@ -1815,8 +1816,7 @@ bool DownloadManager::removeLocked(const std::string& id, bool deleteData,
         }
         if (deleteData) {
             std::string dataPath = it->dataPath;
-            std::lock_guard<std::mutex> cl(cleanupMutex_);
-            cleanupThreads_.emplace_back([this, dataPath]() {
+            brls::async([this, dataPath]() {
                 std::string trashPath = dataPath + ".deleted." + std::to_string(time(nullptr));
                 // Retry rename for up to 5 seconds if torrent engine is still holding files
                 bool renamed = false;
@@ -2456,14 +2456,6 @@ void DownloadManager::shutdown() {
     if (worker_.joinable())
         worker_.join();
         
-    {
-        std::lock_guard<std::mutex> cl(cleanupMutex_);
-        for (auto& t : cleanupThreads_) {
-            if (t.joinable())
-                t.join();
-        }
-        cleanupThreads_.clear();
-    }
         
     std::string ignored;
     save(ignored);

@@ -8,6 +8,8 @@ namespace pipensx {
 enum class CatalogFilter {
     All,
     Games,
+    Retro,
+    Ports,
 };
 
 enum class StreamSelection {

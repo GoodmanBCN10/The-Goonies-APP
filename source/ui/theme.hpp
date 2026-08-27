@@ -18,9 +18,9 @@ namespace pipensx::ui::theme {
 
 // --- Corner radii ------------------------------------------------------
 
-inline constexpr float kRadiusSmall  = 6.0f;
-inline constexpr float kRadiusMedium = 8.0f;
-inline constexpr float kRadiusLarge  = 12.0f;
+inline constexpr float kRadiusSmall  = 0.0f;
+inline constexpr float kRadiusMedium = 0.0f;
+inline constexpr float kRadiusLarge  = 0.0f;
 
 // --- Font scale ---------------------------------------------------------
 
@@ -47,7 +47,7 @@ inline void registerColors() {
     };
     static const Token kTokens[] = {
         // Brand / status
-        {"pipensx/accent", nvgRGB(0, 195, 227), nvgRGB(0, 195, 227)},   // Joy-Con Neon Blue #00C3E3
+        {"pipensx/accent", nvgRGB(138, 43, 226), nvgRGB(138, 43, 226)},   // Joy-Con Neon Blue #00C3E3
         {"pipensx/error", nvgRGB(255, 69, 84), nvgRGB(255, 69, 84)},    // Neon Red #FF4554
         {"pipensx/success", nvgRGB(40, 170, 90), nvgRGB(96, 220, 130)}, // #60DC82 (darkened on light)
         {"pipensx/warning", nvgRGB(196, 110, 22), nvgRGB(230, 150, 80)},

@@ -15,7 +15,12 @@ namespace {
 using Json = nlohmann::json;
 
 const char* catalogFilterName(CatalogFilter value) {
-    return value == CatalogFilter::Games ? "games" : "all";
+    switch (value) {
+        case CatalogFilter::Games: return "games";
+        case CatalogFilter::Retro: return "retro";
+        case CatalogFilter::Ports: return "ports";
+        default: return "all";
+    }
 }
 
 const char* streamSelectionName(StreamSelection value) {
@@ -126,6 +131,10 @@ bool parseSettings(const std::string& text, AppSettingsData& values,
         values.catalogFilter = CatalogFilter::All;
     else if (catalog == "games")
         values.catalogFilter = CatalogFilter::Games;
+    else if (catalog == "retro")
+        values.catalogFilter = CatalogFilter::Retro;
+    else if (catalog == "ports")
+        values.catalogFilter = CatalogFilter::Ports;
     else {
         error = "Setting 'catalog_filter' has an unknown value.";
         return false;
