@@ -36,7 +36,7 @@ inline constexpr float kGameCoverWidth = 112.0f;
 // Cover + name line (17px) + sub line (15px) + inner margins.
 inline constexpr float kCardHeight = 232.0f;
 inline constexpr float kRowHeight = 248.0f;
-inline constexpr int kShelfItems = 12;
+inline constexpr int kShelfItems = 100;
 inline constexpr float kShelfSpacing = 2 * theme::kSpacingUnit;
 // Shelf title (21px) + margin + card strip + bottom breathing room.
 inline constexpr float kShelfHeight = 284.0f;

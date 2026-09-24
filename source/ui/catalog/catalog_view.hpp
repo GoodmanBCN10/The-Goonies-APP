@@ -845,13 +845,18 @@ private:
         int heroIndex = -1;
         std::string heroImage;
 
-        if (currentFilter == CatalogFilter::All && query_.empty() && !shelfDrilldown_) {
+        bool showShelves = (currentFilter == CatalogFilter::All || currentFilter == CatalogFilter::Games) && query_.empty() && !shelfDrilldown_;
+        if (showShelves) {
             std::map<std::string, std::vector<int>> categoryGroups;
             for (size_t i = 0; i < visible.size(); ++i) {
                 const GameMetadata* meta = metas[i];
                 std::string catName = "Otros";
                 if (meta && !meta->categories.empty()) {
                     catName = meta->categories.front();
+                } else if (!visible[i].category.empty()) {
+                    catName = visible[i].category;
+                } else if (!visible[i].genre.empty()) {
+                    catName = visible[i].genre;
                 }
                 categoryGroups[catName].push_back(i);
             }
@@ -860,8 +865,8 @@ private:
                 CatalogShelf shelf;
                 shelf.title = pair.first;
                 shelf.items = std::move(pair.second);
-                if (shelf.items.size() > 25) {
-                    shelf.items.resize(25);
+                if (shelf.items.size() > 100) {
+                    shelf.items.resize(100);
                 }
                 shelf.seeAll = nullptr; 
                 shelves.push_back(std::move(shelf));
