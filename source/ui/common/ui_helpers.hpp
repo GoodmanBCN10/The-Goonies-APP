@@ -184,6 +184,9 @@ inline std::string taskStatusText(const DownloadTask& task) {
             }
             // Fallthrough
         case DownloadStatus::Downloading:
+            if (!task.error.empty() && task.isPort) {
+                return withPercent(task.error, percentOf(progressOf(task)));
+            }
         case DownloadStatus::Verifying:
             return withPercent(pipensx::statusName(task.status),
                                percentOf(progressOf(task)));

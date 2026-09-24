@@ -294,6 +294,7 @@ bool saveInstallJournal(const std::string& path,
         std::remove(tmp.c_str());
         return false;
     }
+    std::remove(path.c_str());
     if (std::rename(tmp.c_str(), path.c_str()) != 0) {
         std::remove(tmp.c_str());
         return false;

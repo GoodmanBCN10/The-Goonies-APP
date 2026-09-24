@@ -291,6 +291,18 @@ bool readPackagedMeta(const std::string& ncaPath, ParsedMeta& out,
     const uint8_t* cursor = data.data() + sizeof(out.header);
     out.extendedHeader.assign(cursor,
         cursor + out.header.extended_header_size);
+
+    // Bypass firmware requirements so users don't get forced to update OS
+    if (type == NcmContentMetaType_Application &&
+        out.extendedHeader.size() >= sizeof(NcmApplicationMetaExtendedHeader)) {
+        auto* appHeader = reinterpret_cast<NcmApplicationMetaExtendedHeader*>(out.extendedHeader.data());
+        appHeader->required_system_version = 0;
+    } else if (type == NcmContentMetaType_Patch &&
+               out.extendedHeader.size() >= sizeof(NcmPatchMetaExtendedHeader)) {
+        auto* patchHeader = reinterpret_cast<NcmPatchMetaExtendedHeader*>(out.extendedHeader.data());
+        patchHeader->required_system_version = 0;
+    }
+
     cursor += out.header.extended_header_size;
     std::vector<NcmPackagedContentInfo> packaged(out.header.content_count);
     std::memcpy(packaged.data(), cursor,

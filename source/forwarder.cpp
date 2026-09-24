@@ -1,4 +1,4 @@
-﻿#include <fstream>
+#include <fstream>
 // creates and installs nca's on the fly
 // based on hacbrewpack (romfs creation) and yati (installation)
 #include <switch.h>
@@ -873,7 +873,7 @@ auto install_forwader_internal(OwoConfig& config, NcmStorageId storage_id) -> Re
     u64 hash_data[SHA256_HASH_SIZE / sizeof(u64)];
     const auto hash_path = config.nro_path + config.args;
     sha256CalculateHash(hash_data, hash_path.data(), hash_path.length());
-    const u64 old_tid = 0x0500000000000000 | (hash_data[0] & 0x00FFFFFFFFFFF000);
+    const u64 old_tid = 0x0100000000000000 | (hash_data[0] & 0x00FFFFFFFFFFF000);
     const u64 tid = 0x0500000000000000 | (hash_data[0] & 0x00FFFFFFFFFFF000);
 
     std::vector<NcaEntry> nca_entries;

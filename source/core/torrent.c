@@ -52,7 +52,7 @@
 #define HEDGE_ADAPTIVE_MIN_MS   500
 #define HEDGE_MIN_LATENCY_PEERS 2
 #define MAX_PEER_TELEMETRY    8
-#define PEER_BLOCKLIST_SIZE   64
+#define PEER_BLOCKLIST_SIZE   256
 #define PEER_BLOCKLIST_MS     60000
 
 struct peer_addr {

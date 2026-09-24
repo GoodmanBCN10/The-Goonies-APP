@@ -1,35 +1,137 @@
 #include <curl/curl.h>
+#include <switch.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdexcept>
 #include <borealis.hpp>
 #include <SDL2/SDL_mixer.h>
-#include <atomic>
-std::atomic<bool> g_appExiting = false;
-#include <switch.h>
 #include <string>
-#include <set>
-#include <map>
-
-#include "app/app_settings.hpp"
+#include <vector>
+#include <thread>
+#include <atomic>
+#include <fstream>
+#include <unordered_map>
+#include <unordered_set>
+#include "app_state.hpp"
+std::atomic<bool> g_appExiting{false};
+#include <mutex>
+#include <usbhsfs.h>
+extern "C" {
+#include <ipcext/es.h>
+}
 #include "app/catalog_service.hpp"
-#include "app/simple_download_manager.hpp"
+#include "app/download_manager.hpp"
 #include "app/game_metadata_service.hpp"
+#include "installer/installer_core.hpp"
+#include "mtp/haze_helper.hpp"
+#include "app/installed_title_service.hpp"
+#include "app/homebrew_service.hpp"
 
+#include "ui/catalog/catalog_view.hpp"
+#include "linkuser.hpp"
+#include "ui/main_menu.hpp"
+#include "ui/common/ui_helpers.hpp"
+#include "app/update_service.hpp"
 #include "ui/theme.hpp"
-#include "ui/main_frame.hpp"
-#include "ui/ports/ports_grid_view.hpp"
-#include "ui/ports/downloads_view.hpp"
-#include "ui/settings_view.hpp"
+#include <borealis/views/progress_spinner.hpp>
+
+using pipensx::AppSettings;
+using pipensx::CatalogService;
+using pipensx::DownloadManager;
+using pipensx::GameMetadataService;
+using pipensx::InstalledTitleService;
+using pipensx::HomebrewService;
+using namespace pipensx::ui;
 
 int main(int argc, char* argv[]) {
-    // Applet mode check
+    std::string nroPath = "sdmc:/switch/thegoonies/TheGooniesInstaller.nro";
+    if (argc > 0 && argv != nullptr) {
+        if (argv[0] != nullptr && std::string(argv[0]).find("sdmc:/") == 0) {
+            nroPath = argv[0];
+        }
+    }
+    
+    // Check if we are running as the temporary update staging file
+    bool isUpdateLaunch = false;
+    std::string originalPath = "";
+    
+    for (int i = 0; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg.find("--finish-update") != std::string::npos) {
+            isUpdateLaunch = true;
+            // Target path is either the next argument, or part of this one if badly parsed
+            if (i + 1 < argc) {
+                originalPath = argv[i + 1];
+            } else if (argc == 2 && i == 0) {
+                 // In case argv[0] is --finish-update and argv[1] is target
+                 originalPath = argv[1];
+            }
+            break;
+        }
+    }
+    
+    // Strip quotes from originalPath if they exist
+    if (!originalPath.empty() && originalPath.front() == '"' && originalPath.back() == '"') {
+        originalPath = originalPath.substr(1, originalPath.length() - 2);
+    }
+    
+    if (isUpdateLaunch && !originalPath.empty()) {
+        
+        // Remove the original NRO (it's not locked since we are running the tmp)
+        unlink(originalPath.c_str());
+        
+        // Copy ourselves (.update) to the original path instead of renaming
+        // We cannot trust nroPath (argv[0]) because v2.1.8 passed the wrong argv[0] (.updater)
+        std::string actualSrcPath = originalPath + ".update";
+        std::string tmpPath = originalPath + ".tmp";
+        
+        // Copy to .tmp using a fast buffered read/write to avoid 20 second hang
+        std::ifstream src(actualSrcPath, std::ios::binary | std::ios::ate);
+        if (src) {
+            std::streamsize size = src.tellg();
+            src.seekg(0, std::ios::beg);
+            std::vector<char> buffer(size);
+            if (src.read(buffer.data(), size)) {
+                std::ofstream dst(tmpPath, std::ios::binary);
+                dst.write(buffer.data(), size);
+                dst.close();
+            }
+            src.close();
+        }
+        
+        // Safely rename the .tmp to the original path (tmp is not the running executable)
+        rename(tmpPath.c_str(), originalPath.c_str());
+        
+        // Force the Switch OS FAT32 driver to commit changes to the SD card
+        fsdevCommitDevice("sdmc");
+        svcSleepThread(1000000000ULL); // 1 second
+        
+        // Exit to hbmenu cleanly. Do NOT use envSetNextLoad, as it causes system panic
+        // when trying to launch a freshly overwritten NRO from an .update instance.
+        return 0;
+    }
+    
+    // If we just updated, clean up the temporary update file on normal launch
+    std::string tempUpdatePath = nroPath + ".update";
+    if (access(tempUpdatePath.c_str(), F_OK) == 0) {
+        unlink(tempUpdatePath.c_str());
+    }
+    
+    pipensx::UpdateService updater(nroPath);
+    updater.discardStaged();
+
+    // Check if launched in Library Applet Mode (Album mode without Title Override)
     AppletType at = appletGetAppletType();
     if (at == AppletType_LibraryApplet || at == AppletType_OverlayApplet) {
         consoleInit(NULL);
         printf("\n====================================================\n");
-        printf(" THE GOONIES PORTS REQUIERE ACCESO TOTAL A LA MEMORIA\n");
-        printf(" THE GOONIES PORTS REQUIRES FULL MEMORY ACCESS\n");
+        printf(" THE GOONIES APP REQUIERE ACCESO TOTAL A LA MEMORIA\n");
+        printf(" THE GOONIES APP REQUIRES FULL MEMORY ACCESS\n");
         printf("====================================================\n\n");
         printf(" Por favor, abre cualquier juego manteniendo pulsado 'R'\n");
         printf(" para abrir el Homebrew Menu en modo Acceso Total.\n\n");
+        printf(" Please launch any game while holding 'R' to open\n");
+        printf(" the Homebrew Menu with full memory access.\n\n");
         printf(" Pulsa + o HOME para salir / Press + or HOME to exit.\n");
         printf("====================================================\n");
         consoleUpdate(NULL);
@@ -47,204 +149,428 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    appletSetFocusHandlingMode(AppletFocusHandlingMode_NoSuspend);
-    NWindow* win = nwindowGetDefault();
-    if (win) {
-        nwindowSetDimensions(win, 1280, 720);
-    }
+    mkdir("sdmc:/switch", 0755);
+    mkdir("sdmc:/switch/thegoonies", 0755);
 
-    socketInitializeDefault();
-    romfsInit();
-    plInitialize(PlServiceType_User);
-    nifmInitialize(NifmServiceType_User);
-    psmInitialize();
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    nxlinkStdio();
+    bool curlReady = false;
+    bool ncmReady = false;
+    bool nsReady = false;
+    bool esReady = false;
+    bool socketReady = false;
+    bool setsysReady = false;
+    bool nifmReady = false;
+    bool psmReady = false;
 
-
-    if (!brls::Application::init()) {
-        brls::Logger::error("Unable to init Borealis application");
-        return EXIT_FAILURE;
-    }
-    brls::Application::createWindow("The Goonies Ports");
-    
-    // Forzar tema oscuro siempre (estilo profesional)
-    brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);
-    
-    brls::Logger::setLogLevel(brls::LogLevel::LOG_DEBUG);
-
-    pipensx::ui::theme::registerColors();
-    
-    // Flat theme
-    brls::Style style = brls::Application::getStyle();
-    style.addMetric("brls/button/corner_radius", 0.0f);
-    style.addMetric("brls/sidebar/padding_left", 24.0f);
-    
-    pipensx::AppSettings* settings = new pipensx::AppSettings("sdmc:/switch/TheGooniesPorts/settings.json");
-    std::string loadErr;
-    settings->load(loadErr);
-    
-    auto* download_manager = new goonies::SimpleDownloadManager(settings);
-    auto* metadata_service = new pipensx::GameMetadataService("sdmc:/switch/TheGooniesPorts");
-
-    auto* catalog_service = new pipensx::CatalogService("sdmc:/switch/TheGooniesPorts");
-    std::string err;
-    std::vector<pipensx::CatalogEntry> latest;
-    // Intentar siempre descargar la ultima version de Github al iniciar
-    if (catalog_service->fetchLatest(latest, err)) {
-        catalog_service->adopt(std::move(latest));
-    } else if (!catalog_service->load(err)) {
-        brls::Logger::error("No se pudo cargar el catalogo: %s", err.c_str());
-        if (!catalog_service->loadFile("romfs:/repo.json", "Local", err)) {
-            brls::Logger::error("No repo.json fallback: %s", err.c_str());
-        }
-    }
-
-    pipensx::ui::installSidebarStyle();
-    
-    
-    bool mixerInit = false;
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-        brls::Logger::error("Mix_OpenAudio failed");
-    } else {
-        mixerInit = true;
-    }
-    Mix_Music *bgmMusic = nullptr;
-    if (mixerInit) {
-        bgmMusic = Mix_LoadMUS("romfs:/bgm.mp3");
-        if (bgmMusic && settings->get().enableBackgroundMusic) {
-            Mix_PlayMusic(bgmMusic, -1);
-        }
-    }
-    bool wasBgmEnabled = settings->get().enableBackgroundMusic;
-
-    pipensx::ui::MainFrame* rootFrame = new pipensx::ui::MainFrame();
-
-    
-    std::map<std::string, int> categoryCounts;
-    for (const auto& entry : catalog_service->entries()) {
-        if (!entry.category.empty()) {
-            categoryCounts[entry.category]++;
-        }
-    }
-
-    int descargas_idx = 2 + categoryCounts.size();
-    int ajustes_idx = descargas_idx + 1;
-
-    auto makeTab = [=](const std::string& filter) -> brls::View* {
-        auto* view = new goonies::ui::PortsGridView(catalog_service, download_manager, metadata_service, filter);
-        view->registerAction(settings->get().language == 2 ? "Exit" : "Salir", brls::BUTTON_START, [](brls::View*) { brls::Application::quit(); return true; });
-        view->registerAction(settings->get().language == 2 ? "Downloads" : "Descargas", brls::BUTTON_Y, [=](brls::View*) { rootFrame->focusTab(descargas_idx); return true; });
-        view->registerAction(settings->get().language == 2 ? "Settings" : "Ajustes", brls::BUTTON_BACK, [=](brls::View*) { rootFrame->focusTab(ajustes_idx); return true; });
-        return view;
+    mkdir("sdmc:/switch/thegoonies/logs", 0777);
+    std::ofstream logOut("sdmc:/switch/thegoonies/logs/debug_log.txt", std::ios::out | std::ios::trunc);
+    std::mutex logMutex;
+    auto writeLog = [&](const std::string& msg) {
+        std::lock_guard<std::mutex> lock(logMutex);
+        logOut << msg << std::endl;
+        logOut.flush();
+        brls::Logger::info("{}", msg);
     };
 
-    int totalCount = catalog_service->entries().size();
-    int novedadesCount = (totalCount < 6) ? totalCount : 6;
-    
-    rootFrame->addNavTab((settings->get().language == 2 ? "New (" : "Novedades (") + std::to_string(novedadesCount) + ")", pipensx::ui::NavIconType::Catalog, [=]() { return makeTab("Novedades"); });
-    rootFrame->addNavTab((settings->get().language == 2 ? "All (" : "Todos (") + std::to_string(totalCount) + ")", pipensx::ui::NavIconType::Catalog, [=]() { return makeTab(""); });
+    writeLog("Starting app");
 
-    for (const auto& pair : categoryCounts) {
-        std::string catName = pair.first;
-        rootFrame->addNavTab(pair.first + " (" + std::to_string(pair.second) + ")", pipensx::ui::NavIconType::Catalog, [=]() { return makeTab(catName); });
-    }
-    
-    rootFrame->addNavTab(settings->get().language == 2 ? "Downloads" : "Descargas", pipensx::ui::NavIconType::Downloads, [=]() -> brls::View* {
-        auto* dlView = new goonies::ui::DownloadsView(download_manager);
-        dlView->registerAction(settings->get().language == 2 ? "Clear Queue" : "Limpiar Cola", brls::BUTTON_LB, [download_manager, settings](brls::View*) {
-            brls::Dialog* d = new brls::Dialog(settings->get().language == 2 ? "Clear finished downloads?" : "¿Limpiar descargas terminadas?");
-            d->addButton(settings->get().language == 2 ? "Yes" : "Si", [download_manager]() {
-                download_manager->clearCompleted();
-            });
-            d->addButton(settings->get().language == 2 ? "No" : "No", []{});
-            d->open();
-            return true;
-        });
-        return dlView;
-    });
+    // (moved usbHsFsInitialize to after setsys)
 
-    rootFrame->addNavTab(settings->get().language == 2 ? "Settings" : "Ajustes", pipensx::ui::NavIconType::Settings, [=]() -> brls::View* {
-        auto* view = new goonies::ui::SettingsView(settings);
-        view->registerAction(settings->get().language == 2 ? "Exit" : "Salir", brls::BUTTON_START, [](brls::View*) { brls::Application::quit(); return true; });
-        view->registerAction(settings->get().language == 2 ? "Downloads" : "Descargas", brls::BUTTON_Y, [=](brls::View*) { rootFrame->focusTab(descargas_idx); return true; });
-        return view;
-    });
-
-    // Register actions on the Sidebar itself so they appear when the sidebar is focused
-    brls::View* sidebar = rootFrame->getView("brls/tab_frame/sidebar");
-    if (sidebar) {
-        sidebar->registerAction(settings->get().language == 2 ? "Exit" : "Salir", brls::BUTTON_START, [](brls::View*) { brls::Application::quit(); return true; });
-        sidebar->registerAction(settings->get().language == 2 ? "Downloads" : "Descargas", brls::BUTTON_Y, [=](brls::View*) { rootFrame->focusTab(descargas_idx); return true; });
-        sidebar->registerAction(settings->get().language == 2 ? "Settings" : "Ajustes", brls::BUTTON_BACK, [=](brls::View*) { rootFrame->focusTab(ajustes_idx); return true; });
+    if (R_SUCCEEDED(romfsInit())) {
+        writeLog("romfsInit OK");
+    } else {
+        writeLog("romfsInit FAILED");
     }
 
-    auto* applet = new brls::AppletFrame(rootFrame);
-    applet->setTitle("The Goonies Ports");
-    applet->setIcon("romfs:/icon_explorer.png");
-    
-    // Disable AppletFrame's default B button back logic so it never shows up
-    applet->setActionAvailable(brls::BUTTON_B, false);
-
-    brls::Application::pushActivity(new brls::Activity(applet));
-
-    if (settings->get().language == 0) {
-        brls::Dialog* langDialog = new brls::Dialog("Selecciona tu idioma / Select your language");
-        langDialog->addButton("Castellano", [settings, langDialog]() {
-            pipensx::AppSettingsData data = settings->get();
-            data.language = 1;
-            std::string e;
-            settings->update(data, e);
-            langDialog->dismiss();
-        });
-        langDialog->addButton("English", [settings, langDialog]() {
-            pipensx::AppSettingsData data = settings->get();
-            data.language = 2;
-            std::string e;
-            settings->update(data, e);
-            brls::Application::quit();
-        });
-        langDialog->setCancelable(false);
-        langDialog->open();
+    if (R_SUCCEEDED(plInitialize(PlServiceType_User))) {
+        writeLog("plInitialize OK");
+    } else {
+        writeLog("plInitialize FAILED");
     }
-    
-    while (brls::Application::mainLoop()) {
-        if (mixerInit && bgmMusic) {
-            bool isBgmEnabled = settings->get().enableBackgroundMusic;
-            if (isBgmEnabled != wasBgmEnabled) {
-                if (isBgmEnabled) {
-                    if (Mix_PlayingMusic() == 0) {
-                        Mix_PlayMusic(bgmMusic, -1);
-                    } else {
-                        Mix_ResumeMusic();
-                    }
-                } else {
-                    Mix_PauseMusic();
+
+    bool nvReady = false;
+    Result nvRc = nvInitialize();
+    if (R_SUCCEEDED(nvRc)) {
+        nvReady = true;
+        writeLog("nvInitialize OK");
+    } else {
+        writeLog("nvInitialize FAILED (non-fatal)");
+    }
+
+    if (R_SUCCEEDED(nifmInitialize(NifmServiceType_User))) {
+        nifmReady = true;
+        writeLog("nifmInitialize OK");
+    } else {
+        writeLog("nifmInitialize FAILED (non-fatal)");
+    }
+
+    if (R_SUCCEEDED(psmInitialize())) {
+        psmReady = true;
+        writeLog("psmInitialize OK");
+    } else {
+        writeLog("psmInitialize FAILED (non-fatal)");
+    }
+
+    std::FILE* borealisLogFile = std::fopen("sdmc:/switch/thegoonies/logs/borealis_log.txt", "w");
+    if (borealisLogFile) {
+        setvbuf(borealisLogFile, NULL, _IONBF, 0);
+        brls::Logger::setLogOutput(borealisLogFile);
+    }
+
+    // Clean up old log files from root directory that were left by older versions
+    unlink("sdmc:/switch/thegoonies/debug_log.txt");
+    unlink("sdmc:/switch/thegoonies/borealis_log.txt");
+    // Invalidate the downloaded cheats ZIP cache automatically on every session start
+    unlink("sdmc:/switch/thegoonies/cheats.zip");
+
+    try {
+        brls::Logger::setLogLevel(brls::LogLevel::LOG_DEBUG);
+
+        // 1. Initialize Settings and Language IMMEDIATELY
+        const char* BundledCatalogPath = "romfs:/catalog/switch_games.json";
+        AppSettings settings("sdmc:/switch/thegoonies/settings.json", BundledCatalogPath);
+        std::string loadError;
+        settings.load(loadError);
+        writeLog("settings.load OK");
+        
+        if (settings.get().language == 1) {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+        } else if (settings.get().language == 2) {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
+        } else if (settings.get().language == 3) {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_PT_BR;
+        } else {
+            brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES; // Default to ES initially
+        }
+        
+        // 2. Initialize Borealis Window IMMEDIATELY (Instant startup under 1 second)
+        appletSetFocusHandlingMode(AppletFocusHandlingMode_NoSuspend);
+        NWindow* win = nwindowGetDefault();
+        if (win) {
+            nwindowSetDimensions(win, 1280, 720);
+        }
+
+        if (!brls::Application::init()) {
+            throw std::runtime_error("Unable to init Borealis application");
+        }
+        writeLog("brls::Application::init OK");
+
+        bool mixerInit = false;
+        if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+            writeLog(std::string("Mix_OpenAudio failed: ") + Mix_GetError());
+        } else {
+            mixerInit = true;
+            writeLog("Mix_OpenAudio OK");
+        }
+        
+        Mix_Music *bgmMusic = nullptr;
+        if (mixerInit) {
+            bgmMusic = Mix_LoadMUS("romfs:/bgm.mp3");
+            if (bgmMusic) {
+                writeLog("bgm.mp3 loaded");
+                if (settings.get().enableBackgroundMusic) {
+                    Mix_PlayMusic(bgmMusic, -1);
                 }
-                wasBgmEnabled = isBgmEnabled;
+            } else {
+                writeLog(std::string("Failed to load bgm.mp3: ") + Mix_GetError());
             }
         }
-    }
 
-    if (bgmMusic) {
-        Mix_FreeMusic(bgmMusic);
-        bgmMusic = nullptr;
-    }
-    if (mixerInit) {
-        Mix_CloseAudio();
-    }
+        pipensx::ui::theme::registerColors();
 
+        brls::Application::createWindow("The Goonies APP");
+        brls::Application::setGlobalQuit(true);
+        brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);
+        writeLog("createWindow OK");
 
-    delete download_manager;
-    delete catalog_service;
-    delete metadata_service;
+        // 3. Initialize Sockets & System Services in background after window is visible
+        if (R_SUCCEEDED(socketInitializeDefault())) {
+            socketReady = true;
+            writeLog("socketInitialize OK");
+        } else {
+            writeLog("socketInitialize FAILED (non-fatal)");
+        }
 
-    curl_global_cleanup();
-    psmExit();
-    nifmExit();
+        // (usbHsFsInitialize moved down)
+
+        CURLcode curlResult = curl_global_init(CURL_GLOBAL_DEFAULT);
+        if (curlResult == CURLE_OK) {
+            curlReady = true;
+        }
+
+        Result rc = ncmInitialize();
+        if (R_SUCCEEDED(rc)) {
+            ncmReady = true;
+            writeLog("ncmInitialize OK");
+        } else {
+            writeLog("ncmInitialize FAILED (non-fatal)");
+        }
+
+        rc = nsInitialize();
+        if (R_SUCCEEDED(rc)) {
+            nsReady = true;
+            writeLog("nsInitialize OK");
+        } else {
+            writeLog("nsInitialize FAILED (non-fatal)");
+        }
+
+        rc = esInitialize();
+        if (R_SUCCEEDED(rc)) {
+            esReady = true;
+            writeLog("esInitialize OK");
+        } else {
+            writeLog("esInitialize FAILED (non-fatal)");
+        }
+
+        rc = accountInitialize(AccountServiceType_System);
+        if (R_FAILED(rc)) {
+            rc = accountInitialize(AccountServiceType_Application);
+        }
+        bool accountReady = R_SUCCEEDED(rc);
+        if (accountReady) writeLog("accountInitialize OK");
+
+        rc = setsysInitialize();
+        setsysReady = R_SUCCEEDED(rc);
+        if (setsysReady) {
+            writeLog("setsysInitialize OK");
+            setsysSetUsb30EnableFlag(settings.get().enableUsb30);
+            if (settings.get().enableUsb30) {
+                writeLog("USB set to 3.0");
+            } else {
+                writeLog("USB forced to 2.0");
+            }
+        }
+        
+        Result usbRc = usbHsFsInitialize(0);
+        if (R_SUCCEEDED(usbRc)) {
+            writeLog("usbHsFsInitialize OK");
+        } else {
+            writeLog("usbHsFsInitialize FAILED (non-fatal)");
+        }
+        
+        DownloadManager* download_manager = new DownloadManager("sdmc:/switch/thegoonies");
+        CatalogService* catalog_service = new CatalogService("sdmc:/switch/thegoonies", BundledCatalogPath);
+        GameMetadataService* metadata_service = new GameMetadataService("sdmc:/switch/thegoonies");
+        InstalledTitleService* installed_service = new InstalledTitleService("sdmc:/switch/thegoonies");
+        HomebrewService* homebrew_service = new HomebrewService();
+        writeLog("Services constructed OK");
+
+        // Load installed games in the background thread to avoid blocking boot
+
+        // Push a loading screen to prevent black screen
+        brls::Box* loadingBox = new brls::Box(brls::Axis::COLUMN);
+        loadingBox->setAlignItems(brls::AlignItems::CENTER);
+        loadingBox->setJustifyContent(brls::JustifyContent::CENTER);
+        
+        brls::Label* loadingLabel = new brls::Label();
+        loadingLabel->setText(t("Iniciando The Goonies APP...\nBuscando juegos instalados...", 
+                                "Starting The Goonies APP...\nFinding installed games...", 
+                                "Iniciando The Goonies APP...\nBuscando jogos instalados..."));
+        loadingLabel->setFontSize(24);
+        loadingLabel->setHorizontalAlign(brls::HorizontalAlign::CENTER);
+        loadingLabel->setMarginBottom(40);
+        
+        loadingBox->addView(loadingLabel);
+        
+        brls::Application::pushActivity(new brls::Activity(loadingBox));
+        writeLog("pushActivity LoadingScreen OK");
+
+        std::thread initThread([&]() {
+            std::string err;
+            if (g_appExiting) return;
+            installed_service->refresh(err);
+            if (g_appExiting) return;
+
+            // Load shop catalog and metadata in background before pushing the Main Menu
+            catalog_service->load(err);
+            if (g_appExiting) return;
+            metadata_service->load(err);
+
+            brls::sync([&]() {
+                if (g_appExiting) return;
+                brls::Application::popActivity(); // Pop LoadingScreen
+                
+                goonies::ui::MainMenu* rootFrame = new goonies::ui::MainMenu(
+                    download_manager, catalog_service, metadata_service, 
+                    installed_service, &settings, homebrew_service, &updater);
+                brls::Application::pushActivity(new brls::Activity(rootFrame));
+                
+                // Show language selection dialog on first run
+                if (settings.get().language == 0) {
+                    brls::Dialog* langDialog = new brls::Dialog("Selecciona tu idioma / Select your language");
+                    langDialog->addButton("Español", [&]() {
+                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_ES;
+                        auto vals = settings.get();
+                        vals.language = 1;
+                        std::string updateErr;
+                        settings.update(vals, updateErr);
+                        brls::Application::notify("Idioma guardado: Español. Reinicia la app para aplicar.");
+                    });
+                    langDialog->addButton("English", [&]() {
+                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_EN_US;
+                        auto vals = settings.get();
+                        vals.language = 2;
+                        std::string updateErr;
+                        settings.update(vals, updateErr);
+                        brls::Application::notify("Language saved: English. Restart app to apply.");
+                    });
+                    langDialog->addButton("Português", [&]() {
+                        brls::Platform::APP_LOCALE_DEFAULT = brls::LOCALE_PT_BR;
+                        auto vals = settings.get();
+                        vals.language = 3;
+                        std::string updateErr;
+                        settings.update(vals, updateErr);
+                        brls::Application::notify("Idioma guardado: Português. Reinicie o aplicativo para aplicar.");
+                    });
+                    langDialog->open();
+                }
+            });
+        });
+
+        brls::Application::getExitEvent()->subscribe([] {
+            g_appExiting = true;
+        });
+
+        // Run the main loop
+        int frameCount = 0;
+        bool wasBgmEnabled = settings.get().enableBackgroundMusic;
+        std::unordered_map<std::string, pipensx::DownloadStatus> lastTaskStatus;
+        uint64_t lastDownloadScanMs = 0;
+
+        while (brls::Application::mainLoop()) {
+            frameCount++;
+            if (frameCount % 60 == 1) {
+                writeLog("Main: pumping UI loop, frame " + std::to_string(frameCount));
+            }
+
+            uint64_t frameNowMs = brls::getCPUTimeUsec() / 1000;
+            if (frameNowMs - lastDownloadScanMs >= 1000) {
+                lastDownloadScanMs = frameNowMs;
+                std::unordered_set<std::string> seen;
+                for (const pipensx::DownloadTask& task : download_manager->snapshot()) {
+                    seen.insert(task.id);
+                    auto previous = lastTaskStatus.find(task.id);
+                    if (previous == lastTaskStatus.end()) {
+                        lastTaskStatus[task.id] = task.status;
+                        continue;
+                    }
+                    if (previous->second == task.status)
+                        continue;
+                    lastTaskStatus[task.id] = task.status;
+                    if (task.status == pipensx::DownloadStatus::Completed)
+                        brls::Application::notify("Descarga completada: " + task.name);
+                    else if (task.status == pipensx::DownloadStatus::Installed)
+                        brls::Application::notify("Instalacion finalizada: " + task.name);
+                    else if (task.status == pipensx::DownloadStatus::Error)
+                        brls::Application::notify("Error en la descarga: " + task.name);
+                }
+                for (auto it = lastTaskStatus.begin(); it != lastTaskStatus.end();) {
+                    if (seen.count(it->first) == 0)
+                        it = lastTaskStatus.erase(it);
+                    else
+                        ++it;
+                }
+            }
+            
+            if (mixerInit && bgmMusic) {
+                bool isBgmEnabled = settings.get().enableBackgroundMusic;
+                if (isBgmEnabled != wasBgmEnabled) {
+                    if (isBgmEnabled) {
+                        if (Mix_PlayingMusic() == 0) {
+                            Mix_PlayMusic(bgmMusic, -1);
+                        } else {
+                            Mix_ResumeMusic();
+                        }
+                    } else {
+                        Mix_PauseMusic();
+                    }
+                    wasBgmEnabled = isBgmEnabled;
+                }
+            }
+        }
+        g_appExiting = true;
+        writeLog("Main loop EXITED. Application closing normally.");
+        
+        download_manager->shutdown();
+
+        if (bgmMusic) {
+            Mix_FreeMusic(bgmMusic);
+            bgmMusic = nullptr;
+        }
+        if (mixerInit) {
+            Mix_CloseAudio();
+        }
+
+        if (initThread.joinable()) {
+            initThread.join();
+        }
+
+        // Gracefully shutdown background threads before local services are destroyed
+        // MTP::Exit();
+
+    } catch (const std::exception& e) {
+        std::string errMsg = std::string("Fatal error: ") + e.what();
+        writeLog(errMsg);
+        consoleInit(NULL);
+        printf("\n====================================================\n");
+        printf(" ERROR AL INICIAR / FATAL ERROR\n");
+        printf("====================================================\n\n");
+        printf(" Details: %s\n\n", e.what());
+        printf(" Log guardado en / Log file saved at:\n");
+        printf(" sdmc:/switch/thegoonies/logs/debug_log.txt\n\n");
+        printf(" Pulsa + o HOME para salir / Press + or HOME to exit.\n");
+        printf("====================================================\n");
+        consoleUpdate(NULL);
+        PadState pad;
+        padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+        padInitializeDefault(&pad);
+        while (appletMainLoop()) {
+            padUpdate(&pad);
+            u64 kDown = padGetButtonsDown(&pad);
+            if (kDown & HidNpadButton_Plus) break;
+            svcSleepThread(50000000ULL);
+        }
+        consoleExit(NULL);
+    } catch (...) {
+        writeLog("Unknown fatal error caught");
+        consoleInit(NULL);
+        printf("\n====================================================\n");
+        printf(" ERROR DESCONOCIDO / UNKNOWN FATAL ERROR\n");
+        printf("====================================================\n\n");
+        printf(" Log guardado en / Log file saved at:\n");
+        printf(" sdmc:/switch/thegoonies/logs/debug_log.txt\n\n");
+        printf(" Pulsa + o HOME para salir / Press + or HOME to exit.\n");
+        printf("====================================================\n");
+        consoleUpdate(NULL);
+        PadState pad;
+        padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+        padInitializeDefault(&pad);
+        while (appletMainLoop()) {
+            padUpdate(&pad);
+            u64 kDown = padGetButtonsDown(&pad);
+            if (kDown & HidNpadButton_Plus) break;
+            svcSleepThread(50000000ULL);
+        }
+        consoleExit(NULL);
+    } 
+
+    // Cleanup
+    if (nvReady) nvExit();
+    if (psmReady) psmExit();
+    if (nifmReady) nifmExit();
+    usbHsFsExit();
+    if (nsReady) nsExit();
+    if (ncmReady) ncmExit();
+    if (esReady) esExit();
+    accountExit();
+    if (setsysReady) setsysExit();
+    if (curlReady) curl_global_cleanup();
+    if (socketReady) socketExit();
     plExit();
     romfsExit();
-    socketExit();
 
+    // Exit
+    if (pipensx::linkuser::g_shouldReboot) {
+        pipensx::linkuser::rebootSystem();
+    }
     return EXIT_SUCCESS;
 }

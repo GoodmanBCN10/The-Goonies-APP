@@ -23,7 +23,7 @@ std::vector<std::string> mergeScreenshotUrls(
     };
     if (metadata)
         append(metadata->screenshots);
-    
+    append(entry.screenshots);
     return result;
 }
 
@@ -89,7 +89,9 @@ CatalogPresentation resolveCatalogPresentation(
         result.iconPreserveAspect = false;
     } else {
         result.iconUrl = entry.posterUrl;
-        result.iconPreserveAspect = false; // Always false for Switchbru so they render as 180x180 squares
+        // For standard games without metadata, assume vertical boxarts (preserve aspect = true).
+        // For ports, they are 16:9 or square, so fill the square cell (preserve aspect = false).
+        result.iconPreserveAspect = !entry.isPort && !result.iconUrl.empty();
     }
     if (metadata && !metadata->bannerUrl.empty())
         result.coverUrl = metadata->bannerUrl;
@@ -103,11 +105,11 @@ CatalogPresentation resolveCatalogPresentation(
         result.description = entry.description;
     result.developer = entry.developer;
     result.publisher = metadata && !metadata->publisher.empty()
-        ? metadata->publisher : entry.developer;
+        ? metadata->publisher : entry.publisher;
     result.releaseDate = metadata && !metadata->releaseDate.empty()
-        ? metadata->releaseDate : entry.version;
+        ? metadata->releaseDate : entry.year;
     result.genre = metadata && !metadata->categories.empty()
-        ? join(metadata->categories) : entry.category;
+        ? join(metadata->categories) : entry.genre;
     result.screenshots = mergeScreenshotUrls(metadata, entry, 6);
     return result;
 }

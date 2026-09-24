@@ -150,14 +150,25 @@ bool CheatManager::writeCheatFile(const std::string& filepath, const std::vector
     std::ofstream file(filepath, std::ios::trunc);
     if (!file.is_open()) return false;
 
-    for (const auto& cheat : cheats) {
-        if (!cheat.enabled) continue; // Only write enabled cheats
+    std::string togglesPath = parent + "/toggles.txt";
+    std::ofstream togglesFile(togglesPath, std::ios::trunc);
+    bool hasToggles = togglesFile.is_open();
 
+    for (const auto& cheat : cheats) {
         file << "[" << cheat.name << "]\n";
         for (const auto& code : cheat.codes) {
             file << code << "\n";
         }
         file << "\n";
+
+        if (hasToggles) {
+            togglesFile << "[" << cheat.name << "]\n";
+            togglesFile << (cheat.enabled ? "true" : "false") << "\n";
+        }
+    }
+
+    if (hasToggles) {
+        togglesFile.close();
     }
 
     return true;
@@ -198,6 +209,28 @@ std::vector<CheatEntry> CheatManager::getAvailableCheats(uint64_t titleId, const
         }
     }
 
+    // Now read toggles.txt from Atmosphere to restore the enabled state
+    std::string togglesPath = "sdmc:/atmosphere/contents/" + tidStr + "/cheats/toggles.txt";
+    std::ifstream tFile(togglesPath);
+    if (tFile.is_open()) {
+        std::string tLine, currentName;
+        while (std::getline(tFile, tLine)) {
+            tLine.erase(tLine.find_last_not_of(" \n\r\t") + 1);
+            if (tLine.empty()) continue;
+            if (tLine.front() == '[' && tLine.back() == ']') {
+                currentName = tLine.substr(1, tLine.length() - 2);
+            } else if (!currentName.empty()) {
+                bool isEnabled = (tLine == "true");
+                for (auto& c : allCheats) {
+                    if (c.name.size() > 18 && c.name.substr(19) == currentName) {
+                        c.enabled = isEnabled;
+                    }
+                }
+                currentName.clear();
+            }
+        }
+    }
+
     return allCheats;
 }
 
@@ -208,24 +241,6 @@ std::vector<CheatEntry> CheatManager::getAtmosphereCheats(uint64_t titleId, cons
 
 bool CheatManager::saveAtmosphereCheats(uint64_t titleId, const std::string& buildId, const std::vector<CheatEntry>& cheats) {
     std::string amsPath = getAtmosphereCheatsPath(titleId, buildId);
-    
-    // Check if any are enabled
-    bool anyEnabled = false;
-    for (const auto& cheat : cheats) {
-        if (cheat.enabled) {
-            anyEnabled = true;
-            break;
-        }
-    }
-
-    if (!anyEnabled) {
-        // If none are enabled, just delete the file so Atmosphere doesn't load an empty cheat file
-        if (pathExists(amsPath)) {
-            remove(amsPath.c_str());
-        }
-        return true;
-    }
-
     return writeCheatFile(amsPath, cheats);
 }
 

@@ -49,6 +49,12 @@ struct DownloadTask {
     std::string error;
     DownloadStatus status = DownloadStatus::Queued;
     TransferMode mode = TransferMode::DownloadOnly;
+    
+    // Extensions for Ports
+    bool isPort = false;
+    std::string portId;
+    std::string directDownloadUrl;
+    
     uint64_t totalBytes = 0;
     uint64_t completedBytes = 0;
     uint64_t speedBytesPerSecond = 0;
@@ -135,6 +141,10 @@ public:
                        std::string& error) {
         return importTorrent(path, TransferMode::DownloadOnly, taskId, error);
     }
+    
+    // Extensions for Ports
+    bool importPort(const std::string& portId, const std::string& name, const std::string& url, std::string& error);
+    
     bool pause(const std::string& taskId);
     bool resume(const std::string& taskId);
     bool moveToFront(const std::string& taskId, std::string& error);
@@ -181,6 +191,7 @@ private:
     std::vector<DownloadTask> tasks_;
     nx::thread worker_;
     std::mutex cleanupMutex_;
+    std::vector<nx::thread> cleanupThreads_;
     std::atomic<bool> stopping_{false};
     std::atomic<bool> cancelActiveTask_{false};
     std::string activeTaskId_;

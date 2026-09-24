@@ -1,4 +1,4 @@
-#include <borealis.hpp>
+﻿#include <filesystem>
 #include "download_manager.hpp"
 #include "request_gate.hpp"
 #include "stream_ram_budget.hpp"
@@ -425,7 +425,7 @@ public:
         // even when no sink or install events fire (rx lull).
         updateRequestGateLocked(now);
         // While the gate is hard-paused no requests flow at all, so buffer
-        // state carries no signal about the swarm — hold the window instead
+        // state carries no signal about the swarm Ã¢â‚¬â€ hold the window instead
         // of grinding it to the minimum (PERF_PLAN 7.2). The pause
         // transition already recorded one stall event, which still shrinks
         // the window once after resume.
@@ -459,7 +459,7 @@ public:
         return lookaheadWindow_;
     }
     // While the request gate curtails new requests (throttle or pause) a
-    // peer's measured throughput reflects the gate, not the peer — the
+    // peer's measured throughput reflects the gate, not the peer Ã¢â‚¬â€ the
     // engine freezes its rate EMAs for the duration (PERF_PLAN 7.2).
     bool requestsCurtailed() const {
         std::lock_guard<std::mutex> lock(queueMutex_);
@@ -552,7 +552,7 @@ public:
             return setErrorLocked("Duplicate package stream chunk.");
         // Never wait for buffer space here (PERF_PLAN 5.3): this runs inside
         // the torrent thread's piece callback, so blocking would stall the
-        // whole event loop. Chunks already in flight are always accepted —
+        // whole event loop. Chunks already in flight are always accepted Ã¢â‚¬â€
         // the request gate below stops new requests once the buffer is full,
         // and the strict-order window bounds the overshoot.
         InstallChunk chunk;
@@ -772,7 +772,7 @@ public:
     }
 
     // F-B: periodically persist a resume point from the install worker.
-    // Cheap when the stream is between safe points — checkpoint() just
+    // Cheap when the stream is between safe points Ã¢â‚¬â€ checkpoint() just
     // declines and we retry after the next chunk.
     void maybeCheckpoint() {
         if (!stream_ || activeFileIndex_ == UINT32_MAX)
@@ -1125,7 +1125,7 @@ public:
     std::unique_ptr<install::InstallBackend> backend_;
     // F-B resume journal (IMPROVEMENT_PLAN F-B). Touched only by the
     // constructor (before the worker starts), the install worker and the
-    // destructor (after the worker joined) — no lock needed.
+    // destructor (after the worker joined) Ã¢â‚¬â€ no lock needed.
     static constexpr uint64_t kJournalIntervalBytes = 32ull * 1024 * 1024;
     std::string journalPath_;
     uint64_t journalConsumed_ = 0;
@@ -1362,6 +1362,41 @@ bool DownloadManager::previewTorrent(const std::string& path,
         preview.files.push_back(std::move(file));
     }
     metainfo_free(&metainfo);
+    return true;
+}
+
+bool DownloadManager::importPort(const std::string& portId, const std::string& name, const std::string& url, std::string& error) {
+    std::string hexId = portId; // Use portId as task ID
+    std::transform(hexId.begin(), hexId.end(), hexId.begin(), [](unsigned char c){ return std::tolower(c); });
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (findLocked(hexId)) {
+            error = "Port is already in the download manager.";
+            return false;
+        }
+
+        DownloadTask task;
+        task.id = hexId;
+        task.name = name;
+        task.status = DownloadStatus::Queued;
+        task.mode = TransferMode::DownloadOnly;
+        task.isPort = true;
+        task.portId = portId;
+        task.directDownloadUrl = url;
+        task.metainfoPath = torrentRoot_ + "/" + hexId + ".port";
+        task.dataPath = downloadRoot_ + "/" + portId;
+        task.fileSelection = {};
+        task.packagesInstalled = 0;
+        
+        makeDirectories(task.dataPath);
+
+        tasks_.push_back(std::move(task));
+        if (!saveLocked(error)) {
+            tasks_.pop_back();
+            return false;
+        }
+    }
+    condition_.notify_all();
     return true;
 }
 
@@ -1662,12 +1697,17 @@ bool DownloadManager::saveLocked(std::string& error) const {
         state << "8:provider" << bint(task.provider);
         state << "9:selection" << bstr(std::string(task.fileSelection.begin(),
                                                    task.fileSelection.end()));
+        if (task.isPort) {
+            state << "7:is-port" << bint(1);
+            state << "7:port-id" << bstr(task.portId);
+            state << "8:port-url" << bstr(task.directDownloadUrl);
+        }
         state << "6:status" << bstr(persistedStatus(task.status));
         state << "5:total" << bint(task.totalBytes);
         state << "e";
     }
     state << "e";
-    state << "7:versioni4e";
+    state << "7:versioni5e";
     state << "e";
 
     std::string temporary = statePath_ + ".tmp";
@@ -1724,7 +1764,7 @@ void DownloadManager::load() {
                      &version) ||
         version.type != BE_INT ||
         (version.ival != 1 && version.ival != 2 && version.ival != 3 &&
-         version.ival != 4))
+         version.ival != 4 && version.ival != 5))
         return;
 
     be_node_t list;
@@ -1768,15 +1808,30 @@ void DownloadManager::load() {
                 task.fileSelection.assign(selection.begin(), selection.end());
             }
         }
+        if (version.ival >= 5) {
+            uint64_t isPortVal = 0;
+            if (dictionaryInteger(item, "is-port", isPortVal) && isPortVal) {
+                task.isPort = true;
+                dictionaryString(item, "port-id", task.portId);
+                dictionaryString(item, "port-url", task.directDownloadUrl);
+            }
+        }
+        
+        // Fallback for v4 port tasks
+        if (task.metainfoPath.find(".port") != std::string::npos) {
+            task.isPort = true;
+        }
+
         task.status = persistedStatus(status);
         if (task.status == DownloadStatus::Completed ||
             task.status == DownloadStatus::Installed)
             task.completedBytes = task.totalBytes;
+            
         if (!isManagedChild(torrentRoot_, task.metainfoPath) ||
             !isManagedChild(downloadRoot_, task.dataPath)) {
             task.status = DownloadStatus::Error;
             task.error = "The stored task contains an invalid path.";
-        } else if (access(task.metainfoPath.c_str(), R_OK) != 0) {
+        } else if (!task.isPort && access(task.metainfoPath.c_str(), R_OK) != 0) {
             task.status = DownloadStatus::Error;
             task.error = "The stored .torrent file is missing.";
         }
@@ -1805,8 +1860,8 @@ bool DownloadManager::removeLocked(const std::string& id, bool deleteData,
     for (auto it = tasks_.begin(); it != tasks_.end(); ++it) {
         if (it->id != id)
             continue;
-        if (!isManagedChild(torrentRoot_, it->metainfoPath) ||
-            !isManagedChild(downloadRoot_, it->dataPath)) {
+        if (!(it->metainfoPath.empty() || isManagedChild(torrentRoot_, it->metainfoPath)) ||
+            !(isManagedChild(downloadRoot_, it->dataPath) || isManagedChild(rootPath_ + "/ports", it->dataPath))) {
             error = "Refusing to remove a path outside application storage.";
             it->status = DownloadStatus::Error;
             it->error = error;
@@ -1816,7 +1871,8 @@ bool DownloadManager::removeLocked(const std::string& id, bool deleteData,
         }
         if (deleteData) {
             std::string dataPath = it->dataPath;
-            brls::async([this, dataPath]() {
+            std::lock_guard<std::mutex> cl(cleanupMutex_);
+            cleanupThreads_.emplace_back([this, dataPath]() {
                 std::string trashPath = dataPath + ".deleted." + std::to_string(time(nullptr));
                 // Retry rename for up to 5 seconds if torrent engine is still holding files
                 bool renamed = false;
@@ -1857,6 +1913,9 @@ void DownloadManager::workerMain() {
         std::vector<uint8_t> fileSelection;
         std::vector<uint8_t> initialPeers;
         int provider = 0;
+        bool isPort = false;
+        std::string portUrl;
+        std::string portId;
         {
             std::unique_lock<std::mutex> lock(mutex_);
             condition_.wait(lock, [this] {
@@ -1880,11 +1939,62 @@ void DownloadManager::workerMain() {
                     fileSelection = task.fileSelection;
                     initialPeers = task.initialPeers;
                     provider = task.provider;
+                    isPort = task.isPort;
+                    portUrl = task.directDownloadUrl;
+                    portId = task.portId;
                     break;
                 }
             }
             activeTaskId_ = activeId;
             cancelActiveTask_.store(false);
+        }
+        
+        if (isPort) {
+            auto progressCb = [this, activeId](const std::string& stage, uint64_t dlnow, uint64_t dltotal) {
+                std::lock_guard<std::mutex> lock(mutex_);
+                if (DownloadTask* task = findLocked(activeId)) {
+                    if (task->status != DownloadStatus::Removing && task->status != DownloadStatus::Paused) {
+                        if (stage.find("Extrayendo") != std::string::npos || stage.find("Finalizando") != std::string::npos) {
+                            task->status = DownloadStatus::Installing;
+                            task->packagesInstalled = static_cast<uint32_t>(dlnow);
+                            task->packageCount = static_cast<uint32_t>(dltotal);
+                            task->installedBytes = dlnow;
+                            task->installTotalBytes = dltotal;
+                        } else {
+                            task->status = DownloadStatus::Downloading;
+                            task->error = stage;
+                            task->completedBytes = dlnow;
+                            task->totalBytes = dltotal;
+                        }
+                    }
+                }
+            };
+            
+            // This would actually need the curl + minizip logic for ZIP extraction and forwarder creation.
+            // Since this file is getting huge, we will call an external helper to process the Port.
+            extern bool processPortTask(const std::string& id, const std::string& url, const std::string& dataPath, std::atomic<bool>& cancelFlag, std::function<void(const std::string&, uint64_t, uint64_t)> progressCb);
+            
+            bool success = processPortTask(portId, portUrl, dataPath, cancelActiveTask_, progressCb);
+            
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                if (DownloadTask* task = findLocked(activeId)) {
+                    if (success) {
+                        task->status = DownloadStatus::Installed;
+                        task->error = ""; // Clear any error
+                    } else if (task->status == DownloadStatus::Removing) {
+                        bool deleteData = task->error == "delete-data";
+                        std::string removeError;
+                        removeLocked(activeId, deleteData, removeError);
+                    } else if (!cancelActiveTask_.load()) {
+                        task->status = DownloadStatus::Error;
+                        if (task->error.find("Error:") == std::string::npos) task->error = "Fallo en la descarga o extracciÃ³n.";
+                    }
+                    std::string ignored;
+                    saveLocked(ignored);
+                }
+            }
+            continue; // Skip the rest of the torrent loop
         }
 
         metainfo_t metainfo;
@@ -2004,7 +2114,7 @@ void DownloadManager::workerMain() {
                             if (!stopping_.load()) {
                                 task->status = DownloadStatus::Error;
                                 if (task->error.empty() || task->error == "Desbloqueando enlace premium..." || task->error.find("Descargando") != std::string::npos) {
-                                    task->error = cancelActiveTask_.load() ? "Descarga cancelada." : "Error obteniendo enlace de Real-Debrid. ¿Está tu cuenta vinculada?";
+                                    task->error = cancelActiveTask_.load() ? "Descarga cancelada." : "Error obteniendo enlace de Real-Debrid. Ã‚Â¿EstÃƒÂ¡ tu cuenta vinculada?";
                                 }
                             }
                             std::string ignored;
@@ -2049,7 +2159,33 @@ void DownloadManager::workerMain() {
                         break;
                     }
                 }
-                fp = fopen((dataPath + "/" + outFilename).c_str(), "wb");
+                std::string fullOutPath = dataPath + "/" + outFilename;
+                uint64_t existingSize = 0;
+                {
+                    std::error_code ec;
+                    existingSize = std::filesystem::file_size(fullOutPath, ec);
+                    if (ec) existingSize = 0;
+                }
+                
+                // Fetch expected size from task if possible to avoid appending if already full
+                uint64_t expectedSize = 0;
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    if (DownloadTask* task = findLocked(activeId)) {
+                        expectedSize = task->totalBytes;
+                        if (existingSize > 0 && (expectedSize == 0 || existingSize <= expectedSize)) {
+                            task->completedBytes = existingSize;
+                        } else {
+                            existingSize = 0;
+                        }
+                    }
+                }
+                
+                if (existingSize > 0) {
+                    fp = fopen(fullOutPath.c_str(), "ab");
+                } else {
+                    fp = fopen(fullOutPath.c_str(), "wb");
+                }
             } else {
                 for (uint32_t i = 0; i < fileSelection.size(); ++i) {
                     if (fileSelection[i]) {
@@ -2230,6 +2366,17 @@ void DownloadManager::workerMain() {
                 if (curl) {
                     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
                     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, RDWriteCallback);
+                    
+                    uint64_t resumeOffset = 0;
+                    if (mode == TransferMode::DownloadOnly) {
+                        std::lock_guard<std::mutex> lock(mutex_);
+                        if (DownloadTask* task = findLocked(activeId)) {
+                            resumeOffset = task->completedBytes;
+                        }
+                    }
+                    if (resumeOffset > 0) {
+                        curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, static_cast<curl_off_t>(resumeOffset));
+                    }
                     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
                     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
                     curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 512 * 1024L);
@@ -2456,6 +2603,14 @@ void DownloadManager::shutdown() {
     if (worker_.joinable())
         worker_.join();
         
+    {
+        std::lock_guard<std::mutex> cl(cleanupMutex_);
+        for (auto& t : cleanupThreads_) {
+            if (t.joinable())
+                t.join();
+        }
+        cleanupThreads_.clear();
+    }
         
     std::string ignored;
     save(ignored);
@@ -2519,5 +2674,9 @@ QueueSummary summarizeQueue(const std::vector<DownloadTask>& tasks, uint64_t now
 }
 
 } // namespace pipensx
+
+
+
+
 
 

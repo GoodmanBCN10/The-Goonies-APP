@@ -208,9 +208,15 @@ private:
         float progress = installing ? installProgressOf(*task)
                                     : progressOf(*task);
         progressBar_->setProgress(progress);
-        progress_->setText(std::to_string(percentOf(progress)) + "%  ·  " +
-                           formatBytes(task->completedBytes) + " / " +
-                           formatBytes(task->totalBytes));
+        if (task->status == DownloadStatus::Installing && task->isPort) {
+            progress_->setText(std::to_string(percentOf(progress)) + "%  ·  " +
+                               std::to_string(task->packagesInstalled) + " / " +
+                               std::to_string(task->packageCount) + " archivos");
+        } else {
+            progress_->setText(std::to_string(percentOf(progress)) + "%  ·  " +
+                               formatBytes(task->completedBytes) + " / " +
+                               formatBytes(task->totalBytes));
+        }
 
         std::string eta;
         if (task->status == DownloadStatus::Downloading &&

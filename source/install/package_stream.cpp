@@ -844,10 +844,11 @@ private:
 } // namespace
 
 class PackageStream::Impl {
+    enum class XciState { None, FindRoot, SkipToSecure, ParseSecure };
 public:
     Impl(bool compressed, PackageCallbacks callbacks, std::string telemetryTag)
         : compressed_(compressed), callbacks_(std::move(callbacks)),
-          telemetryTag_(std::move(telemetryTag)) {}
+          telemetryTag_(std::move(telemetryTag)), xciState_(XciState::None), xci_secure_offset_(0), xci_bytes_skipped_(0) {}
 
     bool write(const uint8_t* data, size_t size) {
         if (failed_ || finished_ || (!data && size)) {
@@ -1218,6 +1219,10 @@ private:
     bool currentSkipped_ = false;
     bool finished_ = false;
     bool failed_ = false;
+    std::vector<uint32_t> blockSizes_;
+    XciState xciState_ = XciState::None;
+    uint64_t xci_secure_offset_ = 0;
+    uint64_t xci_bytes_skipped_ = 0;
 };
 
 PackageStream::PackageStream(bool compressed, PackageCallbacks callbacks,

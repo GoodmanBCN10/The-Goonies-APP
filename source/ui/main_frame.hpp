@@ -52,7 +52,7 @@ public:
 
     void draw(NVGcontext* vg, float x, float y, float width, float height,
               brls::Style style, brls::FrameContext* ctx) override {
-        const NVGcolor c = (owner_ && owner_->isFocused())
+        const NVGcolor c = (owner_ && owner_->isActive())
                                ? theme::accent()
                                : theme::textSecondary();
         nvgStrokeColor(vg, c);
@@ -164,19 +164,13 @@ public:
             expandedWidth_ = 248.0f;
     }
 
-    int tabCount_ = 0;
-
     // Like TabFrame::addTab, but also plants an icon between the active-accent
     // bar and the label, and remembers the label so it can be folded away.
     void addNavTab(const std::string& label, NavIconType icon,
                    brls::TabViewCreator creator) {
         this->addTab(label, std::move(creator));
-        brls::Sidebar* sidebar = this->getChildren().empty() ? nullptr : dynamic_cast<brls::Sidebar*>(this->getChildren()[0]);
-        if (!sidebar) { tabCount_++; return; }
-        
-        brls::SidebarItem* item = sidebar->getItem(tabCount_);
-        tabCount_++;
-        
+        const int index = static_cast<int>(this->sidebar->getItemsSize()) - 1;
+        brls::SidebarItem* item = this->sidebar->getItem(index);
         if (!item)
             return;
 
@@ -184,7 +178,7 @@ public:
         // splice the icon in at index 1 -> [accent, icon, label].
         std::vector<brls::View*>& kids = item->getChildren();
         brls::View* labelView = kids.size() >= 2 ? kids[1] : nullptr;
-        // item->addView(new NavIcon(icon, item), 1);
+        item->addView(new NavIcon(icon, item), 1);
         if (labelView) {
             labels_.push_back(labelView);
             if (collapsed_)
@@ -196,8 +190,7 @@ public:
         if (collapsed == collapsed_)
             return;
         collapsed_ = collapsed;
-        if (!this->getChildren().empty())
-            this->getChildren()[0]->setWidth(collapsed ? kCollapsedWidth : expandedWidth_);
+        this->sidebar->setWidth(collapsed ? kCollapsedWidth : expandedWidth_);
         for (brls::View* label : labels_)
             label->setVisibility(collapsed ? brls::Visibility::GONE
                                            : brls::Visibility::VISIBLE);
@@ -210,14 +203,12 @@ protected:
     void onChildFocusGained(brls::View* directChild,
                             brls::View* focusedView) override {
         brls::TabFrame::onChildFocusGained(directChild, focusedView);
-        brls::View* sidebarView = this->getChildren().empty() ? nullptr : this->getChildren()[0];
-        // Comentado para que el sidebar NUNCA se esconda
-        // setCollapsed(!(sidebarView == directChild));
+        setCollapsed(!(this->sidebar == directChild));
     }
 
 private:
     // Wide enough for padding + the active-accent bar + the 28px icon.
-    static constexpr float kCollapsedWidth = 24.0f;
+    static constexpr float kCollapsedWidth = 88.0f;
 
     bool collapsed_ = false;
     float expandedWidth_ = 248.0f;

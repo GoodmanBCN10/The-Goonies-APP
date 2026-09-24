@@ -168,6 +168,9 @@ bool httpGetOnce(const std::string& url, size_t limit,
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, verifyTls ? 1L : 0L);
     curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, verifyTls ? 2L : 0L);
+    if (verifyTls) {
+        curl_easy_setopt(curl, CURLOPT_CAINFO, "romfs:/ssl/cacert.pem");
+    }
     curl_easy_setopt(curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
     
     // Support instant abort
