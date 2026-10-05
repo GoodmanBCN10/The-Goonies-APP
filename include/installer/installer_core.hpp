@@ -26,6 +26,7 @@ public:
     bool IsFinished() const { return m_all_finished; }
     bool HasError() const { return m_error; }
     Result GetErrorCode() const { return m_last_error_code; }
+    std::string GetErrorString() const { return m_last_error_string; }
     u64 GetBytesWritten() const { return m_mtp_bytes_written; }
     u64 GetFreedBytes() const { return m_freed_bytes; }
     std::string GetFinishedFilename() { 
@@ -47,6 +48,7 @@ private:
     bool m_all_finished = true;
     bool m_error = false;
     Result m_last_error_code = 0;
+    std::string m_last_error_string = "";
     u64 m_mtp_bytes_written = 0;
     u64 m_freed_bytes = 0;
     

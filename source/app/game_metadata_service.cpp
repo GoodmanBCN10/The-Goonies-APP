@@ -793,11 +793,20 @@ bool GameMetadataService::fetchLatest(MetadataSnapshot& snapshot,
 
 const GameMetadata*
 GameMetadataService::findByInfoHash(const std::string& infoHash) const {
+    auto it = byHash_.find(infoHash);
+    if (it != byHash_.end()) return &it->second;
+    
     std::string key = infoHash;
-    std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) {
-        return static_cast<char>(std::toupper(c));
-    });
-    auto it = byHash_.find(key);
+    bool changed = false;
+    for (char& c : key) {
+        if (c >= 'a' && c <= 'z') {
+            c -= 32;
+            changed = true;
+        }
+    }
+    if (changed) {
+        it = byHash_.find(key);
+    }
     return it == byHash_.end() ? nullptr : &it->second;
 }
 

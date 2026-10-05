@@ -35,6 +35,7 @@ bool Core::StartInstallation(const std::string& filename) {
     m_all_finished = false;
     m_error = false;
     m_last_error_code = 0;
+    m_last_error_string = "";
     
     // Check if it's an XCI/XCZ
     std::string lower = filename;
@@ -59,6 +60,7 @@ bool Core::StartInstallation(const std::string& filename) {
     if (!m_backend->beginPackage("local_install", filename)) {
         m_error = true;
         m_last_error_code = 1;
+        m_last_error_string = m_backend->error();
         SafePrintf("Installer Core: Failed to beginPackage\n");
         return false;
     }
@@ -113,6 +115,7 @@ bool Core::WriteData(const void* data, size_t size) {
         if (!m_stream->write(static_cast<const uint8_t*>(data), size)) {
             m_error = true;
             m_last_error_code = 2;
+            m_last_error_string = m_stream->error();
             SafePrintf("Installer Core: stream.write failed: %s\n", m_stream->error().c_str());
             return false;
         }
@@ -147,6 +150,7 @@ void Core::FinishInstallation() {
         if (!m_stream->finish()) {
             m_error = true;
             m_last_error_code = 3;
+            m_last_error_string = m_stream->error();
             SafePrintf("Installer Core: stream.finish failed: %s\n", m_stream->error().c_str());
             return;
         }
@@ -155,6 +159,7 @@ void Core::FinishInstallation() {
         if (!m_backend->commitPackage(alreadyInstalled)) {
             m_error = true;
             m_last_error_code = 4;
+            m_last_error_string = m_backend->error();
             SafePrintf("Installer Core: commitPackage failed: %s\n", m_backend->error().c_str());
             return;
         }
@@ -186,6 +191,7 @@ void Core::AbortInstallation() {
         }
         m_error = true;
         m_last_error_code = 100;
+        m_last_error_string = "Installation aborted";
         m_stream.reset();
         m_backend.reset();
     }

@@ -34,6 +34,48 @@ extern "C" {
 #include "app/update_service.hpp"
 #include "ui/theme.hpp"
 #include <borealis/views/progress_spinner.hpp>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <cstring>
+
+bool sync_time_ntp() {
+    if (R_FAILED(timeInitialize())) return false;
+    bool success = false;
+    int sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sockfd >= 0) {
+        struct timeval tv;
+        tv.tv_sec = 4;
+        tv.tv_usec = 0;
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
+        setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof(tv));
+        struct hostent *server = gethostbyname("pool.ntp.org");
+        if (server != NULL) {
+            struct sockaddr_in serv_addr;
+            memset(&serv_addr, 0, sizeof(serv_addr));
+            serv_addr.sin_family = AF_INET;
+            memcpy((char *)&serv_addr.sin_addr.s_addr, (char *)server->h_addr, server->h_length);
+            serv_addr.sin_port = htons(123);
+            unsigned char msg[48] = {0};
+            msg[0] = 0x1B;
+            if (sendto(sockfd, msg, sizeof(msg), 0, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) >= 0) {
+                struct sockaddr_in sender;
+                socklen_t sender_len = sizeof(sender);
+                if (recvfrom(sockfd, msg, sizeof(msg), 0, (struct sockaddr *)&sender, &sender_len) >= 0) {
+                    uint32_t seconds = (msg[40] << 24) | (msg[41] << 16) | (msg[42] << 8) | msg[43];
+                    uint64_t unix_time = seconds - 2208988800ULL;
+                    timeSetCurrentTime(TimeType_UserSystemClock, unix_time);
+                    timeSetCurrentTime(TimeType_NetworkSystemClock, unix_time);
+                    success = true;
+                }
+            }
+        }
+        close(sockfd);
+    }
+    timeExit();
+    return success;
+}
 
 using pipensx::AppSettings;
 using pipensx::CatalogService;
@@ -362,9 +404,9 @@ int main(int argc, char* argv[]) {
         loadingBox->setJustifyContent(brls::JustifyContent::CENTER);
         
         brls::Label* loadingLabel = new brls::Label();
-        loadingLabel->setText(t("Iniciando The Goonies APP...\nBuscando juegos instalados...", 
-                                "Starting The Goonies APP...\nFinding installed games...", 
-                                "Iniciando The Goonies APP...\nBuscando jogos instalados..."));
+        loadingLabel->setText(t("Iniciando The Goonies APP...\nSincronizando hora y actualizando catalogo...\n(Se paciente mientras se actualiza el catalogo)", 
+                                "Starting The Goonies APP...\nSyncing time and updating catalog...\n(Please be patient while the catalog updates)", 
+                                "Iniciando The Goonies APP...\nSincronizando hora e atualizando catalogo...\n(Por favor, seja paciente enquanto o catalogo e atualizado)"));
         loadingLabel->setFontSize(24);
         loadingLabel->setHorizontalAlign(brls::HorizontalAlign::CENTER);
         loadingLabel->setMarginBottom(40);
@@ -377,6 +419,15 @@ int main(int argc, char* argv[]) {
         std::thread initThread([&]() {
             std::string err;
             if (g_appExiting) return;
+
+            writeLog("Iniciando sincronizacion NTP...");
+            if (sync_time_ntp()) {
+                writeLog("NTP Sync OK");
+            } else {
+                writeLog("NTP Sync FAILED");
+            }
+            if (g_appExiting) return;
+
             installed_service->refresh(err);
             if (g_appExiting) return;
 
@@ -384,6 +435,20 @@ int main(int argc, char* argv[]) {
             catalog_service->load(err);
             if (g_appExiting) return;
             metadata_service->load(err);
+            if (g_appExiting) return;
+
+            // Fetch latest from the internet so the catalog is ready to go
+            writeLog("Descargando catalogo online...");
+            std::vector<pipensx::CatalogEntry> parsedCatalog;
+            if (catalog_service->fetchLatest(parsedCatalog, err)) {
+                catalog_service->adopt(std::move(parsedCatalog));
+            }
+            if (g_appExiting) return;
+
+            pipensx::MetadataSnapshot parsedMeta;
+            if (metadata_service->fetchLatest(parsedMeta, err)) {
+                metadata_service->adopt(std::move(parsedMeta));
+            }
 
             brls::sync([&]() {
                 if (g_appExiting) return;

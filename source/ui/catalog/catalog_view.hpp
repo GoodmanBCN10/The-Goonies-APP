@@ -577,6 +577,13 @@ private:
         return value;
     }
 
+    static bool caseInsensitiveCompare(const std::string& a, const std::string& b) {
+        return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end(),
+            [](unsigned char c1, unsigned char c2) {
+                return std::tolower(c1) < std::tolower(c2);
+            });
+    }
+
     EmptyStateView* ensureEmptyState() {
         if (emptyState_)
             return emptyState_;
@@ -627,7 +634,7 @@ private:
         if (sort_ == SortMode::Alphabetical) {
             std::stable_sort(entries.begin(), entries.end(),
                 [](const CatalogEntry& left, const CatalogEntry& right) {
-                    return lowerAscii(left.title) < lowerAscii(right.title);
+                    return caseInsensitiveCompare(left.title, right.title);
                 });
         } else if (sort_ == SortMode::Largest) {
             std::stable_sort(entries.begin(), entries.end(),
@@ -639,12 +646,12 @@ private:
                 [](const CatalogEntry& left, const CatalogEntry& right) {
                     if (left.peerCount != right.peerCount)
                         return left.peerCount > right.peerCount;
-                    return left.publishedAt > right.publishedAt;
+                    return left.topicId > right.topicId;
                 });
         } else {
             std::stable_sort(entries.begin(), entries.end(),
                 [](const CatalogEntry& left, const CatalogEntry& right) {
-                    return left.publishedAt > right.publishedAt;
+                    return left.topicId > right.topicId;
                 });
         }
         for (const std::string& hash : managed)
@@ -745,7 +752,7 @@ private:
             const GameMetadata* meta =
                 metadata_ ? metadata_->findByInfoHash(entry.infoHash) : nullptr;
                 
-            if (matchedGamesOnly && !catalogEntryHasMatchedTitle(meta))
+            if (matchedGamesOnly && !catalogEntryIsGame(entry, meta))
                 continue;
                 
             if (!searching && currentFilter == CatalogFilter::Ports) {
@@ -772,7 +779,7 @@ private:
         if (sort_ == SortMode::Alphabetical) {
             std::stable_sort(visible.begin(), visible.end(),
                 [](const CatalogEntry& left, const CatalogEntry& right) {
-                    return lowerAscii(left.title) < lowerAscii(right.title);
+                    return caseInsensitiveCompare(left.title, right.title);
                 });
         } else if (sort_ == SortMode::Largest) {
             std::stable_sort(visible.begin(), visible.end(),
@@ -792,7 +799,7 @@ private:
         } else {
             std::stable_sort(visible.begin(), visible.end(),
                 [](const CatalogEntry& left, const CatalogEntry& right) {
-                    return left.publishedAt > right.publishedAt;
+                    return left.topicId > right.topicId;
                 });
         }
 
@@ -845,7 +852,7 @@ private:
         int heroIndex = -1;
         std::string heroImage;
 
-        bool showShelves = (currentFilter == CatalogFilter::All || currentFilter == CatalogFilter::Games) && query_.empty() && !shelfDrilldown_;
+        bool showShelves = false;
         if (showShelves) {
             std::map<std::string, std::vector<int>> categoryGroups;
             for (size_t i = 0; i < visible.size(); ++i) {
@@ -865,8 +872,8 @@ private:
                 CatalogShelf shelf;
                 shelf.title = pair.first;
                 shelf.items = std::move(pair.second);
-                if (shelf.items.size() > 100) {
-                    shelf.items.resize(100);
+                if (shelf.items.size() > 15) {
+                    shelf.items.resize(15);
                 }
                 shelf.seeAll = nullptr; 
                 shelves.push_back(std::move(shelf));
@@ -1026,7 +1033,7 @@ private:
                     const auto& r = entries[static_cast<size_t>(right)];
                     if (l.peerCount != r.peerCount)
                         return l.peerCount > r.peerCount;
-                    return l.publishedAt > r.publishedAt;
+                    return l.topicId > r.topicId;
                 });
             return order;
         }
@@ -1034,8 +1041,8 @@ private:
         std::vector<int> ranked = order;
         std::stable_sort(ranked.begin(), ranked.end(),
             [&entries](int left, int right) {
-                return entries[static_cast<size_t>(left)].publishedAt >
-                       entries[static_cast<size_t>(right)].publishedAt;
+                return entries[static_cast<size_t>(left)].topicId >
+                       entries[static_cast<size_t>(right)].topicId;
             });
         for (size_t pos = 0; pos < ranked.size(); ++pos)
             score[static_cast<size_t>(ranked[pos])] += pos;
@@ -1052,8 +1059,8 @@ private:
                     score[static_cast<size_t>(right)])
                     return score[static_cast<size_t>(left)] <
                            score[static_cast<size_t>(right)];
-                return entries[static_cast<size_t>(left)].publishedAt >
-                       entries[static_cast<size_t>(right)].publishedAt;
+                return entries[static_cast<size_t>(left)].topicId >
+                       entries[static_cast<size_t>(right)].topicId;
             });
         return order;
     }

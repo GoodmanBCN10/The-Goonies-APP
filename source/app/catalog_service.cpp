@@ -435,7 +435,7 @@ bool CatalogService::parseJson(const std::string& json,
             static_cast<uint32_t>(readUnsigned(item, "tracker_id"));
         entry.peerCount =
             static_cast<uint32_t>(readUnsigned(item, "peer_count"));
-        entry.publishedAt = readSigned(item, "published_date");
+        entry.topicId = readSigned(item, "published_date");
         entry.sourceUpdatedAt = readSigned(item, "source_updated_at");
         entry.catalogGeneratedAt = readSigned(item, "catalog_generated_at");
         entry.lastCheckedAt = readSigned(item, "last_checked_at");
@@ -479,7 +479,7 @@ bool CatalogService::parseJson(const std::string& json,
     }
     std::stable_sort(entries.begin(), entries.end(),
                      [](const CatalogEntry& left, const CatalogEntry& right) {
-                         return left.publishedAt > right.publishedAt;
+                         return left.topicId > right.topicId;
                      });
     return true;
 }

@@ -1060,8 +1060,9 @@ private:
             size_t available = stringsSize - nameOffset;
             const void* end = std::memchr(name, '\0', available);
             if (!end) {
-                error_ = "Unterminated PFS0 filename.";
-                return fail();
+                // Relaxed PFS0 parsing for some custom tools:
+                // If there's no null terminator, just use the remaining string table bytes.
+                end = name + available;
             }
             PfsEntry parsed;
             parsed.offset = read64(entry);

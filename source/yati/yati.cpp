@@ -24,9 +24,39 @@
 #include <zstd.h>
 #include <algorithm>
 #include <atomic>
+#include <fstream>
+#include <borealis/extern/nlohmann/json.hpp>
 
 namespace GooniesInstaller::yati {
 namespace {
+
+void SaveOriginalFirmware(uint64_t titleId, uint32_t version) {
+    if (version == 0) return;
+    std::string path = "sdmc:/switch/thegoonies/firmwares.json";
+    nlohmann::json j;
+    std::ifstream i(path);
+    if (i.is_open()) {
+        try {
+            i >> j;
+        } catch (...) {
+            j = nlohmann::json::object();
+        }
+        i.close();
+    } else {
+        j = nlohmann::json::object();
+    }
+    
+    char idStr[17];
+    snprintf(idStr, sizeof(idStr), "%016llX", (unsigned long long)titleId);
+    j[idStr] = version;
+    
+    std::ofstream o(path);
+    if (o.is_open()) {
+        o << j.dump(4);
+        o.close();
+    }
+}
+
 
 constexpr NcmStorageId NCM_STORAGE_IDS[]{
     NcmStorageId_BuiltInUser,
@@ -1257,10 +1287,16 @@ Result Yati::InstallCnmtNca(std::span<TikCollection> tickets, CnmtCollection& cn
     if (config.lower_system_version) {
         auto extended_header = (ncm::ExtendedHeader*)cnmt.extended_header.data();
         log_write("patching version\n");
+        u32 original_version = 0;
         if (cnmt.key.type == NcmContentMetaType_Application) {
+            original_version = extended_header->application.required_system_version;
             extended_header->application.required_system_version = 0;
         } else if (cnmt.key.type == NcmContentMetaType_Patch) {
+            original_version = extended_header->patch.required_system_version;
             extended_header->patch.required_system_version = 0;
+        }
+        if (original_version > 0) {
+            SaveOriginalFirmware(header.title_id, original_version);
         }
     } else {
         u32 req_sys_version = 0;

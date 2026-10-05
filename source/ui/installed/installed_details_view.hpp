@@ -5,6 +5,8 @@
 #include <sstream>
 #include <iomanip>
 #include <ctime>
+#include <fstream>
+#include <borealis/extern/nlohmann/json.hpp>
 
 #include <borealis.hpp>
 #include <switch.h>
@@ -19,6 +21,27 @@
 #include <borealis/views/cells/cell_bool.hpp>
 
 namespace pipensx::ui {
+
+inline uint32_t GetOriginalFirmware(uint64_t titleId) {
+    std::string path = "sdmc:/switch/thegoonies/firmwares.json";
+    std::ifstream i(path);
+    if (!i.is_open()) return 0;
+    
+    nlohmann::json j;
+    try {
+        i >> j;
+    } catch (...) {
+        return 0;
+    }
+    
+    char idStr[17];
+    snprintf(idStr, sizeof(idStr), "%016llX", (unsigned long long)titleId);
+    
+    if (j.contains(idStr)) {
+        return j[idStr].get<uint32_t>();
+    }
+    return 0;
+}
 
 struct ContentItem {
     std::string type;
@@ -140,6 +163,13 @@ public:
                 if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, title.applicationId))) {
                     uint32_t reqV = 0;
                     if (R_SUCCEEDED(ncmContentMetaDatabaseGetRequiredSystemVersion(&db, &reqV, &key))) {
+                        uint32_t cachedV = GetOriginalFirmware(key.id);
+                        if (cachedV == 0 && key.id != title.applicationId) {
+                            cachedV = GetOriginalFirmware(title.applicationId);
+                        }
+                        if (cachedV > 0) {
+                            reqV = cachedV;
+                        }
                         reqSysVer = std::to_string((reqV >> 26) & 0x3F) + "." + std::to_string((reqV >> 20) & 0x3F) + "." + std::to_string((reqV >> 16) & 0xF);
                     }
                 }
@@ -163,7 +193,11 @@ public:
         infoBox->addView(verLabel);
 
         brls::Label* reqLabel = new brls::Label();
-        reqLabel->setText("Min FW: " + reqSysVer);
+        if (reqSysVer == "0.0.0") {
+            reqLabel->setText("Min FW: " + reqSysVer + " (Bypass)");
+        } else {
+            reqLabel->setText("Min FW: " + reqSysVer);
+        }
         reqLabel->setFontSize(20);
         reqLabel->setMarginTop(4);
         reqLabel->setTextColor(theme::textSecondary());

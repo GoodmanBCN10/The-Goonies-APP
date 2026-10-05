@@ -21,8 +21,37 @@ extern "C" {
 #include <unistd.h>
 #include <utility>
 #include <vector>
+#include <fstream>
+#include <borealis/extern/nlohmann/json.hpp>
 
 namespace pipensx::install {
+
+inline void SaveOriginalFirmware(uint64_t titleId, uint32_t version) {
+    if (version == 0) return;
+    std::string path = "sdmc:/switch/thegoonies/firmwares.json";
+    nlohmann::json j;
+    std::ifstream i(path);
+    if (i.is_open()) {
+        try {
+            i >> j;
+        } catch (...) {
+            j = nlohmann::json::object();
+        }
+        i.close();
+    } else {
+        j = nlohmann::json::object();
+    }
+    
+    char idStr[17];
+    snprintf(idStr, sizeof(idStr), "%016llX", (unsigned long long)titleId);
+    j[idStr] = version;
+    
+    std::ofstream o(path);
+    if (o.is_open()) {
+        o << j.dump(4);
+        o.close();
+    }
+}
 namespace {
 
 constexpr const char* TempRoot = "sdmc:/switch/thegoonies/install-temp";
@@ -296,10 +325,16 @@ bool readPackagedMeta(const std::string& ncaPath, ParsedMeta& out,
     if (type == NcmContentMetaType_Application &&
         out.extendedHeader.size() >= sizeof(NcmApplicationMetaExtendedHeader)) {
         auto* appHeader = reinterpret_cast<NcmApplicationMetaExtendedHeader*>(out.extendedHeader.data());
+        if (appHeader->required_system_version > 0) {
+            SaveOriginalFirmware(out.header.id, appHeader->required_system_version);
+        }
         appHeader->required_system_version = 0;
     } else if (type == NcmContentMetaType_Patch &&
                out.extendedHeader.size() >= sizeof(NcmPatchMetaExtendedHeader)) {
         auto* patchHeader = reinterpret_cast<NcmPatchMetaExtendedHeader*>(out.extendedHeader.data());
+        if (patchHeader->required_system_version > 0) {
+            SaveOriginalFirmware(out.header.id, patchHeader->required_system_version);
+        }
         patchHeader->required_system_version = 0;
     }
 

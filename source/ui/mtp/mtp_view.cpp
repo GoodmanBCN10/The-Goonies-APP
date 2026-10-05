@@ -243,7 +243,7 @@ void MTPView::updateStatus() {
     if (!g_mtpInstallerCore) return;
 
     if (g_mtpInstallerCore->HasError()) {
-        activeFilenameLabel_->setText(fmt::format("Error de instalación (0x{:X})", g_mtpInstallerCore->GetErrorCode()));
+        activeFilenameLabel_->setText(fmt::format("Error (0x{:X}): {}", g_mtpInstallerCore->GetErrorCode(), g_mtpInstallerCore->GetErrorString()));
         progressBar_->setProgress(1.0f);
         speedLabel_->setText("");
     } else if (g_mtpInstallerCore->IsFinished() && !currentFilename_.empty()) {
