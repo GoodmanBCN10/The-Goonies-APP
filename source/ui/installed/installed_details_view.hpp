@@ -23,22 +23,67 @@
 namespace goonies::ui {
 
 inline uint32_t GetOriginalFirmware(uint64_t titleId) {
-    std::string path = "sdmc:/switch/thegoonies/firmwares.json";
-    std::ifstream i(path);
-    if (!i.is_open()) return 0;
-    
-    nlohmann::json j;
-    try {
-        i >> j;
-    } catch (...) {
-        return 0;
-    }
-    
-    char idStr[17];
-    snprintf(idStr, sizeof(idStr), "%016llX", (unsigned long long)titleId);
-    
-    if (j.contains(idStr)) {
-        return j[idStr].get<uint32_t>();
+    const std::string paths[] = {
+        "sdmc:/switch/thegoonies/firmwares.json",
+        "sdmc:/switch/TheGoonies/firmwares.json",
+        "sdmc:/switch/pipensx/firmwares.json"
+    };
+
+    uint64_t baseId = titleId & 0xFFFFFFFFFFFFF000ULL;
+    uint64_t patchId = baseId | 0x800ULL;
+
+    char pUpper[17], pLower[17];
+    snprintf(pUpper, sizeof(pUpper), "%016llX", (unsigned long long)patchId);
+    snprintf(pLower, sizeof(pLower), "%016llx", (unsigned long long)patchId);
+
+    char bUpper[17], bLower[17];
+    snprintf(bUpper, sizeof(bUpper), "%016llX", (unsigned long long)baseId);
+    snprintf(bLower, sizeof(bLower), "%016llx", (unsigned long long)baseId);
+
+    char tUpper[17], tLower[17];
+    snprintf(tUpper, sizeof(tUpper), "%016llX", (unsigned long long)titleId);
+    snprintf(tLower, sizeof(tLower), "%016llx", (unsigned long long)titleId);
+
+    for (const auto& path : paths) {
+        std::ifstream i(path);
+        if (!i.is_open()) continue;
+
+        nlohmann::json j;
+        try {
+            i >> j;
+        } catch (...) {
+            continue;
+        }
+
+        // 1. Check patch ID first (highest priority)
+        if (j.contains(pUpper) && j[pUpper].is_number_unsigned()) {
+            uint32_t v = j[pUpper].get<uint32_t>();
+            if (v > 0) return v;
+        }
+        if (j.contains(pLower) && j[pLower].is_number_unsigned()) {
+            uint32_t v = j[pLower].get<uint32_t>();
+            if (v > 0) return v;
+        }
+
+        // 2. Check exact titleId
+        if (j.contains(tUpper) && j[tUpper].is_number_unsigned()) {
+            uint32_t v = j[tUpper].get<uint32_t>();
+            if (v > 0) return v;
+        }
+        if (j.contains(tLower) && j[tLower].is_number_unsigned()) {
+            uint32_t v = j[tLower].get<uint32_t>();
+            if (v > 0) return v;
+        }
+
+        // 3. Check base ID
+        if (j.contains(bUpper) && j[bUpper].is_number_unsigned()) {
+            uint32_t v = j[bUpper].get<uint32_t>();
+            if (v > 0) return v;
+        }
+        if (j.contains(bLower) && j[bLower].is_number_unsigned()) {
+            uint32_t v = j[bLower].get<uint32_t>();
+            if (v > 0) return v;
+        }
     }
     return 0;
 }
@@ -149,40 +194,63 @@ public:
             free(controlData);
         }
 
-        std::string reqSysVer = "0.0.0";
+        uint32_t highestReqV = 0;
         std::vector<ContentItem> gameContents;
         NcmStorageId storages[] = {NcmStorageId_SdCard, NcmStorageId_BuiltInUser};
         std::string storageNames[] = {"MicroSD", "NAND"};
 
+        uint64_t baseId = title.applicationId & 0xFFFFFFFFFFFFF000ULL;
+        uint64_t patchId = baseId | 0x800ULL;
+
         for (int s = 0; s < 2; s++) {
             NcmContentMetaDatabase db;
             if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storages[s]))) {
-                fetchContentsFromDB(&db, title.applicationId, "Base", storageNames[s], gameContents);
-                
-                NcmContentMetaKey key = {0};
-                if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, title.applicationId))) {
-                    uint32_t reqV = 0;
-                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetRequiredSystemVersion(&db, &reqV, &key))) {
-                        uint32_t cachedV = GetOriginalFirmware(key.id);
-                        if (cachedV == 0 && key.id != title.applicationId) {
-                            cachedV = GetOriginalFirmware(title.applicationId);
-                        }
-                        if (cachedV > 0) {
-                            reqV = cachedV;
-                        }
-                        reqSysVer = std::to_string((reqV >> 26) & 0x3F) + "." + std::to_string((reqV >> 20) & 0x3F) + "." + std::to_string((reqV >> 16) & 0xF);
+                fetchContentsFromDB(&db, baseId, "Base", storageNames[s], gameContents);
+
+                // Check Base in NCM
+                NcmContentMetaKey baseKey = {0};
+                if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &baseKey, baseId))) {
+                    uint32_t bReqV = 0;
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetRequiredSystemVersion(&db, &bReqV, &baseKey))) {
+                        if (bReqV > highestReqV) highestReqV = bReqV;
                     }
                 }
-                
-                fetchContentsFromDB(&db, title.applicationId | 0x800, "Update", storageNames[s], gameContents);
-                
-                uint64_t dlcBase = (title.applicationId & 0xFFFFFFFFFFFFF000ULL) | 0x1000ULL;
+
+                // Check Update (Patch) in NCM
+                fetchContentsFromDB(&db, patchId, "Update", storageNames[s], gameContents);
+                NcmContentMetaKey patchKey = {0};
+                if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &patchKey, patchId))) {
+                    uint32_t pReqV = 0;
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetRequiredSystemVersion(&db, &pReqV, &patchKey))) {
+                        if (pReqV > highestReqV) highestReqV = pReqV;
+                    }
+                }
+
+                uint64_t dlcBase = baseId | 0x1000ULL;
                 for (int i = 0; i < 256; i++) {
                     fetchContentsFromDB(&db, dlcBase + i, "DLC", storageNames[s], gameContents);
                 }
-                
+
                 ncmContentMetaDatabaseClose(&db);
             }
+        }
+
+        // Check firmwares.json cache (highest priority if bypassed)
+        uint32_t cachedPatchV = GetOriginalFirmware(patchId);
+        if (cachedPatchV > highestReqV) {
+            highestReqV = cachedPatchV;
+        }
+        uint32_t cachedBaseV = GetOriginalFirmware(baseId);
+        if (cachedBaseV > highestReqV) {
+            highestReqV = cachedBaseV;
+        }
+
+        std::string reqSysVer = "0.0.0";
+        if (highestReqV > 0) {
+            uint32_t major = (highestReqV >> 26) & 0x3F;
+            uint32_t minor = (highestReqV >> 20) & 0x3F;
+            uint32_t micro = (highestReqV >> 16) & 0xF;
+            reqSysVer = std::to_string(major) + "." + std::to_string(minor) + "." + std::to_string(micro);
         }
 
         brls::Label* verLabel = new brls::Label();
@@ -193,10 +261,10 @@ public:
         infoBox->addView(verLabel);
 
         brls::Label* reqLabel = new brls::Label();
-        if (reqSysVer == "0.0.0") {
-            reqLabel->setText("Min FW: " + reqSysVer + " (Bypass)");
-        } else {
+        if (highestReqV > 0) {
             reqLabel->setText("Min FW: " + reqSysVer);
+        } else {
+            reqLabel->setText("Min FW: " + reqSysVer + " (Bypass)");
         }
         reqLabel->setFontSize(20);
         reqLabel->setMarginTop(4);

@@ -28,6 +28,8 @@ namespace goonies::install {
 
 inline void SaveOriginalFirmware(uint64_t titleId, uint32_t version) {
     if (version == 0) return;
+    std::error_code ec;
+    std::filesystem::create_directories("sdmc:/switch/thegoonies", ec);
     std::string path = "sdmc:/switch/thegoonies/firmwares.json";
     nlohmann::json j;
     std::ifstream i(path);
@@ -46,9 +48,18 @@ inline void SaveOriginalFirmware(uint64_t titleId, uint32_t version) {
     snprintf(idStr, sizeof(idStr), "%016llX", (unsigned long long)titleId);
     j[idStr] = version;
     
+    // Also save under base application ID if this is a patch (or vice versa)
+    uint64_t baseId = titleId & 0xFFFFFFFFFFFFF000ULL;
+    char baseStr[17];
+    snprintf(baseStr, sizeof(baseStr), "%016llX", (unsigned long long)baseId);
+    if (!j.contains(baseStr) || j[baseStr].get<uint32_t>() < version) {
+        j[baseStr] = version;
+    }
+    
     std::ofstream o(path);
     if (o.is_open()) {
         o << j.dump(4);
+        o.flush();
         o.close();
     }
 }
