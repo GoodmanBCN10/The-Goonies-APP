@@ -2145,6 +2145,7 @@ void DownloadManager::workerMain() {
             }
             
             appletSetMediaPlaybackState(true);
+            appletSetAutoSleepDisabled(true);
             
             FILE* fp = nullptr;
             uint32_t targetFileIndex = 0;
@@ -2404,6 +2405,7 @@ void DownloadManager::workerMain() {
             if (fp) fclose(fp);
             
             appletSetMediaPlaybackState(false);
+            appletSetAutoSleepDisabled(false);
             
             bool installOk = (mode != TransferMode::StreamInstall) || (coordinator && coordinator->finish());
             
@@ -2476,6 +2478,7 @@ void DownloadManager::workerMain() {
         }
 
         appletSetMediaPlaybackState(true);
+        appletSetAutoSleepDisabled(true);
         bool finished = false;
         while (!stopping_) {
             {
@@ -2561,6 +2564,7 @@ void DownloadManager::workerMain() {
         }
         
         appletSetMediaPlaybackState(false);
+        appletSetAutoSleepDisabled(false);
 
         torrent_destroy(torrent);
         log_msg("[manager] torrent destroyed %s\n", activeId.c_str());

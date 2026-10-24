@@ -22,6 +22,18 @@ struct PortDownloadContext {
     std::function<void(const std::string&, uint64_t, uint64_t)> progressCb;
     std::atomic<bool>* cancelFlag;
     double totalSize = 0;
+    uint64_t resumeOffset = 0;
+};
+
+struct SleepLockGuard {
+    SleepLockGuard() {
+        appletSetMediaPlaybackState(true);
+        appletSetAutoSleepDisabled(true);
+    }
+    ~SleepLockGuard() {
+        appletSetMediaPlaybackState(false);
+        appletSetAutoSleepDisabled(false);
+    }
 };
 
 static size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *stream) {
@@ -34,14 +46,17 @@ static int progress_callback(void *clientp, double dltotal, double dlnow, double
     if (ctx->cancelFlag && ctx->cancelFlag->load()) {
         return 1; // Abort download
     }
-    if (dltotal > 0) {
-        ctx->totalSize = dltotal;
-        ctx->progressCb("Descargando...", static_cast<uint64_t>(dlnow), static_cast<uint64_t>(dltotal));
+    double actualTotal = dltotal + static_cast<double>(ctx->resumeOffset);
+    double actualNow = dlnow + static_cast<double>(ctx->resumeOffset);
+    if (actualTotal > 0) {
+        ctx->totalSize = actualTotal;
+        ctx->progressCb("Descargando...", static_cast<uint64_t>(actualNow), static_cast<uint64_t>(actualTotal));
     }
     return 0;
 }
 
 bool processPortTask(const std::string& id, const std::string& url, const std::string& dataPath, std::atomic<bool>& cancelFlag, std::function<void(const std::string&, uint64_t, uint64_t)> progressCb) {
+    SleepLockGuard sleepGuard;
     std::vector<std::string> urls;
     size_t s = 0;
     size_t e = url.find(',');
@@ -67,11 +82,17 @@ bool processPortTask(const std::string& id, const std::string& url, const std::s
             prefix = "[P" + std::to_string(u + 1) + "/" + std::to_string(urls.size()) + "] ";
         }
 
-        // 1. DOWNLOAD ZIP
+        // 1. DOWNLOAD ZIP (with resume support)
+        uint64_t resumeOffset = 0;
+        struct stat st{};
+        if (stat(zipPath.c_str(), &st) == 0 && st.st_size > 0) {
+            resumeOffset = static_cast<uint64_t>(st.st_size);
+        }
+
         CURL* curl = curl_easy_init();
         if (!curl) { progressCb("Error: curl init",0,0); return false; }
         
-        FILE* fp = fopen(zipPath.c_str(), "wb");
+        FILE* fp = fopen(zipPath.c_str(), resumeOffset > 0 ? "ab" : "wb");
         if (!fp) { curl_easy_cleanup(curl); progressCb("Error: fopen zip fail",0,0); return false; }
         
         std::vector<char> ioBuf(128 * 1024);
@@ -82,9 +103,13 @@ bool processPortTask(const std::string& id, const std::string& url, const std::s
             progressCb(prefix + stage, dlnow, dltotal);
         };
         ctx.cancelFlag = &cancelFlag;
+        ctx.resumeOffset = resumeOffset;
         
         curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 128 * 1024L);
         curl_easy_setopt(curl, CURLOPT_URL, currentUrl.c_str());
+        if (resumeOffset > 0) {
+            curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, static_cast<curl_off_t>(resumeOffset));
+        }
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
@@ -95,10 +120,49 @@ bool processPortTask(const std::string& id, const std::string& url, const std::s
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
         
         CURLcode res = curl_easy_perform(curl);
+        long http_code = 0;
+        curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
         fclose(fp);
         curl_easy_cleanup(curl);
+
+        if (resumeOffset > 0 && (http_code == 416 || res == CURLE_HTTP_RETURNED_ERROR)) {
+            remove(zipPath.c_str());
+            fp = fopen(zipPath.c_str(), "wb");
+            if (fp) {
+                curl = curl_easy_init();
+                if (curl) {
+                    ctx.resumeOffset = 0;
+                    setvbuf(fp, ioBuf.data(), _IOFBF, ioBuf.size());
+                    curl_easy_setopt(curl, CURLOPT_BUFFERSIZE, 128 * 1024L);
+                    curl_easy_setopt(curl, CURLOPT_URL, currentUrl.c_str());
+                    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
+                    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+                    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+                    curl_easy_setopt(curl, CURLOPT_PROGRESSFUNCTION, progress_callback);
+                    curl_easy_setopt(curl, CURLOPT_PROGRESSDATA, &ctx);
+                    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+                    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+                    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+                    res = curl_easy_perform(curl);
+                    fclose(fp);
+                    curl_easy_cleanup(curl);
+                } else {
+                    fclose(fp);
+                }
+            }
+        }
         
-        if (res != CURLE_OK || cancelFlag.load()) { remove(zipPath.c_str()); progressCb(std::string("Error: descarga fallida (") + curl_easy_strerror(res) + ")",0,0); return false; }
+        if (cancelFlag.load()) {
+            remove(zipPath.c_str());
+            progressCb("Error: cancelado", 0, 0);
+            return false;
+        }
+
+        if (res != CURLE_OK) {
+            // Keep partial file for resume! Do not remove.
+            progressCb(std::string("Error: descarga interrumpida (") + curl_easy_strerror(res) + ")", 0, 0);
+            return false;
+        }
 
         // 2. EXTRACT THIS ZIP IMMEDIATELY
         progressCb(prefix + "Preparando extraccion...", 0, 100);

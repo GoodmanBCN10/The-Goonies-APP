@@ -121,7 +121,7 @@ private:
             }
             
             if (current) {
-                if (!isAwake) { appletSetMediaPlaybackState(true); isAwake = true; }
+                if (!isAwake) { appletSetMediaPlaybackState(true); appletSetAutoSleepDisabled(true); isAwake = true; }
                 current->status = Status::Downloading;
                 std::string targetDir = "sdmc:";
                 std::string err;
@@ -204,7 +204,7 @@ private:
                     current->error = err;
                 }
             } else {
-                if (isAwake) { appletSetMediaPlaybackState(false); isAwake = false; }
+                if (isAwake) { appletSetMediaPlaybackState(false); appletSetAutoSleepDisabled(false); isAwake = false; }
                 std::this_thread::sleep_for(std::chrono::milliseconds(500));
             }
         }

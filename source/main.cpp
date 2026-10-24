@@ -66,7 +66,6 @@ bool sync_time_ntp() {
                     uint32_t seconds = (msg[40] << 24) | (msg[41] << 16) | (msg[42] << 8) | msg[43];
                     uint64_t unix_time = seconds - 2208988800ULL;
                     timeSetCurrentTime(TimeType_UserSystemClock, unix_time);
-                    timeSetCurrentTime(TimeType_NetworkSystemClock, unix_time);
                     success = true;
                 }
             }

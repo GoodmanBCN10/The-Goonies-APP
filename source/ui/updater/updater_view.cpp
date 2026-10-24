@@ -252,6 +252,7 @@ void UpdaterView::PerformUpdate() {
         std::string temp_zip = "sdmc:/goonies_update.zip";
         
         appletSetMediaPlaybackState(true);
+        appletSetAutoSleepDisabled(true);
         
         CURL* curl = curl_easy_init();
         if (curl) {
@@ -281,14 +282,17 @@ void UpdaterView::PerformUpdate() {
                     std::string err_msg = "Error 3 - URL len: " + std::to_string(download_url.length());
                     brls::sync([this, err_msg]() { status_label->setText(err_msg); });
                     appletSetMediaPlaybackState(false);
+        appletSetAutoSleepDisabled(false);
                     return;
                 }
             } else {
                 appletSetMediaPlaybackState(false);
+        appletSetAutoSleepDisabled(false);
                 return;
             }
         } else {
             appletSetMediaPlaybackState(false);
+        appletSetAutoSleepDisabled(false);
             return;
         }
         
@@ -368,6 +372,7 @@ void UpdaterView::PerformUpdate() {
         }
 
         appletSetMediaPlaybackState(false);
+        appletSetAutoSleepDisabled(false);
 
         if (current_mode == UpdateMode::Firmware) {
             brls::sync([this]() { status_label->setText(t("Instalando firmware con Daybreak...", "Installing firmware...", "Instalando firmware...")); });
