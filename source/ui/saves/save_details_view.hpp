@@ -7,7 +7,7 @@
 #include "app/installed_title_service.hpp"
 #include "app/game_metadata_service.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class SaveDetailsView : public brls::Box {
 public:
@@ -25,4 +25,4 @@ private:
     brls::Label* statusLabel_ = nullptr;
 };
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

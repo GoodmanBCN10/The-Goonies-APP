@@ -1,6 +1,6 @@
 #include "ui/catalog/batch_install.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 void BatchInstallDataSource::didSelectRowAt(brls::RecyclerFrame*,
                                             brls::IndexPath index) {
@@ -11,4 +11,4 @@ void BatchInstallDataSource::didSelectRowAt(brls::RecyclerFrame*,
         owner_->togglePrepared(row);
 }
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

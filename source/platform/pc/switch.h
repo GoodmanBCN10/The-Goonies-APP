@@ -3,7 +3,7 @@
 /* PC stand-in for libnx <switch.h> — desktop/golden builds only.
  *
  * This header is picked up instead of the real libnx header when the build
- * adds -Isrc/platform/pc (see PIPENSX_GOLDEN in CMakeLists.txt). It provides
+ * adds -Isrc/platform/pc (see THEGOONIES_GOLDEN in CMakeLists.txt). It provides
  * the minimal surface consumed by src/ui and src/app so the UI compiles
  * unmodified off-console:
  *   - ui/common/ui_helpers.hpp: applet type/main loop, console, pad input

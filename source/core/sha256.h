@@ -1,5 +1,5 @@
-#ifndef PIPENSX_SHA256_H
-#define PIPENSX_SHA256_H
+#ifndef THEGOONIES_SHA256_H
+#define THEGOONIES_SHA256_H
 
 #include <stddef.h>
 #include <stdint.h>

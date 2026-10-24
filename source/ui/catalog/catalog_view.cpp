@@ -1,6 +1,6 @@
 #include "ui/catalog/catalog_view.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 brls::RecyclerCell* CatalogDataSource::cellForRow(
     brls::RecyclerFrame* recycler, brls::IndexPath index) {
@@ -65,4 +65,4 @@ void CatalogDataSource::didSelectRowAt(brls::RecyclerFrame*,
         owner_->openSearchKeyboard();
 }
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

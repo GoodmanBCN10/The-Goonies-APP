@@ -40,7 +40,7 @@ ROMFS		:=	romfs
 APP_TITLE	:=	The Goonies App
 APP_AUTHOR	:=	GoodmanBCN
 APP_VERSION	:=	v2.1.22
-DEFINES		:=	-DPIPENSX_VERSION=\"$(APP_VERSION)\"
+DEFINES		:=	-DTHEGOONIES_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE

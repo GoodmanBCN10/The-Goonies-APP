@@ -879,11 +879,11 @@ static void *upnp_worker(void *arg) {
             int r1 = UPNP_AddPortMapping(t->upnp_urls.controlURL,
                 t->upnp_data.first.servicetype,
                 t->upnp_port_str, t->upnp_port_str,
-                t->upnp_lanaddr, "pipensx", "TCP", NULL, "0");
+                t->upnp_lanaddr, "The Goonies APP", "TCP", NULL, "0");
             int r2 = UPNP_AddPortMapping(t->upnp_urls.controlURL,
                 t->upnp_data.first.servicetype,
                 t->upnp_port_str, t->upnp_port_str,
-                t->upnp_lanaddr, "pipensx", "UDP", NULL, "0");
+                t->upnp_lanaddr, "The Goonies APP", "UDP", NULL, "0");
             t->upnp_mapped = (r1 == UPNPCOMMAND_SUCCESS || r2 == UPNPCOMMAND_SUCCESS);
             log_msg("[upnp] port %u: TCP=%s UDP=%s\n", (unsigned)t->listen_port,
                     r1 == UPNPCOMMAND_SUCCESS ? "ok" : "fail",

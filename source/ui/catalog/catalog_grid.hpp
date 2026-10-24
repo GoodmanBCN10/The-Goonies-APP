@@ -13,7 +13,7 @@
 #include "ui/common/ui_helpers.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 // ---------------------------------------------------------------------------
 // UI_PLAN F2 — eShop-style catalog: cover-art grid + horizontal shelves.
@@ -574,4 +574,4 @@ private:
     HeroCard* hero_;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

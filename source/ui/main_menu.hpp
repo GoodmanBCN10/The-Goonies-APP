@@ -13,19 +13,19 @@ namespace goonies::ui {
 
 class MainMenu : public brls::Box {
 public:
-    MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* catalog,
-             pipensx::GameMetadataService* metadata,
-             pipensx::InstalledTitleService* installed, pipensx::AppSettings* settings,
-             pipensx::HomebrewService* homebrew, pipensx::UpdateService* updater);
+    MainMenu(goonies::DownloadManager* manager, goonies::CatalogService* catalog,
+             goonies::GameMetadataService* metadata,
+             goonies::InstalledTitleService* installed, goonies::AppSettings* settings,
+             goonies::HomebrewService* homebrew, goonies::UpdateService* updater);
 
 private:
-    pipensx::DownloadManager* manager_;
-    pipensx::CatalogService* catalog_;
-    pipensx::GameMetadataService* metadata_;
-    pipensx::InstalledTitleService* installed_;
-    pipensx::AppSettings* settings_;
-    pipensx::HomebrewService* homebrew_;
-    pipensx::UpdateService* updater_;
+    goonies::DownloadManager* manager_;
+    goonies::CatalogService* catalog_;
+    goonies::GameMetadataService* metadata_;
+    goonies::InstalledTitleService* installed_;
+    goonies::AppSettings* settings_;
+    goonies::HomebrewService* homebrew_;
+    goonies::UpdateService* updater_;
 
     brls::Button* createMenuButton(const std::string& title, std::function<void()> onClick);
 };

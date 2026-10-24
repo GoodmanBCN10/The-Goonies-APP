@@ -2,7 +2,7 @@
 #include "save_details_view.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 SavesView::SavesView(InstalledTitleService* installedService, GameMetadataService* metadata)
     : brls::Box(brls::Axis::COLUMN), installedService_(installedService), metadata_(metadata) {
@@ -64,4 +64,4 @@ SavesView::SavesView(InstalledTitleService* installedService, GameMetadataServic
     });
 }
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

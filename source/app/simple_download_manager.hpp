@@ -43,9 +43,9 @@ struct DLTask {
 
 class SimpleDownloadManager {
 public:
-    pipensx::AppSettings* settings() { return settings_; }
+    goonies::AppSettings* settings() { return settings_; }
     
-    SimpleDownloadManager(pipensx::AppSettings* settings = nullptr) : settings_(settings) {
+    SimpleDownloadManager(goonies::AppSettings* settings = nullptr) : settings_(settings) {
         worker_ = nx::thread(&SimpleDownloadManager::processQueue, this);
     }
     
@@ -134,7 +134,7 @@ private:
                     current->progress = 0;
                     current->total = 0;
                     
-                    bool ok = pipensx::CatalogService::downloadAndExtractZip(
+                    bool ok = goonies::CatalogService::downloadAndExtractZip(
                         current->urls[i], 
                         current->id, 
                         targetDir, 
@@ -214,7 +214,7 @@ private:
     std::mutex mutex_;
     nx::thread worker_;
     std::atomic<bool> running_{true};
-    pipensx::AppSettings* settings_;
+    goonies::AppSettings* settings_;
 };
 
 } // namespace goonies

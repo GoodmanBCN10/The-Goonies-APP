@@ -10,7 +10,7 @@
 #include "ui/common/ui_helpers.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 // UI_PLAN O8 — download details as eShop-style cards (Progress / Speed /
 // Network) with on-screen Pause/Verify/Remove buttons instead of blind X/Y
@@ -200,7 +200,7 @@ private:
         }
         frame_->setTitle(task->name);
         status_->setText(std::string("Status: ") +
-                         pipensx::statusName(task->status));
+                         goonies::statusName(task->status));
         status_->setTextColor(statusColor(task->status));
 
         bool installing = task->status == DownloadStatus::Installing ||
@@ -339,7 +339,7 @@ private:
 
     void openRemoveDialog() {
         auto* dialog = new brls::Dialog(
-            "Remove this download from pipensx?");
+            "Remove this download from The Goonies APP?");
         dialog->addButton("Keep downloaded data", [this] {
             std::string error;
             if (!manager_->remove(taskId_, false, error))
@@ -388,4 +388,4 @@ private:
     bool hasInstallSample_ = false;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

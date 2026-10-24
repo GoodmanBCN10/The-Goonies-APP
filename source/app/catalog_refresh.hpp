@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace pipensx {
+namespace goonies {
 
 struct CatalogRefreshBatch {
     bool catalogOk = false;
@@ -28,4 +28,4 @@ CatalogRefreshAdoption adoptCatalogRefresh(
     CatalogService& catalog, GameMetadataService& metadata,
     CatalogRefreshBatch batch);
 
-} // namespace pipensx
+} // namespace goonies

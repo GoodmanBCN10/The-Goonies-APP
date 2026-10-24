@@ -11,7 +11,7 @@ namespace goonies::ui {
 
 class PortsGridView : public brls::Box {
 public:
-    PortsGridView(pipensx::CatalogService* catalog, goonies::SimpleDownloadManager* manager, pipensx::GameMetadataService* metadata, const std::string& categoryFilter) 
+    PortsGridView(goonies::CatalogService* catalog, goonies::SimpleDownloadManager* manager, goonies::GameMetadataService* metadata, const std::string& categoryFilter) 
         : brls::Box(brls::Axis::COLUMN) 
     {
         this->setGrow(1.0f);

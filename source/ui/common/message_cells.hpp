@@ -7,7 +7,7 @@
 
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class MessageCell : public brls::Box {
 public:
@@ -125,4 +125,4 @@ private:
     brls::Label* label_;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

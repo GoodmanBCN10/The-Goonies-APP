@@ -3,7 +3,7 @@
 #include "app/homebrew_service.hpp"
 #include <functional>
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class HomebrewGridItem : public brls::Box {
 public:
@@ -76,4 +76,4 @@ private:
     ForwardersDataSource* dataSource_;
 };
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

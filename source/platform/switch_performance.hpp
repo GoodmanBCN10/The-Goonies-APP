@@ -1,6 +1,6 @@
 #pragma once
 
-namespace pipensx {
+namespace goonies {
 
 class SwitchPerformanceController {
 public:
@@ -23,4 +23,4 @@ private:
     bool previousAutoSleepDisabled_ = false;
 };
 
-} // namespace pipensx
+} // namespace goonies

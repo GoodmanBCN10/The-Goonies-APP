@@ -123,7 +123,7 @@ dht_engine_t *dht_engine_create(uint16_t listen_port, const uint8_t node_id[20])
         return NULL;
     }
 
-    if (dht_init(e->fd, -1, node_id, (const uint8_t*)"PIPENSX1") < 0) {
+    if (dht_init(e->fd, -1, node_id, (const uint8_t*)"GOONIES1") < 0) {
         net_close(e->fd);
         free(e);
         atomic_flag_clear(&g_engine_busy);

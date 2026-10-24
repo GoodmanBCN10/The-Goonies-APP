@@ -22,7 +22,7 @@ extern "C" {
 #include <thread>
 #include <unistd.h>
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
 int trackerCancelled(void* user) {
@@ -896,4 +896,4 @@ bool MagnetResolver::resolveToFile(const std::string& uri,
     return true;
 }
 
-} // namespace pipensx
+} // namespace goonies

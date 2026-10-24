@@ -69,7 +69,7 @@ MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
     
     activeInstallBox_->addView(activeTopRow);
     
-    progressBar_ = new pipensx::ui::ProgressBar();
+    progressBar_ = new goonies::ui::ProgressBar();
     progressBar_->setHeight(15);
     progressBar_->setProgress(0.0f);
     progressBar_->setMarginBottom(10);

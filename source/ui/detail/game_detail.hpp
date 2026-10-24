@@ -24,7 +24,7 @@
 #include "ui/downloads/details_activity.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 // ---------------------------------------------------------------------------
 // Install/status button (O5)
@@ -533,23 +533,23 @@ private:
             std::string err;
             MagnetResolver resolver;
             auto progress = [this, alive, last = std::string()](
-                                const pipensx::MagnetProgress& p) mutable {
+                                const goonies::MagnetProgress& p) mutable {
                 std::string text;
                 switch (p.stage) {
-                    case pipensx::MagnetProgress::Stage::FindingPeers:
+                    case goonies::MagnetProgress::Stage::FindingPeers:
                         text = "Finding peers...";
                         break;
-                    case pipensx::MagnetProgress::Stage::Connecting:
+                    case goonies::MagnetProgress::Stage::Connecting:
                         text = "Contacting peer " +
                                std::to_string(p.peerIndex) + "/" +
                                std::to_string(p.peerCount) + "...";
                         break;
-                    case pipensx::MagnetProgress::Stage::FetchingMetadata:
+                    case goonies::MagnetProgress::Stage::FetchingMetadata:
                         text = "Fetching metadata " +
                                std::to_string(p.completedPieces) + "/" +
                                std::to_string(p.totalPieces) + "...";
                         break;
-                    case pipensx::MagnetProgress::Stage::Validating:
+                    case goonies::MagnetProgress::Stage::Validating:
                         text = "Validating...";
                         break;
                 }
@@ -600,7 +600,7 @@ private:
 
     void finishImport(const std::string& path, bool forcePicker,
                       std::vector<uint8_t> initialPeers) {
-        pipensx::TorrentPreview preview;
+        goonies::TorrentPreview preview;
         std::string error;
         if (!DownloadManager::previewTorrent(path, preview, error)) {
             diagnostic_error("catalog", "preview", "error=%s",
@@ -703,7 +703,7 @@ private:
     }
 
     void openSelection(const std::string& path,
-                       pipensx::TorrentPreview preview,
+                       goonies::TorrentPreview preview,
                        std::vector<uint8_t> initialPeers) {
         StreamSelection selection = settings_
             ? settings_->get().streamSelection : StreamSelection::AllFiles;
@@ -735,5 +735,5 @@ private:
     bool busy_ = false;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui
 

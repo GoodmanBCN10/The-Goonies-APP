@@ -10,7 +10,7 @@
 #include "ui/common/ui_helpers.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class DownloadCell : public brls::Box {
 public:
@@ -71,4 +71,4 @@ private:
     brls::Label* meta_;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

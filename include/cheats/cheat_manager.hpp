@@ -6,7 +6,7 @@
 #include <memory>
 #include <functional>
 
-namespace pipensx::cheats {
+namespace goonies::cheats {
 
 struct CheatEntry {
     std::string name;
@@ -50,4 +50,4 @@ private:
     bool writeCheatFile(const std::string& filepath, const std::vector<CheatEntry>& cheats);
 };
 
-} // namespace pipensx::cheats
+} // namespace goonies::cheats

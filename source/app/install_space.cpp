@@ -11,7 +11,7 @@
 #include <sys/statvfs.h>
 #endif
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
 void addBytes(uint64_t& target, uint64_t value, bool& overflow) {
@@ -147,4 +147,4 @@ StorageSpaceSnapshot queryStorageSpace(const std::string& path) {
     return result;
 }
 
-} // namespace pipensx
+} // namespace goonies

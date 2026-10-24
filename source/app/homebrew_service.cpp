@@ -6,7 +6,7 @@
 #include <sys/stat.h>
 #include <strings.h>
 
-namespace pipensx {
+namespace goonies {
 
 void normalizePath(std::string& path) {
     for (char &c : path) {
@@ -155,4 +155,4 @@ std::vector<HomebrewTitle> HomebrewService::titles() const {
     return titles_;
 }
 
-} // namespace pipensx
+} // namespace goonies

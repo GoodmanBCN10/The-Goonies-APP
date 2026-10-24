@@ -7,7 +7,7 @@
 #include "app_settings.hpp"
 #include "download_manager.hpp"
 
-namespace pipensx {
+namespace goonies {
 
 enum class SpaceEstimateCertainty {
     Exact,
@@ -60,4 +60,4 @@ InstallSpaceCheck assessInstallSpace(
 
 StorageSpaceSnapshot queryStorageSpace(const std::string& path);
 
-} // namespace pipensx
+} // namespace goonies

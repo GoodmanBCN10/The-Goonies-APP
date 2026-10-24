@@ -45,7 +45,7 @@ static std::string getParentPath(const std::string& path) {
     return "";
 }
 
-namespace pipensx::cheats {
+namespace goonies::cheats {
 
 void CheatManager::init() {
     std::string masterPath = getMasterCheatsPath();
@@ -244,4 +244,4 @@ bool CheatManager::saveAtmosphereCheats(uint64_t titleId, const std::string& bui
     return writeCheatFile(amsPath, cheats);
 }
 
-} // namespace pipensx::cheats
+} // namespace goonies::cheats

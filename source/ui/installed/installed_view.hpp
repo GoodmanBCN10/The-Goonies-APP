@@ -20,7 +20,7 @@
 #include <algorithm>
 #include <algorithm>
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class InstalledCell : public brls::RecyclerCell {
 public:
@@ -583,4 +583,4 @@ private:
     bool showUpdatesOnly_ = false;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

@@ -7,7 +7,7 @@
 #include <vector>
 #include <nx_thread.hpp>
 
-namespace pipensx {
+namespace goonies {
 
 struct MagnetSpec {
     uint8_t infoHash[20]{};
@@ -53,4 +53,4 @@ public:
                        const std::vector<uint8_t>* presetInfo = nullptr) const;
 };
 
-} // namespace pipensx
+} // namespace goonies

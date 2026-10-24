@@ -9,7 +9,7 @@
 #include "ui/common/ui_helpers.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class SpeedGraphView : public brls::View {
 public:
@@ -108,4 +108,4 @@ private:
     std::vector<uint64_t> install_;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

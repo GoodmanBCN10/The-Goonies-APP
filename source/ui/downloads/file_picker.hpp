@@ -12,7 +12,7 @@
 #include "app/download_manager.hpp"
 #include "ui/common/ui_helpers.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 struct FileEntry {
     std::string name;
@@ -83,7 +83,7 @@ public:
             return;
         }
 
-        pipensx::TorrentPreview preview;
+        goonies::TorrentPreview preview;
         std::string error;
         if (!DownloadManager::previewTorrent(entry.path, preview, error)) {
             brls::Application::notify(error);
@@ -208,4 +208,4 @@ private:
     friend class FileDataSource;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

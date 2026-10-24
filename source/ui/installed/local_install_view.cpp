@@ -63,7 +63,7 @@ LocalInstallView::LocalInstallView(const std::vector<std::string>& queue) : brls
 
     progressContainer_->addView(activeTopRow);
 
-    progressBar_ = new pipensx::ui::ProgressBar();
+    progressBar_ = new goonies::ui::ProgressBar();
     progressBar_->setProgress(0.0f);
     progressContainer_->addView(progressBar_);
 

@@ -8,7 +8,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-namespace pipensx::saves {
+namespace goonies::saves {
 
 static bool CopyDirectoryRecursive(const std::string& src, const std::string& dst, std::string& errorOut) {
     std::error_code ec;
@@ -210,4 +210,4 @@ bool SaveManager::DeleteBackup(uint64_t titleId, const std::string& gameName, st
     return true;
 }
 
-} // namespace pipensx::saves
+} // namespace goonies::saves

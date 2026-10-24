@@ -10,7 +10,7 @@
 #include "ui/common/async_image.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 // ---------------------------------------------------------------------------
 // Fullscreen screenshot pager (O6)
@@ -112,4 +112,4 @@ class ScreenshotViewerActivity : public brls::Activity {
     brls::Label* counter_ = nullptr;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

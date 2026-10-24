@@ -10,7 +10,7 @@
 #include "install_space.hpp"
 #include "magnet_resolver.hpp"
 
-namespace pipensx {
+namespace goonies {
 
 struct PreparedCatalogInstall {
     CatalogEntry entry;
@@ -86,4 +86,4 @@ private:
     ResolveTorrent resolver_;
 };
 
-} // namespace pipensx
+} // namespace goonies

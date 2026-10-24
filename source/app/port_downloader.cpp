@@ -16,7 +16,7 @@
 #include "../yati/yati.hpp"
 #include "installer/installer_core.hpp"
 
-namespace pipensx {
+namespace goonies {
 
 struct PortDownloadContext {
     std::function<void(const std::string&, uint64_t, uint64_t)> progressCb;
@@ -299,7 +299,7 @@ bool processPortTask(const std::string& id, const std::string& url, const std::s
     return true;
 }
 
-} // namespace pipensx
+} // namespace goonies
 
 
 

@@ -21,11 +21,11 @@ extern "C" {
 #include "core/sha256.h"
 }
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
-#ifndef PIPENSX_VERSION
-#define PIPENSX_VERSION "0.0.0"
+#ifndef THEGOONIES_VERSION
+#define THEGOONIES_VERSION "0.0.0"
 #endif
 
 constexpr const char* kLatestReleaseUrl =
@@ -109,7 +109,7 @@ bool configureCurl(CURL* curl, const std::string& url, TransferKind kind,
         return false;
     }
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "pipensx/" PIPENSX_VERSION);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "TheGooniesAPP/" THEGOONIES_VERSION);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
@@ -434,7 +434,7 @@ UpdateCheckResult UpdateService::check() const {
         return result;
     result.ok = true;
     result.updateAvailable = isNewerVersion(result.release.version,
-                                            PIPENSX_VERSION);
+                                            THEGOONIES_VERSION);
     return result;
 }
 
@@ -531,4 +531,4 @@ void UpdateService::installAsync(ReleaseInfo release, InstallCallback callback) 
     });
 }
 
-} // namespace pipensx
+} // namespace goonies

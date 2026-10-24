@@ -14,7 +14,7 @@ extern "C" {
 
 #include "../install/install_backend.hpp"
 
-namespace pipensx {
+namespace goonies {
 
 enum class DownloadStatus {
     Queued,
@@ -202,5 +202,5 @@ private:
 
 const char* statusName(DownloadStatus status);
 
-} // namespace pipensx
+} // namespace goonies
 

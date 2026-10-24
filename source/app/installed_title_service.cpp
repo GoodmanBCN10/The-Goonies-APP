@@ -18,7 +18,7 @@ extern "C" {
 #include <unistd.h>
 #include "../app_state.hpp"
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
 std::string resultText(const char* operation, Result result) {
@@ -266,4 +266,4 @@ bool InstalledTitleService::deleteTitle(uint64_t applicationId) {
     return false;
 }
 
-} // namespace pipensx
+} // namespace goonies

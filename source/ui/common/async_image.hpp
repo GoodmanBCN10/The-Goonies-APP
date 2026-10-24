@@ -9,7 +9,7 @@
 
 #include "app/game_metadata_service.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 struct ImageRequestState {
     std::atomic<uint64_t> generation {0};
@@ -110,4 +110,4 @@ inline void setArtworkUrl(AsyncRgbaImage* image, GameMetadataService* service,
     loadImageInto(image, service, url, state, generation);
 }
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

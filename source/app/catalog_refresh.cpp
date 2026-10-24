@@ -1,6 +1,6 @@
 #include "catalog_refresh.hpp"
 
-namespace pipensx {
+namespace goonies {
 
 CatalogRefreshAdoption adoptCatalogRefresh(
     CatalogService& catalog, GameMetadataService& metadata,
@@ -18,4 +18,4 @@ CatalogRefreshAdoption adoptCatalogRefresh(
     return result;
 }
 
-} // namespace pipensx
+} // namespace goonies

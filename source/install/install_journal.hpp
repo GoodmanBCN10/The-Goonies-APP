@@ -6,7 +6,7 @@
 
 #include "package_stream.hpp"
 
-namespace pipensx::install {
+namespace goonies::install {
 
 // Persistent snapshot of an interrupted streaming install
 // (IMPROVEMENT_PLAN F-B). Serialized as one bencoded dict: a version tag,
@@ -34,4 +34,4 @@ bool loadInstallJournal(const std::string& path, InstallJournal& journal);
 // True when the journal no longer exists (including "never existed").
 bool removeInstallJournal(const std::string& path);
 
-} // namespace pipensx::install
+} // namespace goonies::install

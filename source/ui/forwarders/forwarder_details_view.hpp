@@ -2,7 +2,7 @@
 #include <borealis.hpp>
 #include "app/homebrew_service.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class ForwarderDetailsView : public brls::Box {
 public:
@@ -23,4 +23,4 @@ private:
     void CreateForwarder();
 };
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

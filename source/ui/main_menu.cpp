@@ -121,7 +121,7 @@ namespace goonies {
 
     class ManageMenuView : public brls::Box {
     public:
-        ManageMenuView(pipensx::InstalledTitleService* installed, pipensx::DownloadManager* manager, pipensx::GameMetadataService* metadata)
+        ManageMenuView(goonies::InstalledTitleService* installed, goonies::DownloadManager* manager, goonies::GameMetadataService* metadata)
             : brls::Box(brls::Axis::COLUMN) {
             this->setAlignItems(brls::AlignItems::STRETCH);
             
@@ -147,12 +147,12 @@ namespace goonies {
 
             buttonsBox->addView(createMenuButton(t("Juegos Instalados", "Installed Games", "Jogos instalados"), [installed, manager, metadata]() {
                 brls::Application::pushActivity(new brls::Activity(
-                    new pipensx::ui::InstalledView(installed, manager, metadata, nullptr, nullptr)));
+                    new goonies::ui::InstalledView(installed, manager, metadata, nullptr, nullptr)));
             }));
 
             buttonsBox->addView(createMenuButton(t("Partidas Guardadas", "Save Data", "Jogos salvos"), [installed, metadata]() {
                 brls::Application::pushActivity(new brls::Activity(
-                    new pipensx::ui::SavesView(installed, metadata)));
+                    new goonies::ui::SavesView(installed, metadata)));
             }));
 
             centerBox->addView(buttonsBox);
@@ -207,11 +207,11 @@ namespace goonies {
                 auto* dialog = new brls::Dialog(t("Â¿Vincular todas las cuentas offline?\nEsto crearÃ¡ una vinculaciÃ³n falsa. Si tenÃ­as una cuenta NNID vinculada, se sobrescribirÃ¡.", "Link all accounts offline?\nThis will create a dummy link. If you had a linked NNID account, it will be overwritten.", "Vincular todas as contas off-line?\nIsso criarÃ¡ um link falso. Se vocÃª tivesse uma conta NNID vinculada, ela serÃ¡ substituÃ­da."));
                 dialog->addButton(t("Vincular", "Link", "Link"), [] {
                     brls::Application::notify(t("Vinculando cuentas...", "Linking accounts...", "Vinculando contas..."));
-                    std::string err = pipensx::linkuser::linkAccounts();
+                    std::string err = goonies::linkuser::linkAccounts();
                     if (err.empty()) {
                         auto* rebootDialog = new brls::Dialog(t("Â¡Cuentas vinculadas con Ã©xito! Para aplicar los cambios y evitar que la consola crasheÃ©, es obligatorio reiniciar.", "Accounts linked successfully! To apply changes and prevent a system crash, you must reboot.", "Contas vinculadas com sucesso! Para aplicar as alteraÃ§Ãµes e evitar que o console trave, Ã© necessÃ¡ria uma reinicializaÃ§Ã£o."));
                         rebootDialog->addButton(t("Reiniciar", "Reboot", "ReinÃ­cio"), [] {
-                            pipensx::linkuser::g_shouldReboot = true;
+                            goonies::linkuser::g_shouldReboot = true;
                             brls::Application::quit();
                         });
                         rebootDialog->open();
@@ -233,11 +233,11 @@ namespace goonies {
                 auto* dialog = new brls::Dialog(t("Â¿Desvincular todas las cuentas?\nSe eliminarÃ¡ la vinculaciÃ³n local y online de tus perfiles.", "Unlink all accounts?\nThis will remove local and online links from your profiles.", "Desvincular todas as contas?\nA vinculaÃ§Ã£o local e on-line dos seus perfis serÃ¡ removida."));
                 dialog->addButton(t("Desvincular", "Unlink", "Desvincular"), [] {
                     brls::Application::notify(t("Desvinculando cuentas...", "Unlinking accounts...", "Desvinculando contas..."));
-                    std::string err = pipensx::linkuser::unlinkAccounts();
+                    std::string err = goonies::linkuser::unlinkAccounts();
                     if (err.empty()) {
                         auto* rebootDialog = new brls::Dialog(t("Â¡Cuentas desvinculadas con Ã©xito! Para aplicar los cambios y evitar que la consola crasheÃ©, es obligatorio reiniciar.", "Accounts unlinked successfully! To apply changes and prevent a system crash, you must reboot.", "Contas desvinculadas com sucesso! Para aplicar as alteraÃ§Ãµes e evitar que o console trave, Ã© necessÃ¡ria uma reinicializaÃ§Ã£o."));
                         rebootDialog->addButton(t("Reiniciar", "Reboot", "ReinÃ­cio"), [] {
-                            pipensx::linkuser::g_shouldReboot = true;
+                            goonies::linkuser::g_shouldReboot = true;
                             brls::Application::quit();
                         });
                         rebootDialog->open();
@@ -256,7 +256,7 @@ namespace goonies {
 
             // 3. Restaurar copia
             buttonsBox->addView(createMenuButton(t("Restaurar copia de seguridad", "Restore backup", "Restaurar cÃ³pia de seguranÃ§a"), []() {
-                std::vector<std::string> backups = pipensx::linkuser::getBackups();
+                std::vector<std::string> backups = goonies::linkuser::getBackups();
                 if (backups.empty()) {
                     auto* dialog = new brls::Dialog(t("No se encontraron copias de seguridad en la SD.", "No backups found on the SD card.", "Nenhum backup encontrado no SD."));
                     dialog->addButton(t("Aceptar", "OK", "Aceitar"), [] {});
@@ -271,11 +271,11 @@ namespace goonies {
                 ));
                 dialog->addButton(t("Restaurar", "Restore", "Restaurar"), [latest_backup] {
                     brls::Application::notify(t("Restaurando copia...", "Restoring backup...", "Restaurando cÃ³pia..."));
-                    std::string err = pipensx::linkuser::restoreBackup(latest_backup);
+                    std::string err = goonies::linkuser::restoreBackup(latest_backup);
                     if (err.empty()) {
                         auto* rebootDialog = new brls::Dialog(t("Â¡Copia restaurada con Ã©xito! Para aplicar los cambios y evitar que la consola crasheÃ©, es obligatorio reiniciar.", "Backup restored successfully! To apply changes and prevent a system crash, you must reboot.", "CÃ³pia restaurada com sucesso! Para aplicar as alteraÃ§Ãµes e evitar que o console trave, Ã© necessÃ¡ria uma reinicializaÃ§Ã£o."));
                         rebootDialog->addButton(t("Reiniciar", "Reboot", "ReinÃ­cio"), [] {
-                            pipensx::linkuser::g_shouldReboot = true;
+                            goonies::linkuser::g_shouldReboot = true;
                             brls::Application::quit();
                         });
                         rebootDialog->open();
@@ -317,10 +317,10 @@ namespace goonies {
 
 namespace goonies::ui {
 
-MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* catalog,
-                   pipensx::GameMetadataService* metadata,
-                   pipensx::InstalledTitleService* installed, pipensx::AppSettings* settings,
-                   pipensx::HomebrewService* homebrew, pipensx::UpdateService* updater)
+MainMenu::MainMenu(goonies::DownloadManager* manager, goonies::CatalogService* catalog,
+                   goonies::GameMetadataService* metadata,
+                   goonies::InstalledTitleService* installed, goonies::AppSettings* settings,
+                   goonies::HomebrewService* homebrew, goonies::UpdateService* updater)
     : brls::Box(brls::Axis::COLUMN), manager_(manager), catalog_(catalog),
       metadata_(metadata), installed_(installed), settings_(settings), homebrew_(homebrew), updater_(updater) {
     
@@ -354,7 +354,7 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
     brls::Label* titleLabel = new brls::Label();
     titleLabel->setText("THE GOONIES APP");
     titleLabel->setFontSize(64);
-    titleLabel->setTextColor(pipensx::ui::theme::accent()); // Yellow/gold accent
+    titleLabel->setTextColor(goonies::ui::theme::accent()); // Yellow/gold accent
     titleBox->addView(titleLabel);
 
     brls::Label* subtitleLabel = new brls::Label();
@@ -378,11 +378,11 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
     auto m_catalog = catalog_;
     auto m_installed = installed_;
     buttonsBox->addView(createMenuButton(t("Descarga de Juegos", "Download Games", "Baixar jogos"), [this, m_manager, m_catalog, m_metadata, m_installed, m_settings]() {
-        brls::Application::pushActivity(new brls::Activity(new pipensx::ui::CatalogView(
+        brls::Application::pushActivity(new brls::Activity(new goonies::ui::CatalogView(
             m_manager, m_catalog, m_metadata, m_installed, m_settings, [m_manager, m_metadata, m_settings]() {
                 brls::Logger::info("User clicked Cola Descargas");
                 brls::Logger::info("Allocating MainView...");
-                auto* mainView = new pipensx::ui::MainView(m_manager, m_metadata, m_settings);
+                auto* mainView = new goonies::ui::MainView(m_manager, m_metadata, m_settings);
                 brls::Logger::info("MainView allocated. Pushing Activity...");
                 brls::Application::pushActivity(new brls::Activity(mainView));
                 brls::Logger::info("Activity pushed successfully.");
@@ -397,7 +397,7 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
     // 3. Juegos Instalados / Partidas Guardadas
     buttonsBox->addView(createMenuButton(t("Juegos Instalados / Partidas Guardadas", "Installed Games / Save Data", "Jogos instalados/jogos salvos"), [this, m_installed, m_manager, m_metadata, m_catalog, m_settings]() {
         brls::Application::pushActivity(new brls::Activity(
-            new pipensx::ui::InstalledView(m_installed, m_manager, m_metadata, m_catalog, m_settings)));
+            new goonies::ui::InstalledView(m_installed, m_manager, m_metadata, m_catalog, m_settings)));
     }));
 
     // 4. LinkGoonies - Vincular y desvincular cuentas online
@@ -409,7 +409,7 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
     auto m_homebrew = homebrew_;
     buttonsBox->addView(createMenuButton(t("Crear acceso directo", "Create Forwarder", "Criar atalho"), [this, m_homebrew]() {
         brls::Application::pushActivity(new brls::Activity(
-            new pipensx::ui::ForwardersView("sdmc:/switch/")));
+            new goonies::ui::ForwardersView("sdmc:/switch/")));
     }));
 
     centerBox->addView(buttonsBox);
@@ -436,7 +436,7 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
     // Register Actions
     this->registerAction(t("Ajustes", "Settings", "ConfiguraÃ§Ãµes"), brls::BUTTON_BACK, [this](brls::View* view) {
         brls::Application::pushActivity(new brls::Activity(
-            new pipensx::ui::SettingsView(settings_, manager_, catalog_, metadata_, installed_, updater_)));
+            new goonies::ui::SettingsView(settings_, manager_, catalog_, metadata_, installed_, updater_)));
         return true;
     }, false); // false = show in hint bar
     
@@ -472,7 +472,7 @@ MainMenu::MainMenu(pipensx::DownloadManager* manager, pipensx::CatalogService* c
 
     // Auto-update check at startup
     if (updater_) {
-        updater_->checkAsync([this](pipensx::UpdateCheckResult result) {
+        updater_->checkAsync([this](goonies::UpdateCheckResult result) {
             if (!result.ok) {
                 brls::sync([this, error = result.error]() {
                     brls::Application::notify("Update error: " + error);

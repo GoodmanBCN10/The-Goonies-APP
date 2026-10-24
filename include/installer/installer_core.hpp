@@ -58,8 +58,8 @@ private:
     bool m_is_xci = false;
 
     // NSP/NSZ Engine
-    std::unique_ptr<pipensx::install::InstallBackend> m_backend;
-    std::unique_ptr<pipensx::install::PackageStream> m_stream;
+    std::unique_ptr<goonies::install::InstallBackend> m_backend;
+    std::unique_ptr<goonies::install::PackageStream> m_stream;
 
     // XCI/XCZ Engine (Yati)
     std::queue<std::vector<u8>> m_data_queue; // empty vector = EOF

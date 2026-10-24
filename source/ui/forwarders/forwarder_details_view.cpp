@@ -3,7 +3,7 @@
 #include "ui/theme.hpp"
 #include "owo.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 ForwarderDetailsView::ForwarderDetailsView(const HomebrewTitle& title)
     : brls::Box(brls::Axis::COLUMN), title_(title) {
@@ -119,4 +119,4 @@ void ForwarderDetailsView::CreateForwarder() {
     }
 }
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

@@ -54,8 +54,8 @@ bool Core::StartInstallation(const std::string& filename) {
     
     m_is_xci = false;
     
-    pipensx::install::InstallStorageTarget target = pipensx::install::InstallStorageTarget::SdCard;
-    m_backend = pipensx::install::createInstallBackend("sdmc:/switch/thegoonies", target);
+    goonies::install::InstallStorageTarget target = goonies::install::InstallStorageTarget::SdCard;
+    m_backend = goonies::install::createInstallBackend("sdmc:/switch/thegoonies", target);
     
     if (!m_backend->beginPackage("local_install", filename)) {
         m_error = true;
@@ -65,7 +65,7 @@ bool Core::StartInstallation(const std::string& filename) {
         return false;
     }
 
-    pipensx::install::PackageCallbacks cb;
+    goonies::install::PackageCallbacks cb;
     cb.beginFile = [this](const std::string& name, uint64_t size) {
         return m_backend->beginFile(name, size);
     };
@@ -83,7 +83,7 @@ bool Core::StartInstallation(const std::string& filename) {
     };
 
     bool compressed = (filename.size() >= 4 && filename.substr(filename.size() - 4) == ".nsz");
-    m_stream = std::make_unique<pipensx::install::PackageStream>(compressed, cb, "local_install");
+    m_stream = std::make_unique<goonies::install::PackageStream>(compressed, cb, "local_install");
 
     SafePrintf("Installer Core: Queued NSP for %s\n", filename.c_str());
     return true;

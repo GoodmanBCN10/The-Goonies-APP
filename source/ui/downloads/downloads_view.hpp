@@ -17,7 +17,7 @@
 #include "ui/downloads/file_picker.hpp"
 #include "ui/common/progress_bar.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class PanelBox : public brls::Box {
 public:
@@ -243,7 +243,7 @@ private:
     void resumeAll() { for (const auto& t : manager_->snapshot()) if (t.status == DownloadStatus::Paused || t.status == DownloadStatus::Error) manager_->resume(t.id); startRefreshing(true); }
     void pauseResumeAll() { if (hasPausableTask(manager_->snapshot())) pauseAll(); else resumeAll(); }
     void clearCompleted() { std::vector<std::string> ids; for (const auto& t : manager_->snapshot()) if (t.status == DownloadStatus::Completed || t.status == DownloadStatus::Installed) ids.push_back(t.id); if (ids.empty()) { brls::Application::notify("No hay descargas finalizadas para limpiar."); return; } for (const auto& id : ids) { std::string err; manager_->remove(id, true, err); } startRefreshing(true); }
-    std::string summaryText(const std::vector<DownloadTask>& tasks) const { if (tasks.empty()) return ""; const pipensx::QueueSummary s = pipensx::summarizeQueue(tasks, now_ms()); std::string t = "Descargando: " + std::to_string(s.downloading) + " | En cola: " + std::to_string(s.queued) + " | Instalando: " + std::to_string(s.installing); if (s.paused) t += " | Pausadas: " + std::to_string(s.paused); if (s.errors) t += " | Errores: " + std::to_string(s.errors); const uint64_t speed = s.downloadSpeedBps + s.installSpeedBps; if (speed) t += " | Velocidad: " + formatSpeed(speed); if (s.etaSeconds) t += " | ETA: " + formatEta(s.totalRemainingBytes, speed); return t; }
+    std::string summaryText(const std::vector<DownloadTask>& tasks) const { if (tasks.empty()) return ""; const goonies::QueueSummary s = goonies::summarizeQueue(tasks, now_ms()); std::string t = "Descargando: " + std::to_string(s.downloading) + " | En cola: " + std::to_string(s.queued) + " | Instalando: " + std::to_string(s.installing); if (s.paused) t += " | Pausadas: " + std::to_string(s.paused); if (s.errors) t += " | Errores: " + std::to_string(s.errors); const uint64_t speed = s.downloadSpeedBps + s.installSpeedBps; if (speed) t += " | Velocidad: " + formatSpeed(speed); if (s.etaSeconds) t += " | ETA: " + formatEta(s.totalRemainingBytes, speed); return t; }
     bool containsFocus(brls::View* focused) const {
         for (brls::View* view = focused; view; view = view->getParent())
             if (view == this) return true;
@@ -429,4 +429,4 @@ private:
     bool fastRefresh_ = false;
 };
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

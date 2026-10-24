@@ -13,7 +13,7 @@ namespace goonies::ui {
 
 class PortCell : public brls::Box {
 public:
-    PortCell(pipensx::CatalogEntry entry, goonies::SimpleDownloadManager* manager, pipensx::GameMetadataService* metadata_service) 
+    PortCell(goonies::CatalogEntry entry, goonies::SimpleDownloadManager* manager, goonies::GameMetadataService* metadata_service) 
         : brls::Box(brls::Axis::COLUMN), entry_(std::move(entry)), manager_(manager), metadata_(metadata_service)
     {
         this->setFocusable(true);
@@ -23,7 +23,7 @@ public:
         this->setJustifyContent(brls::JustifyContent::CENTER);
         this->setBackgroundColor(brls::Application::getTheme().getColor("brls/sidebar/background"));
 
-        image_ = new pipensx::ui::AsyncRgbaImage();
+        image_ = new goonies::ui::AsyncRgbaImage();
         image_->setWidth(120);
         image_->setHeight(120);
         image_->setMarginBottom(15);
@@ -31,7 +31,7 @@ public:
         image_->setScalingType(brls::ImageScalingType::FIT);
         
         if (!entry_.posterUrl.empty()) {
-            pipensx::ui::loadImageInto(image_, metadata_, entry_.posterUrl);
+            goonies::ui::loadImageInto(image_, metadata_, entry_.posterUrl);
         } else {
             image_->setImageFromRes("icon_explorer.png");
         }
@@ -95,10 +95,10 @@ private:
         dialog->open();
     }
 
-    pipensx::CatalogEntry entry_;
+    goonies::CatalogEntry entry_;
     goonies::SimpleDownloadManager* manager_;
-    pipensx::GameMetadataService* metadata_;
-    pipensx::ui::AsyncRgbaImage* image_;
+    goonies::GameMetadataService* metadata_;
+    goonies::ui::AsyncRgbaImage* image_;
 };
 
 } // namespace goonies::ui

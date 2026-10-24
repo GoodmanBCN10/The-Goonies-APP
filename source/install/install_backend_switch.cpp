@@ -24,7 +24,7 @@ extern "C" {
 #include <fstream>
 #include <borealis/extern/nlohmann/json.hpp>
 
-namespace pipensx::install {
+namespace goonies::install {
 
 inline void SaveOriginalFirmware(uint64_t titleId, uint32_t version) {
     if (version == 0) return;
@@ -1392,6 +1392,6 @@ std::unique_ptr<InstallBackend> createInstallBackend(
     return std::make_unique<SwitchInstallBackend>(workingRoot, target);
 }
 
-} // namespace pipensx::install
+} // namespace goonies::install
 
 #endif

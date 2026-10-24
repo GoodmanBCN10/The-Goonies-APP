@@ -11,7 +11,7 @@
 extern "C" char* fake_heap_end;
 #endif
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
 constexpr uint64_t MiB = 1024 * 1024;
@@ -178,4 +178,4 @@ StreamRamBudget detectStreamRamBudget(uint64_t pieceLengthBytes) {
     return selectStreamRamBudget(memory, pieceLengthBytes);
 }
 
-} // namespace pipensx
+} // namespace goonies

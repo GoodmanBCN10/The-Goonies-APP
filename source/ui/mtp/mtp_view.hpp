@@ -23,7 +23,7 @@ public:
     brls::Box* activeInstallBox_;
     brls::Label* activeFilenameLabel_;
     brls::Label* speedLabel_;
-    pipensx::ui::ProgressBar* progressBar_;
+    goonies::ui::ProgressBar* progressBar_;
     brls::Label* progressTextLabel_;
 
     brls::Box* historyBox_;

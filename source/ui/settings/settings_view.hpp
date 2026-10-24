@@ -30,7 +30,7 @@
 #include "ui/settings/rd_auth_dialog.hpp"
 #include "../updater/updater_view.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class SettingsView : public brls::Box {
 public:
@@ -107,7 +107,7 @@ public:
 
         // App Version
         auto* appVerLabel = new brls::Label();
-        appVerLabel->setText(std::string(t("Versión de la App: ", "App Version: ", "Versão do aplicativo:")) + PIPENSX_VERSION);
+        appVerLabel->setText(std::string(t("Versión de la App: ", "App Version: ", "Versão do aplicativo:")) + THEGOONIES_VERSION);
         appVerLabel->setFontSize(20);
         appVerLabel->setMarginTop(8);
         appVerLabel->setMarginBottom(12);
@@ -393,7 +393,7 @@ private:
 
     void confirmInstallUpdate(ReleaseInfo release) {
         auto* dialog = new brls::Dialog(
-            "pipensx " + release.version + " is available. Install it now?");
+            "The Goonies APP " + release.version + " is available. Install it now?");
         dialog->addButton("Install and restart", [this, release = std::move(release)] {
             installUpdate(release);
         });
@@ -456,7 +456,7 @@ private:
                 }
 #endif
                 brls::Application::notify(
-                    "Update downloaded. pipensx will restart to install it.");
+                    "Update downloaded. The Goonies APP will restart to install it.");
                 brls::Application::quit();
             });
         });
@@ -501,19 +501,19 @@ private:
             "version=%s hos=%u.%u.%u operation_mode=%d telemetry=%d "
             "catalog=%zu metadata=%zu installed=%zu active=%zu errors=%zu "
             "sd_free_bytes=%llu",
-            PIPENSX_VERSION, HOSVER_MAJOR(hos), HOSVER_MINOR(hos),
+            THEGOONIES_VERSION, HOSVER_MAJOR(hos), HOSVER_MINOR(hos),
             HOSVER_MICRO(hos), static_cast<int>(appletGetOperationMode()),
             telemetry_enabled(), catalog_->entries().size(), metadata_->size(),
             installed_->titles().size(), active, errors,
             static_cast<unsigned long long>(freeBytes));
-        brls::Application::notify("Diagnostic snapshot written to pipensx.log.");
+        brls::Application::notify("Diagnostic snapshot written to goonies.log.");
     }
 
     void confirmClearLog() {
-        auto* dialog = new brls::Dialog("Clear pipensx.log now?");
+        auto* dialog = new brls::Dialog("Clear goonies.log now?");
         dialog->addButton("Clear log", [] {
             if (!clearApplicationLog())
-                brls::Application::notify("Unable to clear pipensx.log.");
+                brls::Application::notify("Unable to clear goonies.log.");
             else
                 brls::Application::notify("Log cleared.");
         });
@@ -538,7 +538,7 @@ private:
     }
 
     void confirmReset() {
-        auto* dialog = new brls::Dialog("Reset all pipensx settings?");
+        auto* dialog = new brls::Dialog("Reset all Goonies settings?");
         dialog->addButton("Reset settings", [this] {
             std::string error;
             if (!settings_->reset(error)) {
@@ -573,4 +573,4 @@ private:
     bool updateInFlight_ = false;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

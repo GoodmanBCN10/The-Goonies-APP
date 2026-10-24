@@ -20,7 +20,7 @@
 
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 enum class NavIconType { Catalog, Downloads, Installed, Settings, About };
 
@@ -215,4 +215,4 @@ private:
     std::vector<brls::View*> labels_;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

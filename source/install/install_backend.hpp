@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-namespace pipensx::install {
+namespace goonies::install {
 
 // Where committed content lands. SD is the historical default; NAND
 // (BuiltInUser / eMMC) is the write-ceiling experiment from PERF_PLAN 7.4 —
@@ -71,4 +71,4 @@ std::unique_ptr<InstallBackend> createInstallBackend(
     const std::string& workingRoot,
     InstallStorageTarget target = InstallStorageTarget::SdCard);
 
-} // namespace pipensx::install
+} // namespace goonies::install

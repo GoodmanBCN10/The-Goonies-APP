@@ -6,7 +6,7 @@
 #include <sstream>
 #include <unordered_set>
 
-namespace pipensx {
+namespace goonies {
 
 std::vector<std::string> mergeScreenshotUrls(
     const GameMetadata* metadata, const CatalogEntry& entry, size_t limit) {
@@ -128,4 +128,4 @@ bool catalogEntryHasMatchedTitle(const GameMetadata* metadata) {
     return metadata && looksLikeTitleId(metadata->titleId);
 }
 
-} // namespace pipensx
+} // namespace goonies

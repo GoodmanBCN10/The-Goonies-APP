@@ -76,13 +76,13 @@ bool sync_time_ntp() {
     return success;
 }
 
-using pipensx::AppSettings;
-using pipensx::CatalogService;
-using pipensx::DownloadManager;
-using pipensx::GameMetadataService;
-using pipensx::InstalledTitleService;
-using pipensx::HomebrewService;
-using namespace pipensx::ui;
+using goonies::AppSettings;
+using goonies::CatalogService;
+using goonies::DownloadManager;
+using goonies::GameMetadataService;
+using goonies::InstalledTitleService;
+using goonies::HomebrewService;
+using namespace goonies::ui;
 
 int main(int argc, char* argv[]) {
     std::string nroPath = "sdmc:/switch/thegoonies/TheGooniesInstaller.nro";
@@ -158,7 +158,7 @@ int main(int argc, char* argv[]) {
         unlink(tempUpdatePath.c_str());
     }
     
-    pipensx::UpdateService updater(nroPath);
+    goonies::UpdateService updater(nroPath);
     updater.discardStaged();
 
     // Check if launched in Library Applet Mode (Album mode without Title Override)
@@ -316,7 +316,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        pipensx::ui::theme::registerColors();
+        goonies::ui::theme::registerColors();
 
         brls::Application::createWindow("The Goonies APP");
         brls::Application::setGlobalQuit(true);
@@ -438,13 +438,13 @@ int main(int argc, char* argv[]) {
 
             // Fetch latest from the internet so the catalog is ready to go
             writeLog("Descargando catalogo online...");
-            std::vector<pipensx::CatalogEntry> parsedCatalog;
+            std::vector<goonies::CatalogEntry> parsedCatalog;
             if (catalog_service->fetchLatest(parsedCatalog, err)) {
                 catalog_service->adopt(std::move(parsedCatalog));
             }
             if (g_appExiting) return;
 
-            pipensx::MetadataSnapshot parsedMeta;
+            goonies::MetadataSnapshot parsedMeta;
             if (metadata_service->fetchLatest(parsedMeta, err)) {
                 metadata_service->adopt(std::move(parsedMeta));
             }
@@ -497,7 +497,7 @@ int main(int argc, char* argv[]) {
         // Run the main loop
         int frameCount = 0;
         bool wasBgmEnabled = settings.get().enableBackgroundMusic;
-        std::unordered_map<std::string, pipensx::DownloadStatus> lastTaskStatus;
+        std::unordered_map<std::string, goonies::DownloadStatus> lastTaskStatus;
         uint64_t lastDownloadScanMs = 0;
 
         while (brls::Application::mainLoop()) {
@@ -510,7 +510,7 @@ int main(int argc, char* argv[]) {
             if (frameNowMs - lastDownloadScanMs >= 1000) {
                 lastDownloadScanMs = frameNowMs;
                 std::unordered_set<std::string> seen;
-                for (const pipensx::DownloadTask& task : download_manager->snapshot()) {
+                for (const goonies::DownloadTask& task : download_manager->snapshot()) {
                     seen.insert(task.id);
                     auto previous = lastTaskStatus.find(task.id);
                     if (previous == lastTaskStatus.end()) {
@@ -520,11 +520,11 @@ int main(int argc, char* argv[]) {
                     if (previous->second == task.status)
                         continue;
                     lastTaskStatus[task.id] = task.status;
-                    if (task.status == pipensx::DownloadStatus::Completed)
+                    if (task.status == goonies::DownloadStatus::Completed)
                         brls::Application::notify("Descarga completada: " + task.name);
-                    else if (task.status == pipensx::DownloadStatus::Installed)
+                    else if (task.status == goonies::DownloadStatus::Installed)
                         brls::Application::notify("Instalacion finalizada: " + task.name);
-                    else if (task.status == pipensx::DownloadStatus::Error)
+                    else if (task.status == goonies::DownloadStatus::Error)
                         brls::Application::notify("Error en la descarga: " + task.name);
                 }
                 for (auto it = lastTaskStatus.begin(); it != lastTaskStatus.end();) {
@@ -633,8 +633,8 @@ int main(int argc, char* argv[]) {
     romfsExit();
 
     // Exit
-    if (pipensx::linkuser::g_shouldReboot) {
-        pipensx::linkuser::rebootSystem();
+    if (goonies::linkuser::g_shouldReboot) {
+        goonies::linkuser::rebootSystem();
     }
     return EXIT_SUCCESS;
 }

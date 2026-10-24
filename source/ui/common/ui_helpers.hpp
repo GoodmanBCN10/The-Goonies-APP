@@ -25,12 +25,12 @@ inline const char* t(const char* es, const char* en, const char* pt = nullptr) {
     return brls::Platform::APP_LOCALE_DEFAULT == brls::LOCALE_EN_US ? en : es;
 }
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
-inline pipensx::install::InstallStorageTarget installTargetFor(InstallLocation value) {
+inline goonies::install::InstallStorageTarget installTargetFor(InstallLocation value) {
     return value == InstallLocation::SystemMemory
-               ? pipensx::install::InstallStorageTarget::Nand
-               : pipensx::install::InstallStorageTarget::SdCard;
+               ? goonies::install::InstallStorageTarget::Nand
+               : goonies::install::InstallStorageTarget::SdCard;
 }
 
 inline FILE* gBorealisLog = nullptr;
@@ -77,10 +77,10 @@ inline bool isApplicationMode() {
 
 inline void showApplicationModeRequired() {
     consoleInit(nullptr);
-    std::printf("\npipensx requires application mode.\n\n");
+    std::printf("\nThe Goonies APP requires application mode.\n\n");
     std::printf("Press HOME for exit.\n");
     std::printf("After that, hold R while launching a game.\n");
-    std::printf("Keep holding R until hbmenu opens, then start pipensx.\n\n");
+    std::printf("Keep holding R until hbmenu opens, then start The Goonies APP.\n\n");
     std::printf("Album applet mode does not provide enough memory and\n");
     std::printf("network sessions for the GUI torrent client.\n\n");
     consoleUpdate(nullptr);
@@ -188,11 +188,11 @@ inline std::string taskStatusText(const DownloadTask& task) {
                 return withPercent(task.error, percentOf(progressOf(task)));
             }
         case DownloadStatus::Verifying:
-            return withPercent(pipensx::statusName(task.status),
+            return withPercent(goonies::statusName(task.status),
                                percentOf(progressOf(task)));
         case DownloadStatus::Installing:
         case DownloadStatus::Committing:
-            return withPercent(pipensx::statusName(task.status),
+            return withPercent(goonies::statusName(task.status),
                                percentOf(installProgressOf(task)));
         case DownloadStatus::Paused: {
             int pct = percentOf(progressOf(task));
@@ -208,9 +208,9 @@ inline std::string taskStatusText(const DownloadTask& task) {
             return "Installed";
         case DownloadStatus::Queued:
         case DownloadStatus::Removing:
-            return pipensx::statusName(task.status);
+            return goonies::statusName(task.status);
     }
-    return pipensx::statusName(task.status);
+    return goonies::statusName(task.status);
 }
 inline std::string placeholderLetter(const std::string& title) {
     size_t offset = 0;
@@ -227,4 +227,4 @@ inline std::string placeholderLetter(const std::string& title) {
         letter[0] = static_cast<char>(std::toupper(lead));
     return letter;
 }
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

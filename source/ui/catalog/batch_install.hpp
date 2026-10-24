@@ -18,7 +18,7 @@
 #include "ui/common/ui_helpers.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class BatchInstallActivity;
 
@@ -69,7 +69,7 @@ public:
         meta_->setText(meta);
     }
 
-    void setFailure(const pipensx::BatchItemFailure& failure) {
+    void setFailure(const goonies::BatchItemFailure& failure) {
         mark_->setText("!");
         mark_->setTextColor(theme::error());
         title_->setText(failure.entry.title);
@@ -283,19 +283,19 @@ private:
         StreamSelection selection = selection_;
         brls::async([this, alive, cancelled, installer, entries, selection] {
             auto progress = [this, alive](
-                                const pipensx::BatchPrepareProgress& value) {
+                                const goonies::BatchPrepareProgress& value) {
                 std::string stage;
                 switch (value.magnet.stage) {
-                    case pipensx::MagnetProgress::Stage::FindingPeers:
+                    case goonies::MagnetProgress::Stage::FindingPeers:
                         stage = "Finding peers";
                         break;
-                    case pipensx::MagnetProgress::Stage::Connecting:
+                    case goonies::MagnetProgress::Stage::Connecting:
                         stage = "Connecting";
                         break;
-                    case pipensx::MagnetProgress::Stage::FetchingMetadata:
+                    case goonies::MagnetProgress::Stage::FetchingMetadata:
                         stage = "Fetching metadata";
                         break;
-                    case pipensx::MagnetProgress::Stage::Validating:
+                    case goonies::MagnetProgress::Stage::Validating:
                         stage = "Validating";
                         break;
                 }
@@ -353,8 +353,8 @@ private:
         for (const PreparedCatalogInstall& item : prepared_->items())
             selected += item.selected ? 1 : 0;
         const auto estimate = prepared_->selectedSpace();
-        storage_ = pipensx::queryStorageSpace(manager_->rootPath());
-        const auto check = pipensx::assessInstallSpace(estimate, storage_);
+        storage_ = goonies::queryStorageSpace(manager_->rootPath());
+        const auto check = goonies::assessInstallSpace(estimate, storage_);
 
         std::string text = std::to_string(selected) + " ready selected";
         if (!prepared_->failures().empty())
@@ -392,15 +392,15 @@ private:
             brls::Application::notify("Select at least one ready game.");
             return;
         }
-        storage_ = pipensx::queryStorageSpace(manager_->rootPath());
-        const auto check = pipensx::assessInstallSpace(estimate, storage_);
+        storage_ = goonies::queryStorageSpace(manager_->rootPath());
+        const auto check = goonies::assessInstallSpace(estimate, storage_);
         if (check.status == InstallSpaceCheckStatus::Insufficient) {
             refreshSummary();
             brls::Application::notify("Not enough free space on SD.");
             return;
         }
 
-        pipensx::BatchEnqueueResult result =
+        goonies::BatchEnqueueResult result =
             installer_->enqueue(*prepared_, *manager_);
         for (const std::string& hash : result.queuedInfoHashes)
             remaining_.erase(catalogLower(hash));
@@ -418,13 +418,13 @@ private:
         if (!remaining_.empty())
             message += "\nUnfinished games stay selected for retry.";
         size_t shown = 0;
-        for (const pipensx::BatchItemFailure& failure :
+        for (const goonies::BatchItemFailure& failure :
              prepared_->failures()) {
             if (shown++ == 3)
                 break;
             message += "\n" + failure.entry.title + ": " + failure.error;
         }
-        for (const pipensx::BatchItemFailure& failure : result.failures) {
+        for (const goonies::BatchItemFailure& failure : result.failures) {
             if (shown++ == 3)
                 break;
             message += "\n" + failure.entry.title + ": " + failure.error;
@@ -465,4 +465,4 @@ private:
     bool enqueueFinished_ = false;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

@@ -3,7 +3,7 @@
 #include <qrcodegen.hpp>
 #include "RealDebridProvider.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class QRCodeView : public brls::View {
 private:

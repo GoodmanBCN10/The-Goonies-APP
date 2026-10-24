@@ -4,7 +4,7 @@
 #include <string>
 #include <atomic>
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class CheatDownloaderView : public brls::Box {
 public:
@@ -26,4 +26,4 @@ private:
     std::shared_ptr<bool> isAlive;
 };
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

@@ -10,7 +10,7 @@ extern "C" {
 }
 #endif
 
-namespace pipensx {
+namespace goonies {
 
 bool CleanupHelper::cleanSystem(std::string& errorOut, u64& outFreedBytes, int& outDeletedTickets) {
     outFreedBytes = 0;
@@ -115,4 +115,4 @@ bool CleanupHelper::cleanSystem(std::string& errorOut, u64& outFreedBytes, int& 
     return true;
 }
 
-} // namespace pipensx
+} // namespace goonies

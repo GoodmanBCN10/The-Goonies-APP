@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-namespace pipensx::linkuser {
+namespace goonies::linkuser {
 
 // Starts link user process, returns error message or empty string on success
 std::string linkAccounts();
@@ -22,4 +22,4 @@ void rebootSystem();
 
 extern bool g_shouldReboot;
 
-} // namespace pipensx::linkuser
+} // namespace goonies::linkuser

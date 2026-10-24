@@ -30,9 +30,9 @@ target_include_directories(borealis PRIVATE
 # ZSTD
 file(GLOB ZSTD_COMMON_SOURCES CONFIGURE_DEPENDS vendor/zstd/lib/common/*.c)
 file(GLOB ZSTD_DECOMPRESS_SOURCES CONFIGURE_DEPENDS vendor/zstd/lib/decompress/*.c)
-add_library(pipensx_zstd STATIC ${ZSTD_COMMON_SOURCES} ${ZSTD_DECOMPRESS_SOURCES})
-target_include_directories(pipensx_zstd PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/zstd/lib)
-target_compile_definitions(pipensx_zstd PRIVATE ZSTD_MULTITHREAD=0 ZSTD_DISABLE_ASM)
+add_library(thegoonies_zstd STATIC ${ZSTD_COMMON_SOURCES} ${ZSTD_DECOMPRESS_SOURCES})
+target_include_directories(thegoonies_zstd PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/vendor/zstd/lib)
+target_compile_definitions(thegoonies_zstd PRIVATE ZSTD_MULTITHREAD=0 ZSTD_DISABLE_ASM)
 
 # Goonies sources
 file(GLOB_RECURSE GOONIES_SOURCES
@@ -121,7 +121,7 @@ target_link_directories(TheGooniesInstaller PRIVATE
 
 target_link_libraries(TheGooniesInstaller PRIVATE
     borealis
-    pipensx_zstd
+    thegoonies_zstd
     usbhsfs
     ntfs-3g
     lwext4
@@ -150,7 +150,7 @@ if(NOT DEFINED APP_VERSION)
 endif()
 
 target_compile_definitions(TheGooniesInstaller PRIVATE
-    PIPENSX_VERSION="${APP_VERSION}"
+    THEGOONIES_VERSION="${APP_VERSION}"
 )
 
 target_link_options(TheGooniesInstaller PRIVATE -Wl,--gc-sections -s)

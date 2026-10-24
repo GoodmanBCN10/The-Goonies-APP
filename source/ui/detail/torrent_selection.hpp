@@ -12,7 +12,7 @@
 #include "ui/common/ui_helpers.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 struct TorrentSelectionEntry {
     std::string path;
@@ -165,7 +165,7 @@ public:
     friend class TorrentSelectionDataSource;
 
     TorrentSelectionActivity(DownloadManager* manager, std::string path,
-                             pipensx::TorrentPreview preview,
+                             goonies::TorrentPreview preview,
                              TransferMode preferred,
                              StreamSelection initialSelection,
                              std::vector<uint8_t> initialPeers = {})
@@ -317,11 +317,11 @@ private:
         const TransferMode mode = installs > 0
             ? TransferMode::StreamInstall
             : TransferMode::DownloadOnly;
-        const auto estimate = pipensx::estimateInstallSpace(preview_, actions,
+        const auto estimate = goonies::estimateInstallSpace(preview_, actions,
                                                             mode);
         const StorageSpaceSnapshot storage =
-            pipensx::queryStorageSpace(manager_->rootPath());
-        const auto check = pipensx::assessInstallSpace(estimate, storage);
+            goonies::queryStorageSpace(manager_->rootPath());
+        const auto check = goonies::assessInstallSpace(estimate, storage);
         std::string text = std::to_string(selected) + " / " +
                            std::to_string(preview_.files.size()) +
                            " files   " + formatBytes(estimate.requiredBytes);
@@ -364,11 +364,11 @@ private:
         TransferMode mode = dataSource_->installCount() > 0
             ? TransferMode::StreamInstall
             : TransferMode::DownloadOnly;
-        const auto estimate = pipensx::estimateInstallSpace(preview_, actions,
+        const auto estimate = goonies::estimateInstallSpace(preview_, actions,
                                                             mode);
         const StorageSpaceSnapshot storage =
-            pipensx::queryStorageSpace(manager_->rootPath());
-        if (pipensx::assessInstallSpace(estimate, storage).status ==
+            goonies::queryStorageSpace(manager_->rootPath());
+        if (goonies::assessInstallSpace(estimate, storage).status ==
             InstallSpaceCheckStatus::Insufficient) {
             refreshSummary();
             brls::Application::notify("Not enough free space on SD.");
@@ -391,7 +391,7 @@ private:
 
     DownloadManager* manager_;
     std::string path_;
-    pipensx::TorrentPreview preview_;
+    goonies::TorrentPreview preview_;
     TransferMode preferred_;
     StreamSelection initialSelection_;
     std::vector<uint8_t> initialPeers_;
@@ -406,4 +406,4 @@ private:
     bool finished_ = false;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

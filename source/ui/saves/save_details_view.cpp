@@ -4,7 +4,7 @@
 #include "ui/common/ui_helpers.hpp"
 #include "ui/common/async_image.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 SaveDetailsView::SaveDetailsView(const InstalledTitle& title, GameMetadataService* metadata)
     : brls::Box(brls::Axis::COLUMN), title_(title), metadata_(metadata) {
@@ -159,4 +159,4 @@ void SaveDetailsView::UpdateButtons() {
     }
 }
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

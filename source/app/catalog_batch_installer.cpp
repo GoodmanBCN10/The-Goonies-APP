@@ -7,7 +7,7 @@
 #include <utility>
 #include <unistd.h>
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
 std::atomic<uint64_t> gBatchTempSerial{1};
@@ -188,5 +188,5 @@ BatchEnqueueResult CatalogBatchInstaller::enqueue(
     return result;
 }
 
-} // namespace pipensx
+} // namespace goonies
 

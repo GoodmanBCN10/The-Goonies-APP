@@ -20,7 +20,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
 constexpr size_t kMaxCatalogBytes = 32 * 1024 * 1024;
@@ -170,7 +170,7 @@ bool httpGet(const std::string& url, const std::string& etagIn, std::string& eta
     }
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "pipensx/0.4");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "TheGooniesAPP/2.1.22");
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 45L);
@@ -698,4 +698,4 @@ void CatalogService::adopt(std::vector<CatalogEntry> parsed) {
             sourceLabel_.c_str());
 }
 
-} // namespace pipensx
+} // namespace goonies

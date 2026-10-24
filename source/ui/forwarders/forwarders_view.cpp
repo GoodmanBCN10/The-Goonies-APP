@@ -5,7 +5,7 @@
 #include "ui/common/message_cells.hpp"
 #include <algorithm>
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 // --- HomebrewGridItem ---
 HomebrewGridItem::HomebrewGridItem() : brls::Box(brls::Axis::COLUMN) {
@@ -227,7 +227,7 @@ int ForwardersDataSource::numberOfRows(brls::RecyclerFrame* recycler, int sectio
 brls::RecyclerCell* ForwardersDataSource::cellForRow(brls::RecyclerFrame* recycler, brls::IndexPath index) {
     if (titles_.empty()) {
         auto* cell = recycler->dequeueReusableCell("Message");
-        dynamic_cast<pipensx::ui::TextMessageCell*>(cell)->setMessage("No se han encontrado aplicaciones homebrew.");
+        dynamic_cast<goonies::ui::TextMessageCell*>(cell)->setMessage("No se han encontrado aplicaciones homebrew.");
         return cell;
     }
 
@@ -319,4 +319,4 @@ ForwardersView::ForwardersView(const std::string& currentPath)
     });
 }
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

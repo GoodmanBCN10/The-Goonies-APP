@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace pipensx {
+namespace goonies {
 
 namespace {
 
@@ -116,4 +116,4 @@ void RequestGate::update(size_t bufferedBytes, uint32_t producerOrdinal,
         edgeOffset_, saturatingAdd(producerOffset, pieceLengthBytes_));
 }
 
-} // namespace pipensx
+} // namespace goonies

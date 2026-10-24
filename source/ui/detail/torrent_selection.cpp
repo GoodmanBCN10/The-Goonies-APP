@@ -1,6 +1,6 @@
 #include "ui/detail/torrent_selection.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 brls::RecyclerCell* TorrentSelectionDataSource::cellForRow(
     brls::RecyclerFrame* recycler, brls::IndexPath index) {
@@ -40,4 +40,4 @@ void TorrentSelectionDataSource::cycleRow(int row) {
     }
 }
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

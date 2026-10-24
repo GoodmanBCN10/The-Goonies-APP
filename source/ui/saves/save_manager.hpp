@@ -3,7 +3,7 @@
 #include <string>
 #include <switch.h>
 
-namespace pipensx::saves {
+namespace goonies::saves {
 
 class SaveManager {
 public:
@@ -17,4 +17,4 @@ private:
     static std::string CleanGameName(const std::string& name);
 };
 
-} // namespace pipensx::saves
+} // namespace goonies::saves

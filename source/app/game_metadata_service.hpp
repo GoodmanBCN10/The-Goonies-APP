@@ -13,7 +13,7 @@
 #include <vector>
 #include <nx_thread.hpp>
 
-namespace pipensx {
+namespace goonies {
 
 struct GameMetadata {
     std::string infoHash;
@@ -67,7 +67,7 @@ public:
                                      "romfs:/catalog/game_metadata_index.json",
                                  std::string manifestUrl =
                                      "https://github.com/i3sey/"
-                                     "pipensx-metadata/releases/latest/"
+                                     "The-Goonies-APP/releases/latest/"
                                      "download/manifest.json",
                                  MetadataFetcher metadataFetcher = {});
     ~GameMetadataService();
@@ -153,4 +153,4 @@ private:
     MetadataManifest manifest_;
 };
 
-} // namespace pipensx
+} // namespace goonies

@@ -20,7 +20,7 @@
 #include <cheats/cheat_manager.hpp>
 #include <borealis/views/cells/cell_bool.hpp>
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 inline uint32_t GetOriginalFirmware(uint64_t titleId) {
     std::string path = "sdmc:/switch/thegoonies/firmwares.json";
@@ -244,7 +244,7 @@ public:
         launchBtn->setHeight(50);
         launchBtn->setMarginRight(10);
         launchBtn->registerClickAction([title](brls::View*) {
-            pipensx::InstalledTitleService::launchTitle(title.applicationId);
+            goonies::InstalledTitleService::launchTitle(title.applicationId);
             return true;
         });
 
@@ -255,7 +255,7 @@ public:
         deleteGameBtn->registerClickAction([this, title](brls::View*) {
             brls::Dialog* dialog = new brls::Dialog("¿Deseas eliminar el juego?");
             dialog->addButton("Si", [this, title]() {
-                pipensx::InstalledTitleService::deleteTitle(title.applicationId);
+                goonies::InstalledTitleService::deleteTitle(title.applicationId);
                 brls::Application::notify("Eliminado correctamente");
                 brls::Application::popActivity();
             });
@@ -563,4 +563,4 @@ public:
     }
 };
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

@@ -28,7 +28,7 @@ extern "C" {
 #include <borealis/extern/nanovg/stb_image.h>
 #pragma GCC diagnostic pop
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
 constexpr size_t kMaxIndexBytes = 24 * 1024 * 1024;
@@ -42,7 +42,7 @@ constexpr size_t kMaxImageCacheBytes = 96 * 1024 * 1024;
 constexpr uint64_t kImageRetryDelayMs = 30 * 1000;
 constexpr size_t kImageWorkerCount = 2;
 constexpr const char* kDefaultMetadataIndexUrl =
-    "https://github.com/i3sey/pipensx-metadata/releases/latest/download/"
+    "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/latest/download/"
     "game_metadata_index.json";
 
 #ifdef __SWITCH__
@@ -155,7 +155,7 @@ bool httpGetOnce(const std::string& url, size_t limit,
     HttpBuffer buffer;
     buffer.limit = limit;
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "pipensx/0.4");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "TheGooniesAPP/2.1.22");
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, followRedirects ? 1L : 0L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 8L);
     const bool relayRequest =
@@ -548,8 +548,8 @@ bool GameMetadataService::parseIndex(const std::string& json,
 
 bool GameMetadataService::isTrustedSource(const std::string& url) {
     static const char* const prefixes[] = {
-        "https://raw.githubusercontent.com/i3sey/pipensx-metadata/",
-        "https://github.com/i3sey/pipensx-metadata/releases/",
+        "https://raw.githubusercontent.com/GoodmanBCN10/The-Goonies-APP/",
+        "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/",
     };
     for (const char* prefix : prefixes)
         if (url.rfind(prefix, 0) == 0)
@@ -559,8 +559,8 @@ bool GameMetadataService::isTrustedSource(const std::string& url) {
 
 bool GameMetadataService::isTrustedRedirect(const std::string& url) {
     static const char* const prefixes[] = {
-        "https://raw.githubusercontent.com/i3sey/pipensx-metadata/",
-        "https://github.com/i3sey/pipensx-metadata/releases/",
+        "https://raw.githubusercontent.com/GoodmanBCN10/The-Goonies-APP/",
+        "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/",
         "https://release-assets.githubusercontent.com/",
         "https://objects.githubusercontent.com/",
     };
@@ -1188,4 +1188,4 @@ void GameMetadataService::imageWorkerMain() const {
     }
 }
 
-} // namespace pipensx
+} // namespace goonies

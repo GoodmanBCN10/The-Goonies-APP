@@ -4,7 +4,7 @@
 #include <vector>
 #include <switch.h>
 
-namespace pipensx {
+namespace goonies {
 
 struct HomebrewTitle {
     std::string path;
@@ -26,4 +26,4 @@ private:
     std::vector<HomebrewTitle> titles_;
 };
 
-} // namespace pipensx
+} // namespace goonies

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-namespace pipensx {
+namespace goonies {
 
 enum class CatalogFilter {
     All,
@@ -72,4 +72,4 @@ private:
     uint64_t generation_ = 0;
 };
 
-} // namespace pipensx
+} // namespace goonies

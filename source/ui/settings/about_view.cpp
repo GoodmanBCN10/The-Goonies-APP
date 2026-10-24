@@ -11,7 +11,7 @@
 #include "ui/common/ui_helpers.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 namespace {
 
@@ -158,9 +158,9 @@ AboutView::AboutView() : brls::Box(brls::Axis::COLUMN) {
     auto* summary = new brls::Box(brls::Axis::COLUMN);
     summary->setGrow(1);
     auto* title =
-        addLabel(summary, "pipensx", theme::kFontTitle, theme::textPrimary());
+        addLabel(summary, "The Goonies APP", theme::kFontTitle, theme::textPrimary());
     title->setMarginBottom(10);
-    auto* version = addLabel(summary, std::string(t("Versión ", "Version ", "Versão")) + PIPENSX_VERSION,
+    auto* version = addLabel(summary, std::string(t("Versión ", "Version ", "Versão")) + THEGOONIES_VERSION,
                              theme::kFontSmall, theme::accent());
     version->setMarginBottom(4);
     auto* build = addLabel(summary,
@@ -216,4 +216,4 @@ AboutView::AboutView() : brls::Box(brls::Axis::COLUMN) {
     addView(scroll);
 }
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

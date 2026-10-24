@@ -5,7 +5,7 @@
 #include <borealis.hpp>
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class ProgressBar : public brls::View {
 public:
@@ -36,4 +36,4 @@ private:
     float progress_ = 0;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

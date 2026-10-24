@@ -34,7 +34,7 @@ extern "C" {
 #include <thread>
 #include <unistd.h>
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
 bool hasPackageExtension(const std::string& path) {
@@ -454,7 +454,7 @@ public:
         // resume path restores it instead of regrowing from the minimum
         // (PERF_PLAN 7.3).
         if (!stalled &&
-            requestGate_.state() == pipensx::RequestGate::State::Free)
+            requestGate_.state() == goonies::RequestGate::State::Free)
             lookaheadHealthy_ = lookaheadWindow_;
         return lookaheadWindow_;
     }
@@ -463,7 +463,7 @@ public:
     // engine freezes its rate EMAs for the duration (PERF_PLAN 7.2).
     bool requestsCurtailed() const {
         std::lock_guard<std::mutex> lock(queueMutex_);
-        return requestGate_.state() != pipensx::RequestGate::State::Free;
+        return requestGate_.state() != goonies::RequestGate::State::Free;
     }
 
     std::string error() const {
@@ -586,7 +586,7 @@ public:
     // ceiling. Call whenever bufferedBytesLocked() changes and as a
     // periodic heartbeat so the token bucket refills during rx lulls.
     void updateRequestGateLocked(uint64_t now) {
-        using GateState = pipensx::RequestGate::State;
+        using GateState = goonies::RequestGate::State;
         requestGate_.update(bufferedBytesLocked(), producerOrdinal_,
                             producerOffset_, now);
         GateState state = requestGate_.state();
@@ -1009,7 +1009,7 @@ public:
             requestGate_.paused() ? 1 : 0,
             telemetryThrottleCount_,
             (unsigned long long)telemetryThrottledMs_,
-            requestGate_.state() == pipensx::RequestGate::State::Throttled
+            requestGate_.state() == goonies::RequestGate::State::Throttled
                 ? 1 : 0,
             (unsigned long long)requestGate_.drainBps(),
             (unsigned long long)telemetryProcessUs_,
@@ -1170,9 +1170,9 @@ public:
     uint32_t lookaheadStallEvents_ = 0;
     uint64_t lookaheadLastAdaptMs_ = 0;
     // Request gate state (PERF_PLAN 5.3 + 7.1); guarded by queueMutex_.
-    pipensx::RequestGate requestGate_;
-    pipensx::RequestGate::State requestGateState_ =
-        pipensx::RequestGate::State::Free;
+    goonies::RequestGate requestGate_;
+    goonies::RequestGate::State requestGateState_ =
+        goonies::RequestGate::State::Free;
     uint64_t requestGateStateSinceMs_ = 0;
     bool accepting_ = true;
     bool stopping_ = false;
@@ -2677,7 +2677,7 @@ QueueSummary summarizeQueue(const std::vector<DownloadTask>& tasks, uint64_t now
     return summary;
 }
 
-} // namespace pipensx
+} // namespace goonies
 
 
 

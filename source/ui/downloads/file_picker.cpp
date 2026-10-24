@@ -1,6 +1,6 @@
 #include "ui/downloads/file_picker.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 int FileDataSource::numberOfRows(brls::RecyclerFrame*, int) {
     return static_cast<int>(owner_->entries().size());
@@ -19,4 +19,4 @@ void FileDataSource::didSelectRowAt(brls::RecyclerFrame*,
     owner_->select(static_cast<size_t>(index.row));
 }
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

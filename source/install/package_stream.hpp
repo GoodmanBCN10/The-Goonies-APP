@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace pipensx::install {
+namespace goonies::install {
 
 struct PackageCallbacks {
     std::function<bool(const std::string&, uint64_t)> beginFile;
@@ -96,4 +96,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-} // namespace pipensx::install
+} // namespace goonies::install

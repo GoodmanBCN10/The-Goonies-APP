@@ -11,7 +11,7 @@
 #include "app/game_metadata_service.hpp"
 #include "ui/common/async_image.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 // ---------------------------------------------------------------------------
 // Shared catalog helpers (used by both the list and the detail page)
@@ -40,18 +40,18 @@ inline std::string classifyResolveFailure(const std::string& error) {
 
 inline std::string badgeForCatalogHealth(const CatalogEntry& entry) {
     switch (entry.health) {
-        case pipensx::CatalogHealth::Ok:
+        case goonies::CatalogHealth::Ok:
             return entry.metadataOk ? "Fresh" : "Checked";
-        case pipensx::CatalogHealth::NoPeers:
+        case goonies::CatalogHealth::NoPeers:
             return "No peers";
-        case pipensx::CatalogHealth::MetadataTimeout:
+        case goonies::CatalogHealth::MetadataTimeout:
             return "No metadata";
-        case pipensx::CatalogHealth::TrackerNotRegistered:
-        case pipensx::CatalogHealth::Dead:
+        case goonies::CatalogHealth::TrackerNotRegistered:
+        case goonies::CatalogHealth::Dead:
             return "Dead";
-        case pipensx::CatalogHealth::Replaced:
+        case goonies::CatalogHealth::Replaced:
             return "Replaced";
-        case pipensx::CatalogHealth::Unknown:
+        case goonies::CatalogHealth::Unknown:
             break;
     }
     return entry.catalogGeneratedAt || entry.sourceUpdatedAt
@@ -92,4 +92,4 @@ inline void appendAsyncImage(brls::Box* parent, GameMetadataService* service,
     loadImageInto(image, service, url);
     parent->addView(image);
 }
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace pipensx {
+namespace goonies {
 
 enum class CatalogHealth {
     Unknown,
@@ -105,4 +105,4 @@ private:
     std::string sourceLabel_;
 };
 
-} // namespace pipensx
+} // namespace goonies

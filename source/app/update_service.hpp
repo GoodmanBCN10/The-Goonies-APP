@@ -7,7 +7,7 @@
 #include <vector>
 #include <nx_thread.hpp>
 
-namespace pipensx {
+namespace goonies {
 
 struct ReleaseInfo {
     std::string version;
@@ -74,4 +74,4 @@ private:
     std::vector<nx::thread> workers_;
 };
 
-} // namespace pipensx
+} // namespace goonies

@@ -40,7 +40,7 @@ private:
     brls::Box* progressContainer_;
     
     brls::Label* activeFilenameLabel_;
-    pipensx::ui::ProgressBar* progressBar_;
+    goonies::ui::ProgressBar* progressBar_;
     brls::Label* progressTextLabel_;
     brls::Label* speedLabel_;
 

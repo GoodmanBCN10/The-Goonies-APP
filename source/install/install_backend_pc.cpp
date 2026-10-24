@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace pipensx::install {
+namespace goonies::install {
 namespace {
 
 bool makeDirectories(const std::string& path) {
@@ -297,6 +297,6 @@ std::unique_ptr<InstallBackend> createInstallBackend(
     return std::make_unique<PcInstallBackend>(workingRoot);
 }
 
-} // namespace pipensx::install
+} // namespace goonies::install
 
 #endif

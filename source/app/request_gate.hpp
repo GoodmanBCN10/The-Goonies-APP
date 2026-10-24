@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace pipensx {
+namespace goonies {
 
 // Rate-matched request gate for the stream-install reorder buffer
 // (PERF_PLAN 7.1). Replaces the binary pause-at-100%/resume-at-75%
@@ -77,4 +77,4 @@ private:
     uint64_t lastRefillMs_ = 0;
 };
 
-} // namespace pipensx
+} // namespace goonies

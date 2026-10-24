@@ -17,7 +17,7 @@
 
 #include <borealis.hpp>
 
-namespace pipensx::linkuser {
+namespace goonies::linkuser {
 
 namespace {
 
@@ -429,4 +429,4 @@ void rebootSystem() {
 #endif
 }
 
-} // namespace pipensx::linkuser
+} // namespace goonies::linkuser

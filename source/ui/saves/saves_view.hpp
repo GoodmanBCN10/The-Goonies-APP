@@ -9,7 +9,7 @@
 #include "ui/installed/installed_view.hpp"
 #include "ui/common/message_cells.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class SavesView : public brls::Box {
 public:
@@ -23,4 +23,4 @@ private:
     InstalledDataSource* dataSource_ = nullptr;
 };
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

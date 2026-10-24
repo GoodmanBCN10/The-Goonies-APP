@@ -74,25 +74,25 @@ int TorrentEngine::StartDownload(const std::string& torrentPathOrUrl, const std:
                 std::lock_guard<std::mutex> lk(d->stageMtx);
                 d->stage = "Resolviendo magnet link...";
             }
-            pipensx::MagnetResolver resolver;
+            goonies::MagnetResolver resolver;
             std::string error;
             std::atomic<bool> cancelled{false};
             
             bool ok = resolver.resolveToFile(d->url, torrentFilePath, cancelled,
-                [d](const pipensx::MagnetProgress& mp) {
+                [d](const goonies::MagnetProgress& mp) {
                     if (d->stopFlag) return;
                     std::lock_guard<std::mutex> lk(d->stageMtx);
                     switch (mp.stage) {
-                        case pipensx::MagnetProgress::Stage::FindingPeers:
+                        case goonies::MagnetProgress::Stage::FindingPeers:
                             d->stage = "Buscando peers DHT...";
                             break;
-                        case pipensx::MagnetProgress::Stage::Connecting:
+                        case goonies::MagnetProgress::Stage::Connecting:
                             d->stage = "Conectando a peer " + std::to_string(mp.peerIndex+1) + "/" + std::to_string(mp.peerCount) + "...";
                             break;
-                        case pipensx::MagnetProgress::Stage::FetchingMetadata:
+                        case goonies::MagnetProgress::Stage::FetchingMetadata:
                             d->stage = "Descargando metadatos " + std::to_string(mp.completedPieces) + "/" + std::to_string(mp.totalPieces);
                             break;
-                        case pipensx::MagnetProgress::Stage::Validating:
+                        case goonies::MagnetProgress::Stage::Validating:
                             d->stage = "Validando metadatos...";
                             break;
                     }

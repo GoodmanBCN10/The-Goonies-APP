@@ -26,7 +26,7 @@
 #include "ui/detail/game_detail.hpp"
 #include "ui/theme.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 class CatalogView;
 
@@ -694,7 +694,7 @@ private:
                 bytes += entry.size;
         }
         const StorageSpaceSnapshot storage =
-            pipensx::queryStorageSpace(manager_->rootPath());
+            goonies::queryStorageSpace(manager_->rootPath());
         std::string text = std::to_string(selectedHashes_.size()) +
                            " selected   Catalog size: " + formatBytes(bytes);
         if (unknown)
@@ -1428,4 +1428,4 @@ private:
     bool installedRefreshInFlight_ = false;
 };
 
-}  // namespace pipensx::ui
+}  // namespace goonies::ui

@@ -6,7 +6,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace pipensx {
+namespace goonies {
 
 struct InstalledTitle {
     uint64_t applicationId = 0;
@@ -45,4 +45,4 @@ private:
     uint64_t generation_ = 0;
 };
 
-} // namespace pipensx
+} // namespace goonies

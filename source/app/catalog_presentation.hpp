@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace pipensx {
+namespace goonies {
 
 struct CatalogPresentation {
     std::string title;
@@ -35,4 +35,4 @@ bool catalogEntryIsGame(const CatalogEntry& entry,
 
 bool catalogEntryHasMatchedTitle(const GameMetadata* metadata);
 
-} // namespace pipensx
+} // namespace goonies

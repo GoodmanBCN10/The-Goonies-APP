@@ -11,7 +11,7 @@
 
 #include "ui/common/ui_helpers.hpp"
 
-namespace pipensx::ui {
+namespace goonies::ui {
 
 struct CurlProgressData {
     std::shared_ptr<bool> alive;
@@ -244,4 +244,4 @@ void CheatDownloaderView::extractZip(const std::string& temp_zip) {
     unzClose(zipfile);
 }
 
-} // namespace pipensx::ui
+} // namespace goonies::ui

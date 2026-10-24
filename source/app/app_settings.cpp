@@ -9,7 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-namespace pipensx {
+namespace goonies {
 namespace {
 
 using Json = nlohmann::json;
@@ -289,4 +289,4 @@ bool AppSettings::reset(std::string& error) {
     return update(AppSettingsData{}, error);
 }
 
-} // namespace pipensx
+} // namespace goonies
