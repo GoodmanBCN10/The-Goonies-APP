@@ -133,7 +133,7 @@ $(OUTPUT).nso	:	$(OUTPUT).elf
 $(OUTPUT).nro	:	$(OUTPUT).elf $(OUTPUT).nacp
 $(OUTPUT).elf	:	$(OFILES)
 
-$(OFILES_SRC)	: $(HFILES_BIN)
+$(OFILES_SRC)	: $(HFILES_BIN) $(TOPDIR)/Makefile
 
 %.bin.o	%_bin.h :	%.bin
 	@echo $(notdir $<)

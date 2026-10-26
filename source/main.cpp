@@ -117,35 +117,41 @@ int main(int argc, char* argv[]) {
     }
     
     if (isUpdateLaunch && !originalPath.empty()) {
-        
-        // Remove the original NRO (it's not locked since we are running the tmp)
-        unlink(originalPath.c_str());
-        
-        // Copy ourselves (.update) to the original path instead of renaming
-        // We cannot trust nroPath (argv[0]) because v2.1.8 passed the wrong argv[0] (.updater)
         std::string actualSrcPath = originalPath + ".update";
         std::string tmpPath = originalPath + ".tmp";
         
-        // Copy to .tmp using a fast buffered read/write to avoid 20 second hang
-        std::ifstream src(actualSrcPath, std::ios::binary | std::ios::ate);
-        if (src) {
-            std::streamsize size = src.tellg();
-            src.seekg(0, std::ios::beg);
-            std::vector<char> buffer(size);
-            if (src.read(buffer.data(), size)) {
-                std::ofstream dst(tmpPath, std::ios::binary);
-                dst.write(buffer.data(), size);
-                dst.close();
+        unlink(tmpPath.c_str());
+
+        // Copy to .tmp using chunked read/write to avoid huge single allocations
+        bool copyOk = false;
+        FILE* in = fopen(actualSrcPath.c_str(), "rb");
+        if (in) {
+            FILE* out = fopen(tmpPath.c_str(), "wb");
+            if (out) {
+                char chunk[65536];
+                size_t bytes;
+                copyOk = true;
+                while ((bytes = fread(chunk, 1, sizeof(chunk), in)) > 0) {
+                    if (fwrite(chunk, 1, bytes, out) != bytes) {
+                        copyOk = false;
+                        break;
+                    }
+                }
+                fflush(out);
+                fclose(out);
             }
-            src.close();
+            fclose(in);
+        }
+
+        if (copyOk) {
+            unlink(originalPath.c_str());
+            rename(tmpPath.c_str(), originalPath.c_str());
+            fsdevCommitDevice("sdmc");
+            svcSleepThread(500000000ULL); // 0.5s
         }
         
-        // Safely rename the .tmp to the original path (tmp is not the running executable)
-        rename(tmpPath.c_str(), originalPath.c_str());
-        
-        // Force the Switch OS FAT32 driver to commit changes to the SD card
-        fsdevCommitDevice("sdmc");
-        svcSleepThread(1000000000ULL); // 1 second
+        unlink(actualSrcPath.c_str());
+        unlink(tmpPath.c_str());
         
         // Exit to hbmenu cleanly. Do NOT use envSetNextLoad, as it causes system panic
         // when trying to launch a freshly overwritten NRO from an .update instance.
