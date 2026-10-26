@@ -547,9 +547,13 @@ bool GameMetadataService::parseIndex(const std::string& json,
 }
 
 bool GameMetadataService::isTrustedSource(const std::string& url) {
+    if (url.empty())
+        return false;
     static const char* const prefixes[] = {
         "https://raw.githubusercontent.com/GoodmanBCN10/The-Goonies-APP/",
         "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/",
+        "https://raw.githubusercontent.com/GoodmanBCN10/GooniesPorts-Data/",
+        "https://github.com/GoodmanBCN10/GooniesPorts-Data/releases/",
     };
     for (const char* prefix : prefixes)
         if (url.rfind(prefix, 0) == 0)
@@ -558,9 +562,13 @@ bool GameMetadataService::isTrustedSource(const std::string& url) {
 }
 
 bool GameMetadataService::isTrustedRedirect(const std::string& url) {
+    if (url.empty())
+        return false;
     static const char* const prefixes[] = {
         "https://raw.githubusercontent.com/GoodmanBCN10/The-Goonies-APP/",
         "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/",
+        "https://raw.githubusercontent.com/GoodmanBCN10/GooniesPorts-Data/",
+        "https://github.com/GoodmanBCN10/GooniesPorts-Data/releases/",
         "https://release-assets.githubusercontent.com/",
         "https://objects.githubusercontent.com/",
     };
@@ -724,6 +732,10 @@ void GameMetadataService::adopt(MetadataSnapshot snapshot) {
 bool GameMetadataService::fetchLatest(MetadataSnapshot& snapshot,
                                       std::string& error) const {
     snapshot = {};
+    if (manifestUrl_.empty()) {
+        error.clear();
+        return true;
+    }
     auto useCachedAfterFailure = [&](const std::string& refreshError) {
         std::string cacheError;
         MetadataSnapshot cached;

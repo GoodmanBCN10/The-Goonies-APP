@@ -11,9 +11,11 @@ CatalogRefreshAdoption adoptCatalogRefresh(
         result.catalogChanged = true;
     }
     if (batch.metadataOk) {
-        metadata.adopt(std::move(batch.metadata));
+        if (!batch.metadata.items.empty()) {
+            metadata.adopt(std::move(batch.metadata));
+            result.metadataChanged = true;
+        }
         metadata.dropMemoryImageCache();
-        result.metadataChanged = true;
     }
     return result;
 }
