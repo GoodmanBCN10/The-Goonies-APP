@@ -82,7 +82,7 @@ bool Core::StartInstallation(const std::string& filename) {
         return m_backend->shouldSkipFile(name);
     };
 
-    bool compressed = (filename.size() >= 4 && filename.substr(filename.size() - 4) == ".nsz");
+    bool compressed = (lower.size() >= 4 && lower.substr(lower.size() - 4) == ".nsz");
     m_stream = std::make_unique<goonies::install::PackageStream>(compressed, cb, "local_install");
 
     SafePrintf("Installer Core: Queued NSP for %s\n", filename.c_str());

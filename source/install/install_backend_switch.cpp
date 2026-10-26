@@ -696,10 +696,16 @@ public:
             Result rc = ncmContentStorageRegister(
                 &storage_, &metaContent->id, &metaContent->placeholder);
             if (R_FAILED(rc)) {
-                errorResult("Unable to register CNMT NCA", rc);
-                return false;
+                if (rc == 0x2A08 || rc == 0x402) {
+                    ncmContentStorageDeletePlaceHolder(&storage_, &metaContent->placeholder);
+                    metaContent->registered = true;
+                } else {
+                    errorResult("Unable to register CNMT NCA", rc);
+                    return false;
+                }
+            } else {
+                metaContent->registered = true;
             }
-            metaContent->registered = true;
         }
         ParsedMeta meta;
         if (earlyMetaValid_) {
@@ -735,13 +741,9 @@ public:
         }
         if (exists) {
             alreadyInstalled = true;
-            discardPlaceholders();
-            finishSuccess();
-            telemetry_log("ncm", taskId_.c_str(),
-                "event=package_commit target=%s already_installed=1 commit_us=%llu",
-                targetName_, (unsigned long long)(commitStartedUs
-                    ? now_us() - commitStartedUs : 0));
-            return true;
+            log_msg("[install] Title already registered in database; removing existing record to overwrite/reinstall\n");
+            ncmContentMetaDatabaseRemove(&database_, &key);
+            ncmContentMetaDatabaseCommit(&database_);
         }
 
         for (const auto& packaged : meta.contents) {
@@ -781,10 +783,16 @@ public:
             rc = ncmContentStorageRegister(&storage_, &content.id,
                                            &content.placeholder);
             if (R_FAILED(rc)) {
-                errorResult("Unable to register installed content", rc);
-                return false;
+                if (rc == 0x2A08 || rc == 0x402) {
+                    ncmContentStorageDeletePlaceHolder(&storage_, &content.placeholder);
+                    content.registered = true;
+                } else {
+                    errorResult("Unable to register installed content", rc);
+                    return false;
+                }
+            } else {
+                content.registered = true;
             }
-            content.registered = true;
         }
 
         // Delta ids from the CNMT that never showed up as a streamed content
@@ -868,7 +876,17 @@ public:
         }
         previousRecords_ = records;
         applicationId_ = appId;
-        records.push_back({ key, storageId_ });
+        auto existingRec = std::find_if(records.begin(), records.end(),
+            [&key](const NsExtContentStorageMetaKey& rec) {
+                return rec.meta_key.id == key.id &&
+                       rec.meta_key.type == key.type &&
+                       rec.meta_key.install_type == key.install_type;
+            });
+        if (existingRec != records.end()) {
+            *existingRec = { key, storageId_ };
+        } else {
+            records.push_back({ key, storageId_ });
+        }
         nsextDeleteApplicationRecord(appId);
         rc = nsextPushApplicationRecord(
             appId, NsExtApplicationEvent_Present,
@@ -881,14 +899,17 @@ public:
 
         if (!ticket_.empty()) {
             if (certificate_.empty()) {
-                error_ = "Ticket certificate is missing.";
-                return false;
-            }
-            rc = esImportTicket(ticket_.data(), ticket_.size(),
-                                certificate_.data(), certificate_.size());
-            if (R_FAILED(rc)) {
-                errorResult("Unable to import title ticket", rc);
-                return false;
+                // If package lacks a certificate, attempt direct ticket import
+                rc = esImportTicket(ticket_.data(), ticket_.size(), nullptr, 0);
+                if (R_FAILED(rc)) {
+                    log_msg("[install] esImportTicket without cert failed (0x%x); sigpatches may allow ticketless execution\n", rc);
+                }
+            } else {
+                rc = esImportTicket(ticket_.data(), ticket_.size(),
+                                    certificate_.data(), certificate_.size());
+                if (R_FAILED(rc)) {
+                    log_msg("[install] esImportTicket failed (0x%x)\n", rc);
+                }
             }
         }
 

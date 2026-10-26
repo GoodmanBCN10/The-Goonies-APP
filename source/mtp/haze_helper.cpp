@@ -334,6 +334,18 @@ struct FsInstallProxy final : FsProxyVfs {
         if(R_FAILED(rc)) return rc;
         rc = IsValidFileType(path);
         if(R_FAILED(rc)) return rc;
+
+        const auto file_name = GetFileName(path);
+        if(!file_name) return 0x202;
+
+        auto it = std::find_if(m_entries.begin(), m_entries.end(), [file_name](auto& e){
+            return !strcasecmp(file_name, e.name);
+        });
+        if(it != m_entries.end()) {
+            it->file_size = size;
+            return 0;
+        }
+
         return FsProxyVfs::CreateFile(path, size);
     }
 
@@ -634,8 +646,7 @@ bool Init(bool explorerOnly) {
     if (explorerOnly) {
         g_fs_entries.emplace_back(std::make_shared<FsProxySdCard>("SD Card Explorer", "SD Card Explorer"));
     } else {
-        g_fs_entries.emplace_back(std::make_shared<FsInstallProxy>("1. SD Card Install [NSP, NSZ, XCI]", "1. SD Card Install [NSP, NSZ, XCI]"));
-        g_fs_entries.emplace_back(std::make_shared<FsProxySdCard>("2. SD Card Explorer", "2. SD Card Explorer"));
+        g_fs_entries.emplace_back(std::make_shared<FsInstallProxy>("SD CARD INSTALL", "SD CARD INSTALL"));
     }
 
     g_should_exit = false;
