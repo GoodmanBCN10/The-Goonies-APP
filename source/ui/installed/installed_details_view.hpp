@@ -25,8 +25,7 @@ namespace goonies::ui {
 inline uint32_t GetOriginalFirmware(uint64_t titleId) {
     const std::string paths[] = {
         "sdmc:/switch/thegoonies/firmwares.json",
-        "sdmc:/switch/TheGoonies/firmwares.json",
-        "sdmc:/switch/pipensx/firmwares.json"
+        "sdmc:/switch/TheGoonies/firmwares.json"
     };
 
     uint64_t baseId = titleId & 0xFFFFFFFFFFFFF000ULL;

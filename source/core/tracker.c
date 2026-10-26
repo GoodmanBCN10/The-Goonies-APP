@@ -107,7 +107,7 @@ static uint32_t http_announce_once(const char *url,
 
     curl_buf_t buf = {0};
     curl_easy_setopt(curl, CURLOPT_URL, full_url);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "TheGooniesAPP/2.1.22");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "TheGooniesAPP/2.1.23");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);

@@ -170,7 +170,7 @@ bool httpGet(const std::string& url, const std::string& etagIn, std::string& eta
     }
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "TheGooniesAPP/2.1.22");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "TheGooniesAPP/2.1.23");
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 45L);

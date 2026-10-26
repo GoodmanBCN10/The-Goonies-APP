@@ -39,7 +39,7 @@ ROMFS		:=	romfs
 
 APP_TITLE	:=	The Goonies App
 APP_AUTHOR	:=	GoodmanBCN
-APP_VERSION	:=	v2.1.22
+APP_VERSION	:=	v2.1.23
 DEFINES		:=	-DTHEGOONIES_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------
