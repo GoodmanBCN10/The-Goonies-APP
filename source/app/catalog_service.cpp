@@ -362,6 +362,38 @@ uint64_t readFlexibleSize(const nlohmann::json& item, const char* key) {
     return readUnsigned(item, key);
 }
 
+bool isRepositoryPort(const std::string& rawTitle) {
+    std::string title = rawTitle;
+    std::transform(title.begin(), title.end(), title.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+    static const char* const kPackageMarkers[] = {
+        "[nsp", "[nsz", "[xci", "[xcz",
+        ".nsp", ".nsz", ".xci", ".xcz",
+        "/nsp", "/nsz", "/xci", "/xcz",
+        "nsz]", "nsp]", "xci]", "xcz]"
+    };
+    for (const char* marker : kPackageMarkers) {
+        if (title.find(marker) != std::string::npos)
+            return false;
+    }
+
+    static const char* const kPortMarkers[] = {
+        "[nro", ".nro", "/nro", "nro]",
+        "(homebrew", "[homebrew", "homebrew]",
+        "khoumbryu",
+        "(port ", "(port)", "port nativo", "ios-port", "renpy-port", "fanatskiy port",
+        "emulador", "emulyator",
+        "lakka linux", "switchdeck", "wine-nx", "cemu nx", "dekopon",
+        "drastic ds", "vita3k", "yaba sanshiro", "nethersx2", "gzdoom"
+    };
+    for (const char* marker : kPortMarkers) {
+        if (title.find(marker) != std::string::npos)
+            return true;
+    }
+    return false;
+}
+
 } // namespace
 
 CatalogService::CatalogService(std::string rootPath, std::string bundledPath)
@@ -402,6 +434,8 @@ bool CatalogService::parseJson(const std::string& json,
         entry.magnetUri = item[magnetKey].get<std::string>();
         if (entry.title.empty() || entry.title.size() > 1024 ||
             entry.magnetUri.size() > 2048)
+            continue;
+        if (isRepositoryPort(entry.title))
             continue;
         MagnetSpec magnet;
         std::string magnetError;

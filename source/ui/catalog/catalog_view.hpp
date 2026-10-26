@@ -247,7 +247,7 @@ public:
         sidebar->addView(makeSidebarTitle("Categoria"));
         filterAll_ = makeSidebarButton("Todo", [this] { setFilter(CatalogFilter::All); });
         filterGames_ = makeSidebarButton("Juegos", [this] { setFilter(CatalogFilter::Games); });
-          filterPorts_ = makeSidebarButton("Ports", [this] { setFilter(CatalogFilter::Ports); });
+        filterPorts_ = makeSidebarButton("Ports The Goonies", [this] { setFilter(CatalogFilter::Ports); });
           
           sidebar->addView(filterAll_);
           sidebar->addView(filterGames_);
@@ -745,18 +745,24 @@ private:
         std::string needle = lowerAscii(query_);
         const bool searching = !needle.empty();
         const CatalogFilter currentFilter = settings_ ? settings_->get().catalogFilter : CatalogFilter::All;
-        const bool matchedGamesOnly = !searching && currentFilter == CatalogFilter::Games;
         for (const CatalogEntry& entry : catalog_->entries()) {
             if (entry.isHiddenByDefault())
                 continue;
             const GameMetadata* meta =
                 metadata_ ? metadata_->findByInfoHash(entry.infoHash) : nullptr;
                 
-            if (matchedGamesOnly && !catalogEntryIsGame(entry, meta))
-                continue;
-                
-            if (!searching && currentFilter == CatalogFilter::Ports) {
-                if (!entry.isPort) continue;
+            if (currentFilter == CatalogFilter::Games) {
+                if (entry.isPort || !catalogEntryIsGame(entry, meta))
+                    continue;
+            } else if (currentFilter == CatalogFilter::Ports) {
+                if (!entry.isPort)
+                    continue;
+            } else {
+                // CatalogFilter::All ("Todo"):
+                // Include legitimate Switch games and The Goonies ports.
+                // Exclude any broken non-game repository entries.
+                if (!entry.isPort && !catalogEntryIsGame(entry, meta))
+                    continue;
             }
             bool matches = !searching ||
                 lowerAscii(entry.title).find(needle) != std::string::npos ||
