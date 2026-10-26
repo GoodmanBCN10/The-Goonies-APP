@@ -27,13 +27,13 @@ constexpr size_t kMaxCatalogBytes = 32 * 1024 * 1024;
 constexpr size_t kMaxCatalogEntries = 40000;
 constexpr size_t kMaxInfoDictBytes = 16 * 1024 * 1024;
 
-/* The live catalogue source: the Langegen switch-games repo publishes a single
-   switch_games.json on GitHub's raw host. Fetched on demand by the refresh
+/* The live catalogue source: the Langegen switch-game-collection repo publishes
+   ES_catalog.json on GitHub's raw host. Fetched on demand by the refresh
    button and (when the catalogue is empty or the launch toggle is on) in the
    background at startup. Must satisfy isTrustedSource(). */
 constexpr const char* kCatalogSourceUrl =
-    "https://raw.githubusercontent.com/Langegen/switch-games/"
-    "main/switch_games.json";
+    "https://raw.githubusercontent.com/Langegen/switch-game-collection/"
+    "main/ES_catalog.json";
 
 constexpr const char* kPortsSourceUrl =
     "https://raw.githubusercontent.com/GoodmanBCN10/GooniesPorts-Data/main/catalog.json";
@@ -527,10 +527,11 @@ bool CatalogService::load(std::string& error) {
 }
 
 bool CatalogService::isTrustedSource(const std::string& url) {
-    // Host (with path prefix) allowed to serve catalog bytes. Only the Langegen
-    // switch-games repo on GitHub's raw host; every network fetch is gated on
+    // Host (with path prefix) allowed to serve catalog bytes. Only trusted
+    // repositories on GitHub's raw host; every network fetch is gated on
     // this so a redirect or MITM to another host is refused before any parse.
     static const char* const kPrefixes[] = {
+        "https://raw.githubusercontent.com/Langegen/switch-game-collection/",
         "https://raw.githubusercontent.com/Langegen/switch-games/",
         "https://raw.githubusercontent.com/GoodmanBCN10/GooniesPorts-Data/",
     };
@@ -693,7 +694,7 @@ void CatalogService::adopt(std::vector<CatalogEntry> parsed) {
     if (parsed.empty())
         return;
     entries_ = std::move(parsed);
-    sourceLabel_ = "Langegen switch-games";
+    sourceLabel_ = "Langegen switch-game-collection (ES)";
     log_msg("[catalog] refreshed %zu entries from %s\n", entries_.size(),
             sourceLabel_.c_str());
 }
