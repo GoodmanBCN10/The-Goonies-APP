@@ -766,6 +766,8 @@ private:
             }
             bool matches = !searching ||
                 lowerAscii(entry.title).find(needle) != std::string::npos ||
+                (entry.isPort && (needle == "port" || needle == "ports")) ||
+                lowerAscii(entry.category).find(needle) != std::string::npos ||
                 (meta && lowerAscii(meta->name).find(needle) !=
                              std::string::npos);
             // Genre shelves (F5) hand off to search, so categories match too.
@@ -837,6 +839,8 @@ private:
             if (it == added.end() && meta && installed_ &&
                 installed_->contains(meta->titleId))
                 stateBadges.back() = "Installed";
+            else if (it == added.end() && entry.isPort && stateBadges.back().empty())
+                stateBadges.back() = "Port";
             CatalogPresentation presentation =
                 resolveCatalogPresentation(entry, meta);
             gameNames.push_back(std::move(presentation.title));

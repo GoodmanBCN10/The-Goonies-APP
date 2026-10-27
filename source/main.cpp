@@ -422,6 +422,7 @@ int main(int argc, char* argv[]) {
         CatalogService* catalog_service = new CatalogService("sdmc:/switch/thegoonies", BundledCatalogPath);
         GameMetadataService* metadata_service = new GameMetadataService("sdmc:/switch/thegoonies");
         InstalledTitleService* installed_service = new InstalledTitleService("sdmc:/switch/thegoonies");
+        download_manager->setInstalledTitleService(installed_service);
         HomebrewService* homebrew_service = new HomebrewService();
         writeLog("Services constructed OK");
 

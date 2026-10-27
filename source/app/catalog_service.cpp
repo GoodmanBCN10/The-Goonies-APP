@@ -642,10 +642,13 @@ bool CatalogService::fetchLatest(std::vector<CatalogEntry>& parsed,
     if (!portsBody.empty()) {
         nlohmann::json root = nlohmann::json::parse(portsBody, nullptr, false);
         if (!root.is_discarded() && root.is_array()) {
+            size_t idx = 0;
             for (const auto& item : root) {
                 if (!item.is_object() || !item.contains("title") || !item.contains("directDownloadUrl")) continue;
                 CatalogEntry entry;
                 entry.isPort = true;
+                entry.topicId = 2000000000ULL + (root.size() - idx);
+                idx++;
                 entry.title = item["title"].get<std::string>();
                 entry.id = item.contains("name") ? item["name"].get<std::string>() : entry.title;
                 entry.directDownloadUrl = item["directDownloadUrl"].get<std::string>();
@@ -693,10 +696,13 @@ void CatalogService::loadPortsCache() {
     if (readFile(catalogRoot_ + "/ports.json", portsBody, error)) {
         nlohmann::json root = nlohmann::json::parse(portsBody, nullptr, false);
         if (!root.is_discarded() && root.is_array()) {
+            size_t idx = 0;
             for (const auto& item : root) {
                 if (!item.is_object() || !item.contains("title") || !item.contains("directDownloadUrl")) continue;
                 CatalogEntry entry;
                 entry.isPort = true;
+                entry.topicId = 2000000000ULL + (root.size() - idx);
+                idx++;
                 entry.title = item["title"].get<std::string>();
                 entry.id = item.contains("name") ? item["name"].get<std::string>() : entry.title;
                 entry.directDownloadUrl = item["directDownloadUrl"].get<std::string>();

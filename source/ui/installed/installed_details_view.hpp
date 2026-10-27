@@ -28,7 +28,7 @@ inline uint32_t GetOriginalFirmware(uint64_t titleId) {
         "sdmc:/switch/TheGoonies/firmwares.json"
     };
 
-    uint64_t baseId = titleId & 0xFFFFFFFFFFFFF000ULL;
+    uint64_t baseId = titleId & ~0x1FFFULL;
     uint64_t patchId = baseId | 0x800ULL;
 
     char pUpper[17], pLower[17];
@@ -198,7 +198,7 @@ public:
         NcmStorageId storages[] = {NcmStorageId_SdCard, NcmStorageId_BuiltInUser};
         std::string storageNames[] = {"MicroSD", "NAND"};
 
-        uint64_t baseId = title.applicationId & 0xFFFFFFFFFFFFF000ULL;
+        uint64_t baseId = title.applicationId & ~0x1FFFULL;
         uint64_t patchId = baseId | 0x800ULL;
 
         for (int s = 0; s < 2; s++) {

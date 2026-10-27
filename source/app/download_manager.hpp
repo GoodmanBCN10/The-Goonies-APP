@@ -16,6 +16,8 @@ extern "C" {
 
 namespace goonies {
 
+class InstalledTitleService;
+
 enum class DownloadStatus {
     Queued,
     Checking,
@@ -170,6 +172,7 @@ public:
     const std::string& downloadRoot() const { return downloadRoot_; }
     const std::string& torrentRoot() const { return torrentRoot_; }
     void setDefaultProvider(int provider) { defaultProvider_ = provider; }
+    void setInstalledTitleService(InstalledTitleService* service) { installedService_ = service; }
 
 private:
     void load();
@@ -198,6 +201,7 @@ private:
     std::atomic<install::InstallStorageTarget> installTarget_{
         install::InstallStorageTarget::SdCard};
     bool workerStarted_ = false;
+    InstalledTitleService* installedService_ = nullptr;
 };
 
 const char* statusName(DownloadStatus status);

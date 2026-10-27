@@ -649,9 +649,40 @@ private:
             bool skip = false;
             if (hasBaseGame) {
                 std::string lowerPath = catalogLower(file.path);
-                // Si contiene el TitleID del juego base o "[v0]", es el juego base
-                if (lowerPath.find(lowerTitleId) != std::string::npos || lowerPath.find("[v0]") != std::string::npos) {
-                    skip = true;
+                size_t lastSlash = lowerPath.find_last_of("/\\");
+                std::string filename = (lastSlash != std::string::npos) ? lowerPath.substr(lastSlash + 1) : lowerPath;
+                
+                bool isUpdateOrDlc = (filename.find("[upd") != std::string::npos ||
+                                      filename.find("(upd") != std::string::npos ||
+                                      filename.find("update") != std::string::npos ||
+                                      filename.find("patch") != std::string::npos ||
+                                      filename.find("[dlc") != std::string::npos ||
+                                      filename.find("(dlc") != std::string::npos ||
+                                      filename.find("800]") != std::string::npos ||
+                                      filename.find("800)") != std::string::npos);
+                
+                if (!isUpdateOrDlc) {
+                    size_t vPos = filename.find("[v");
+                    if (vPos != std::string::npos) {
+                        size_t endPos = filename.find("]", vPos);
+                        if (endPos != std::string::npos) {
+                            std::string verStr = filename.substr(vPos + 2, endPos - (vPos + 2));
+                            if (verStr != "0") {
+                                try {
+                                    if (std::stoull(verStr) > 0) isUpdateOrDlc = true;
+                                } catch (...) {}
+                            }
+                        }
+                    }
+                }
+                
+                if (!isUpdateOrDlc) {
+                    if (filename.find("[v0]") != std::string::npos ||
+                        filename.find("[base") != std::string::npos ||
+                        filename.find("(base") != std::string::npos ||
+                        (!lowerTitleId.empty() && filename.find(lowerTitleId) != std::string::npos)) {
+                        skip = true;
+                    }
                 }
             }
             

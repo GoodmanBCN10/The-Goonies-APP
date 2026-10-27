@@ -888,12 +888,18 @@ public:
             records.push_back({ key, storageId_ });
         }
         nsextDeleteApplicationRecord(appId);
+        NsExtApplicationEvent appEvent = (key.type == NcmContentMetaType_Patch)
+            ? NsExtApplicationEvent_Updated
+            : NsExtApplicationEvent_Present;
         rc = nsextPushApplicationRecord(
-            appId, NsExtApplicationEvent_Present,
+            appId, appEvent,
             records.data(), records.size());
         if (R_FAILED(rc)) {
             errorResult("Unable to update application record", rc);
             return false;
+        }
+        if (key.type == NcmContentMetaType_Patch || key.version > 0) {
+            nsextPushLaunchVersion(appId, key.version);
         }
         applicationRecordTouched_ = true;
 

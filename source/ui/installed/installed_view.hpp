@@ -392,7 +392,8 @@ public:
                         brls::Application::pushActivity(
                             new GameDetailActivity(entry, "", manager, metadata, this->installed_, settings,
                                 [](const std::string&, const std::string&){},
-                                [](){}));
+                                [this](){ this->refresh(); },
+                                [this](){ this->refresh(); }));
                         return;
                     }
                 }
@@ -405,7 +406,8 @@ public:
                                 brls::Application::pushActivity(
                                     new GameDetailActivity(entry, "", manager, metadata, this->installed_, settings,
                                         [](const std::string&, const std::string&){},
-                                        [](){}));
+                                        [this](){ this->refresh(); },
+                                        [this](){ this->refresh(); }));
                                 return;
                             }
                         }
@@ -423,6 +425,7 @@ public:
         
         updateViewMode();
         reload();
+        refresh();
 
         registerAction("Refresh", brls::BUTTON_RB, [this](brls::View*) {
             refresh();

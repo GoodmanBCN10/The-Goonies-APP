@@ -187,24 +187,25 @@ bool InstalledTitleService::refresh(std::string& error) {
         }
         
         if (has_ncm) {
-            u64 update_id = record.application_id + 0x800;
-            auto getVersion = [&](NcmStorageId storage) -> uint32_t {
+            auto getVersion = [&](uint64_t targetId) -> uint32_t {
                 uint32_t v = 0;
-                NcmContentMetaDatabase db;
-                if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storage))) {
-                    NcmContentMetaKey key;
-                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, update_id))) {
-                        v = key.version;
-                    } else if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, record.application_id))) {
-                        v = key.version;
+                NcmStorageId storages[] = {NcmStorageId_SdCard, NcmStorageId_BuiltInUser};
+                for (int s = 0; s < 2; s++) {
+                    NcmContentMetaDatabase db;
+                    if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storages[s]))) {
+                        NcmContentMetaKey key;
+                        if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, targetId))) {
+                            if (key.version > v) v = key.version;
+                        }
+                        ncmContentMetaDatabaseClose(&db);
                     }
-                    ncmContentMetaDatabaseClose(&db);
                 }
                 return v;
             };
-            title.internalVersion = getVersion(NcmStorageId_SdCard);
+            uint64_t update_id = (record.application_id & ~0x1FFFULL) | 0x800ULL;
+            title.internalVersion = getVersion(update_id);
             if (title.internalVersion == 0) {
-                title.internalVersion = getVersion(NcmStorageId_BuiltInUser);
+                title.internalVersion = getVersion(record.application_id);
             }
         }
         

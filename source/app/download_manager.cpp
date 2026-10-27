@@ -1,5 +1,6 @@
 #include <filesystem>
 #include "download_manager.hpp"
+#include "installed_title_service.hpp"
 #include "request_gate.hpp"
 #include "stream_ram_budget.hpp"
 #include "../install/install_backend.hpp"
@@ -2436,6 +2437,10 @@ void DownloadManager::workerMain() {
                                 : DownloadStatus::Completed;
                             task->completedBytes = task->totalBytes;
                         }
+                        if (task->status == DownloadStatus::Installed && installedService_) {
+                            std::string refreshErr;
+                            installedService_->refresh(refreshErr);
+                        }
                         std::string ignored;
                         saveLocked(ignored);
                     }
@@ -2555,6 +2560,10 @@ void DownloadManager::workerMain() {
                             ? DownloadStatus::Installed
                             : DownloadStatus::Completed;
                         finished = true;
+                    }
+                    if (task->status == DownloadStatus::Installed && installedService_) {
+                        std::string refreshErr;
+                        installedService_->refresh(refreshErr);
                     }
                     task->completedBytes = task->totalBytes;
                     task->speedBytesPerSecond = 0;
