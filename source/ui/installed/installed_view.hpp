@@ -132,15 +132,10 @@ inline bool checkHasUpdate(const InstalledTitle& title,
         if (meta) latestVer = meta->latestVersion;
     }
 
-    if (latestVer > 0 && latestVer <= title.internalVersion) {
-        return false;
-    }
-
-    if (catalog) {
+    if (latestVer == 0 && catalog) {
         uint64_t baseAppId = title.applicationId & ~0x1FFFULL;
         for (const auto& entry : catalog->entries()) {
             if (entry.isHiddenByDefault()) continue;
-
             bool match = false;
             if (!entry.titleId.empty()) {
                 try {
@@ -157,23 +152,49 @@ inline bool checkHasUpdate(const InstalledTitle& title,
                     } catch (...) {}
                 }
             }
+            if (match && entry.updateVersion > latestVer) {
+                latestVer = entry.updateVersion;
+            }
+        }
+    }
 
-            if (match) {
-                if (latestVer > 0 && latestVer > title.internalVersion) {
-                    return true;
-                }
-                std::string lower = entry.title;
-                std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-                if (lower.find("upd") != std::string::npos || lower.find("patch") != std::string::npos ||
-                    lower.find("update") != std::string::npos || lower.find("dlc") != std::string::npos) {
-                    return true;
+    // STRICT: If latest known version is not known (0) or is already <= installed internal version,
+    // then this title DOES NOT have a newer update!
+    if (latestVer == 0 || latestVer <= title.internalVersion) {
+        return false;
+    }
+
+    // A newer version is available (latestVer > title.internalVersion).
+    // If a catalog is provided, ensure we actually have this game/update available in the catalog:
+    if (catalog) {
+        uint64_t baseAppId = title.applicationId & ~0x1FFFULL;
+        for (const auto& entry : catalog->entries()) {
+            if (entry.isHiddenByDefault()) continue;
+            bool match = false;
+            if (!entry.titleId.empty()) {
+                try {
+                    uint64_t tid = std::stoull(entry.titleId, nullptr, 16);
+                    if ((tid & ~0x1FFFULL) == baseAppId) match = true;
+                } catch (...) {}
+            }
+            if (!match && metadata) {
+                const GameMetadata* meta = metadata->findByInfoHash(entry.infoHash);
+                if (meta && !meta->titleId.empty()) {
+                    try {
+                        uint64_t tid = std::stoull(meta->titleId, nullptr, 16);
+                        if ((tid & ~0x1FFFULL) == baseAppId) match = true;
+                    } catch (...) {}
                 }
             }
+            if (!match && releaseNameMatches(title.name, entry.title)) {
+                match = true;
+            }
+            if (match) return true;
         }
         return false;
     }
 
-    return (latestVer > 0 && latestVer > title.internalVersion);
+    return true;
 }
 
 class InstalledGridItem : public brls::Box {

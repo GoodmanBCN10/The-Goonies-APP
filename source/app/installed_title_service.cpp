@@ -234,10 +234,31 @@ bool InstalledTitleService::refresh(std::string& error) {
 
     writeLog("InstalledTitleService: found " + std::to_string(records.size()) + " records. Starting control data loop.");
 
-    NcmContentMetaDatabase db_sd{};
-    bool has_db_sd = has_ncm && R_SUCCEEDED(ncmOpenContentMetaDatabase(&db_sd, NcmStorageId_SdCard));
-    NcmContentMetaDatabase db_nand{};
-    bool has_db_nand = has_ncm && R_SUCCEEDED(ncmOpenContentMetaDatabase(&db_nand, NcmStorageId_BuiltInUser));
+    std::unordered_map<uint64_t, uint32_t> installedPatchVersions;
+    if (has_ncm) {
+        NcmStorageId storages[] = {NcmStorageId_SdCard, NcmStorageId_BuiltInUser};
+        for (NcmStorageId sid : storages) {
+            NcmContentMetaDatabase db;
+            if (R_FAILED(ncmOpenContentMetaDatabase(&db, sid))) continue;
+            std::vector<NcmContentMetaKey> buf(512);
+            s32 total = 0, written = 0;
+            Result rc = ncmContentMetaDatabaseList(&db, &total, &written, buf.data(), static_cast<s32>(buf.size()),
+                                                   NcmContentMetaType_Patch, 0, 0, UINT64_MAX, NcmContentInstallType_Full);
+            if (R_SUCCEEDED(rc) && total > written) {
+                buf.resize(static_cast<size_t>(total));
+                rc = ncmContentMetaDatabaseList(&db, &total, &written, buf.data(), static_cast<s32>(buf.size()),
+                                                NcmContentMetaType_Patch, 0, 0, UINT64_MAX, NcmContentInstallType_Full);
+            }
+            if (R_SUCCEEDED(rc)) {
+                for (s32 i = 0; i < written; ++i) {
+                    const NcmContentMetaKey& k = buf[static_cast<size_t>(i)];
+                    uint32_t& v = installedPatchVersions[k.id & ~0x1FFFULL];
+                    if (k.version > v) v = k.version;
+                }
+            }
+            ncmContentMetaDatabaseClose(&db);
+        }
+    }
 
     std::vector<InstalledTitle> next;
     next.reserve(records.size());
@@ -284,38 +305,32 @@ bool InstalledTitleService::refresh(std::string& error) {
         }
         
         uint32_t installedVer = 0;
-        auto queryDb = [&](NcmContentMetaDatabase* db) {
-            s32 total = 0, written = 0;
-            std::vector<NcmContentMetaKey> keys(4);
-            if (R_SUCCEEDED(ncmContentMetaDatabaseList(db, &total, &written, keys.data(), keys.size(),
-                                                       NcmContentMetaType_Unknown, record.application_id, 0, UINT64_MAX,
-                                                       NcmContentInstallType_Full))) {
-                if (total > static_cast<s32>(keys.size())) {
-                    keys.resize(total);
-                    ncmContentMetaDatabaseList(db, &total, &written, keys.data(), keys.size(),
-                                               NcmContentMetaType_Unknown, record.application_id, 0, UINT64_MAX,
-                                               NcmContentInstallType_Full);
-                }
-                for (s32 i = 0; i < written; ++i) {
-                    if (keys[i].type == NcmContentMetaType_Patch) {
-                        if (keys[i].version > installedVer) installedVer = keys[i].version;
-                    } else if (keys[i].type == NcmContentMetaType_Application) {
-                        if (keys[i].version > installedVer) installedVer = keys[i].version;
-                    }
-                }
-            }
-        };
-        if (has_db_sd) queryDb(&db_sd);
-        if (has_db_nand) queryDb(&db_nand);
-
-        // Always check GetLatestContentMetaKey for patchId to ensure installed update version is captured
-        uint64_t patchId = (record.application_id & ~0x1FFFULL) | 0x800ULL;
-        NcmContentMetaKey pKey;
-        if (has_db_sd && R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db_sd, &pKey, patchId))) {
-            if (pKey.version > installedVer) installedVer = pKey.version;
+        uint64_t baseAppId = record.application_id & ~0x1FFFULL;
+        auto itP = installedPatchVersions.find(baseAppId);
+        if (itP != installedPatchVersions.end()) {
+            installedVer = itP->second;
         }
-        if (has_db_nand && R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db_nand, &pKey, patchId))) {
-            if (pKey.version > installedVer) installedVer = pKey.version;
+
+        if (has_ncm) {
+            uint64_t update_id = baseAppId | 0x800ULL;
+            auto getVersion = [&](NcmStorageId storage) -> uint32_t {
+                uint32_t v = 0;
+                NcmContentMetaDatabase db;
+                if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storage))) {
+                    NcmContentMetaKey key;
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, update_id))) {
+                        v = key.version;
+                    } else if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, record.application_id))) {
+                        v = key.version;
+                    }
+                    ncmContentMetaDatabaseClose(&db);
+                }
+                return v;
+            };
+            uint32_t sdVer = getVersion(NcmStorageId_SdCard);
+            if (sdVer > installedVer) installedVer = sdVer;
+            uint32_t nandVer = getVersion(NcmStorageId_BuiltInUser);
+            if (nandVer > installedVer) installedVer = nandVer;
         }
 
         title.internalVersion = installedVer;
@@ -334,12 +349,6 @@ bool InstalledTitleService::refresh(std::string& error) {
 
     if (has_pdm) {
         pdmqryExit();
-    }
-    if (has_db_sd) {
-        ncmContentMetaDatabaseClose(&db_sd);
-    }
-    if (has_db_nand) {
-        ncmContentMetaDatabaseClose(&db_nand);
     }
     if (has_ncm) {
         ncmExit();
