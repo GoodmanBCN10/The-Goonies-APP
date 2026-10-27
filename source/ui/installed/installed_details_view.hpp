@@ -204,30 +204,59 @@ public:
         for (int s = 0; s < 2; s++) {
             NcmContentMetaDatabase db;
             if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storages[s]))) {
-                fetchContentsFromDB(&db, baseId, "Base", storageNames[s], gameContents);
+                s32 total = 0;
+                s32 written = 0;
+                NcmContentMetaKey dummyKey;
+                // Query all content keys (Base, Update, DLC) for this application ID in one shot
+                if (R_SUCCEEDED(ncmContentMetaDatabaseList(&db, &total, &written, &dummyKey, 1,
+                                                           NcmContentMetaType_Unknown, baseId, 0, UINT64_MAX,
+                                                           NcmContentInstallType_Full)) && total > 0) {
+                    std::vector<NcmContentMetaKey> keys(total);
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseList(&db, &total, &written, keys.data(), total,
+                                                               NcmContentMetaType_Unknown, baseId, 0, UINT64_MAX,
+                                                               NcmContentInstallType_Full))) {
+                        for (s32 i = 0; i < written; ++i) {
+                            const auto& key = keys[i];
+                            std::string typeName;
+                            if (key.type == NcmContentMetaType_Application) {
+                                typeName = "Base";
+                            } else if (key.type == NcmContentMetaType_Patch) {
+                                typeName = "Update";
+                            } else if (key.type == NcmContentMetaType_AddOnContent) {
+                                typeName = "DLC";
+                            } else {
+                                continue;
+                            }
 
-                // Check Base in NCM
-                NcmContentMetaKey baseKey = {0};
-                if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &baseKey, baseId))) {
-                    uint32_t bReqV = 0;
-                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetRequiredSystemVersion(&db, &bReqV, &baseKey))) {
-                        if (bReqV > highestReqV) highestReqV = bReqV;
+                            s32 infoCount = 0;
+                            NcmContentInfo infos[20];
+                            uint64_t totalSize = 0;
+                            if (R_SUCCEEDED(ncmContentMetaDatabaseListContentInfo(&db, &infoCount, infos, 20, &key, 0))) {
+                                for (int j = 0; j < infoCount; j++) {
+                                    totalSize += (uint64_t)infos[j].size_low | ((uint64_t)infos[j].size_high << 32);
+                                }
+                            }
+
+                            uint32_t reqV = 0;
+                            if (R_SUCCEEDED(ncmContentMetaDatabaseGetRequiredSystemVersion(&db, &reqV, &key))) {
+                                if (reqV > highestReqV) highestReqV = reqV;
+                            }
+
+                            ContentItem item;
+                            item.type = typeName;
+                            item.titleId = key.id;
+                            item.version = key.version;
+                            item.size = totalSize;
+                            item.storage = storageNames[s];
+                            gameContents.push_back(item);
+                        }
                     }
                 }
 
-                // Check Update (Patch) in NCM
-                fetchContentsFromDB(&db, patchId, "Update", storageNames[s], gameContents);
-                NcmContentMetaKey patchKey = {0};
-                if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &patchKey, patchId))) {
-                    uint32_t pReqV = 0;
-                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetRequiredSystemVersion(&db, &pReqV, &patchKey))) {
-                        if (pReqV > highestReqV) highestReqV = pReqV;
-                    }
-                }
-
-                uint64_t dlcBase = baseId | 0x1000ULL;
-                for (int i = 0; i < 256; i++) {
-                    fetchContentsFromDB(&db, dlcBase + i, "DLC", storageNames[s], gameContents);
+                // Fallback check if list was empty
+                if (gameContents.empty()) {
+                    fetchContentsFromDB(&db, baseId, "Base", storageNames[s], gameContents);
+                    fetchContentsFromDB(&db, patchId, "Update", storageNames[s], gameContents);
                 }
 
                 ncmContentMetaDatabaseClose(&db);

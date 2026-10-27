@@ -14,6 +14,7 @@ extern "C" {
 #include <cstring>
 #include <fstream>
 #include <memory>
+#include <unordered_map>
 #include <sys/stat.h>
 #include <unistd.h>
 #include "../app_state.hpp"
@@ -224,6 +225,54 @@ bool InstalledTitleService::refresh(std::string& error) {
 
     writeLog("InstalledTitleService: found " + std::to_string(records.size()) + " records. Starting control data loop.");
 
+    std::unordered_map<uint64_t, uint32_t> installedPatches;
+    if (has_ncm) {
+        NcmStorageId storages[] = {NcmStorageId_SdCard, NcmStorageId_BuiltInUser};
+        for (NcmStorageId storage : storages) {
+            NcmContentMetaDatabase db;
+            if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storage))) {
+                s32 total = 0;
+                s32 written = 0;
+                NcmContentMetaKey dummyKey;
+                // Enumerate all patches on this storage
+                if (R_SUCCEEDED(ncmContentMetaDatabaseList(&db, &total, &written, &dummyKey, 1,
+                                                           NcmContentMetaType_Patch, 0, 0, UINT64_MAX,
+                                                           NcmContentInstallType_Full)) && total > 0) {
+                    std::vector<NcmContentMetaKey> keys(total);
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseList(&db, &total, &written, keys.data(), total,
+                                                               NcmContentMetaType_Patch, 0, 0, UINT64_MAX,
+                                                               NcmContentInstallType_Full))) {
+                        for (s32 i = 0; i < written; ++i) {
+                            uint64_t baseAppId = keys[i].id & ~0x1FFFULL;
+                            if (keys[i].version > installedPatches[baseAppId]) {
+                                installedPatches[baseAppId] = keys[i].version;
+                            }
+                        }
+                    }
+                }
+                // Also enumerate applications in case base version > 0
+                total = 0;
+                written = 0;
+                if (R_SUCCEEDED(ncmContentMetaDatabaseList(&db, &total, &written, &dummyKey, 1,
+                                                           NcmContentMetaType_Application, 0, 0, UINT64_MAX,
+                                                           NcmContentInstallType_Full)) && total > 0) {
+                    std::vector<NcmContentMetaKey> keys(total);
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseList(&db, &total, &written, keys.data(), total,
+                                                               NcmContentMetaType_Application, 0, 0, UINT64_MAX,
+                                                               NcmContentInstallType_Full))) {
+                        for (s32 i = 0; i < written; ++i) {
+                            uint64_t baseAppId = keys[i].id & ~0x1FFFULL;
+                            if (keys[i].version > installedPatches[baseAppId]) {
+                                installedPatches[baseAppId] = keys[i].version;
+                            }
+                        }
+                    }
+                }
+                ncmContentMetaDatabaseClose(&db);
+            }
+        }
+    }
+
     std::vector<InstalledTitle> next;
     next.reserve(records.size());
     auto control = std::make_unique<NsApplicationControlData>();
@@ -268,27 +317,12 @@ bool InstalledTitleService::refresh(std::string& error) {
                              "event=control_data result=0x%08x", rc);
         }
         
-        if (has_ncm) {
-            auto getVersion = [&](uint64_t targetId) -> uint32_t {
-                uint32_t v = 0;
-                NcmStorageId storages[] = {NcmStorageId_SdCard, NcmStorageId_BuiltInUser};
-                for (int s = 0; s < 2; s++) {
-                    NcmContentMetaDatabase db;
-                    if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storages[s]))) {
-                        NcmContentMetaKey key;
-                        if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, targetId))) {
-                            if (key.version > v) v = key.version;
-                        }
-                        ncmContentMetaDatabaseClose(&db);
-                    }
-                }
-                return v;
-            };
-            uint64_t update_id = (record.application_id & ~0x1FFFULL) | 0x800ULL;
-            title.internalVersion = getVersion(update_id);
-            if (title.internalVersion == 0) {
-                title.internalVersion = getVersion(record.application_id);
-            }
+        uint64_t baseId = record.application_id & ~0x1FFFULL;
+        auto patchIt = installedPatches.find(baseId);
+        if (patchIt != installedPatches.end()) {
+            title.internalVersion = patchIt->second;
+        } else {
+            title.internalVersion = 0;
         }
         
         if (has_pdm) {

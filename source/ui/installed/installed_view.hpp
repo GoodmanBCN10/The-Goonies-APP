@@ -66,10 +66,30 @@ public:
         subtitle += title.titleId;
 
         if (isUpdateList) {
-            uint32_t latestVer = NxVersionsService::instance().getLatestVersion(title.titleId);
-            if (latestVer == 0 && metadata) {
+            uint32_t latestVer = 0;
+            if (metadata) {
                 auto meta = metadata->findByTitleId(title.titleId);
                 if (meta) latestVer = meta->latestVersion;
+            }
+            if (latestVer == 0 && catalog) {
+                uint64_t baseAppId = title.applicationId & ~0x1FFFULL;
+                for (const auto& entry : catalog->entries()) {
+                    if (entry.isHiddenByDefault()) continue;
+                    bool match = false;
+                    if (!entry.titleId.empty()) {
+                        try {
+                            uint64_t tid = std::stoull(entry.titleId, nullptr, 16);
+                            if ((tid & ~0x1FFFULL) == baseAppId) match = true;
+                        } catch (...) {}
+                    }
+                    if (match && entry.updateVersion > 0) {
+                        latestVer = entry.updateVersion;
+                        break;
+                    }
+                }
+            }
+            if (latestVer == 0) {
+                latestVer = NxVersionsService::instance().getLatestVersion(title.titleId);
             }
             if (latestVer > 0) {
                 std::string versionStr = "v" + std::to_string(latestVer / 65536);
@@ -102,6 +122,59 @@ private:
     std::shared_ptr<ImageRequestState> imageState_ =
         std::make_shared<ImageRequestState>();
 };
+
+inline bool checkHasUpdate(const InstalledTitle& title,
+                           GameMetadataService* metadata,
+                           CatalogService* catalog) {
+    if (metadata) {
+        auto meta = metadata->findByTitleId(title.titleId);
+        if (meta && meta->latestVersion > 0 && meta->latestVersion > title.internalVersion) {
+            return true;
+        }
+    }
+
+    if (catalog) {
+        uint64_t baseAppId = title.applicationId & ~0x1FFFULL;
+        for (const auto& entry : catalog->entries()) {
+            if (entry.isHiddenByDefault()) continue;
+
+            bool match = false;
+            if (!entry.titleId.empty()) {
+                try {
+                    uint64_t tid = std::stoull(entry.titleId, nullptr, 16);
+                    if ((tid & ~0x1FFFULL) == baseAppId) match = true;
+                } catch (...) {}
+            }
+            if (!match && metadata) {
+                const GameMetadata* meta = metadata->findByInfoHash(entry.infoHash);
+                if (meta && !meta->titleId.empty()) {
+                    try {
+                        uint64_t tid = std::stoull(meta->titleId, nullptr, 16);
+                        if ((tid & ~0x1FFFULL) == baseAppId) match = true;
+                    } catch (...) {}
+                }
+            }
+
+            if (match) {
+                if (entry.updateVersion > 0 && entry.updateVersion > title.internalVersion) {
+                    return true;
+                }
+                std::string lowerTitle = entry.title;
+                std::transform(lowerTitle.begin(), lowerTitle.end(), lowerTitle.begin(), ::tolower);
+                if (lowerTitle.find("[upd") != std::string::npos ||
+                    lowerTitle.find("update") != std::string::npos ||
+                    lowerTitle.find("patch") != std::string::npos ||
+                    lowerTitle.find("+ upd") != std::string::npos) {
+                    if (title.internalVersion == 0) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
 
 class InstalledGridItem : public brls::Box {
 public:
@@ -155,13 +228,7 @@ public:
         subtitle_->setText(title.publisher.empty() ? title.titleId : title.publisher);
         setArtworkUrl(image_, metadata, title.iconPath, currentIconPath_, imageState_);
 
-        bool hasUpdate = NxVersionsService::instance().hasUpdate(title.titleId, title.internalVersion);
-        if (!hasUpdate && metadata) {
-            auto meta = metadata->findByTitleId(title.titleId);
-            if (meta && meta->latestVersion > 0 && meta->latestVersion > title.internalVersion) {
-                hasUpdate = true;
-            }
-        }
+        bool hasUpdate = checkHasUpdate(title, metadata, catalog);
         if (updateBadgeBox_) {
             updateBadgeBox_->setVisibility(hasUpdate ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
         }
@@ -260,14 +327,9 @@ public:
         
         for (const auto& t : titles) {
             if (showUpdatesOnly_) {
-                bool hasUpdate = NxVersionsService::instance().hasUpdate(t.titleId, t.internalVersion);
-                if (!hasUpdate && metadata_) {
-                    auto meta = metadata_->findByTitleId(t.titleId);
-                    if (meta && meta->latestVersion > 0 && meta->latestVersion > t.internalVersion) {
-                        hasUpdate = true;
-                    }
+                if (!checkHasUpdate(t, metadata_, catalog_)) {
+                    continue;
                 }
-                if (!hasUpdate) continue;
             }
             
             if (!q.empty()) {
@@ -281,6 +343,10 @@ public:
             titles_.push_back(t);
         }
         applySort();
+    }
+
+    size_t count() const {
+        return titles_.size();
     }
 
     void setSortType(SortType type) {
@@ -419,8 +485,10 @@ public:
             updateViewMode();
             dataSource_->setFilterUpdates(showUpdatesOnly_);
             reload();
-            recycler_->selectRowAt(brls::IndexPath(0, 0), false);
-            brls::Application::giveFocus(recycler_);
+            if (dataSource_->count() > 0) {
+                recycler_->selectRowAt(brls::IndexPath(0, 0), false);
+                brls::Application::giveFocus(recycler_);
+            }
             return true;
         });
 
@@ -616,18 +684,37 @@ private:
 
     void reload() {
         std::vector<InstalledTitle> titles = installed_->titles();
-        size_t count = titles.size();
         dataSource_->setTitles(std::move(titles), searchQuery_);
         recycler_->reloadData();
-        const bool empty = count == 0;
-        if (empty)
+
+        size_t count = dataSource_->count();
+        const bool empty = (count == 0);
+        if (empty) {
+            if (showUpdatesOnly_) {
+                ensureEmptyState()->setContent(
+                    "No hay actualizaciones disponibles",
+                    "Todos tus juegos instalados están al día con el catálogo.",
+                    "Refrescar", [this] { refresh(); });
+            } else {
+                ensureEmptyState()->setContent(
+                    "No hay aplicaciones instaladas",
+                    "Refresca la lista tras instalar juegos o al volver del menú Home.",
+                    "Refrescar instalados", [this] { refresh(); });
+            }
             ensureEmptyState()->setVisibility(brls::Visibility::VISIBLE);
-        else if (emptyState_)
+        } else if (emptyState_) {
             emptyState_->setVisibility(brls::Visibility::GONE);
+        }
         recycler_->setVisibility(empty ? brls::Visibility::GONE
                                        : brls::Visibility::VISIBLE);
-        status_->setText(std::to_string(count) +
-            (count == 1 ? " installed application" : " installed applications"));
+
+        if (showUpdatesOnly_) {
+            status_->setText(std::to_string(count) +
+                (count == 1 ? " actualización disponible" : " actualizaciones disponibles"));
+        } else {
+            status_->setText(std::to_string(count) +
+                (count == 1 ? " aplicación instalada" : " aplicaciones instaladas"));
+        }
         updateSortLabel();
     }
 
