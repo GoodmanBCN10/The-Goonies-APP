@@ -1,4 +1,6 @@
 #include "catalog_presentation.hpp"
+#include "installed_title_service.hpp"
+#include "package_utils.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -83,7 +85,14 @@ CatalogPresentation resolveCatalogPresentation(
     CatalogPresentation result;
     result.title = metadata && !metadata->name.empty()
         ? metadata->name : entry.title;
-    result.titleId = metadata ? metadata->titleId : std::string();
+    result.titleId = metadata && !metadata->titleId.empty()
+        ? metadata->titleId : entry.titleId;
+    if (result.titleId.empty()) {
+        uint64_t parsed = parseTitleIdFromFileName(entry.title);
+        if (parsed != 0) {
+            result.titleId = InstalledTitleService::formatTitleId(parsed);
+        }
+    }
     if (metadata && !metadata->iconUrl.empty()) {
         result.iconUrl = metadata->iconUrl;
         result.iconPreserveAspect = false;

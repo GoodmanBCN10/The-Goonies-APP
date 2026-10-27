@@ -48,6 +48,7 @@ inline uint64_t parseTitleIdFromFileName(const std::string& name) {
         return val;
     };
 
+    // First, look inside [] or ()
     for (size_t i = 0; i < name.size(); ++i) {
         char openChar = name[i];
         if (openChar != '[' && openChar != '(') continue;
@@ -72,6 +73,21 @@ inline uint64_t parseTitleIdFromFileName(const std::string& name) {
             }
         }
     }
+
+    // Fallback: look anywhere in the filename for a 16-hex string starting with 0100
+    for (size_t i = 0; i + 16 <= name.size(); ++i) {
+        if (name[i] == '0' && name[i+1] == '1' && name[i+2] == '0' && name[i+3] == '0') {
+            bool leftBoundary = (i == 0) || !std::isxdigit(static_cast<unsigned char>(name[i - 1]));
+            bool rightBoundary = (i + 16 == name.size()) || !std::isxdigit(static_cast<unsigned char>(name[i + 16]));
+            if (leftBoundary && rightBoundary && is16Hex(&name[i])) {
+                uint64_t tid = toHex64(&name[i]);
+                if (tid >= 0x0100000000000000ULL && tid <= 0x01FFFFFFFFFFFFFFULL) {
+                    return tid;
+                }
+            }
+        }
+    }
+
     return 0;
 }
 

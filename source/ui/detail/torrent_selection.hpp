@@ -297,6 +297,11 @@ public:
 
 private:
     void populateEntries() {
+        uint64_t effectiveAppId = appId_;
+        if (effectiveAppId == 0) {
+            effectiveAppId = parseTitleIdFromFileName(preview_.name);
+        }
+
         std::vector<TorrentSelectionEntry> entries;
         entries.reserve(preview_.files.size());
         for (const auto& file : preview_.files) {
@@ -305,7 +310,7 @@ private:
             entry.length = file.length;
             entry.package = file.package;
             if (file.package && installed_) {
-                PackageInfo pkg = classifyPackage(file.path, appId_);
+                PackageInfo pkg = classifyPackage(file.path, effectiveAppId);
                 entry.installed = installed_->isPackageInstalled(pkg);
                 if (pkg.kind == PackageKind::Update) {
                     entry.kindText = "Update";

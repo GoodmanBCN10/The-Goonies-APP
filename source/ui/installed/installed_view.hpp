@@ -132,8 +132,8 @@ inline bool checkHasUpdate(const InstalledTitle& title,
         if (meta) latestVer = meta->latestVersion;
     }
 
-    if (latestVer > 0) {
-        return latestVer > title.internalVersion;
+    if (latestVer > 0 && latestVer <= title.internalVersion) {
+        return false;
     }
 
     if (catalog) {
@@ -159,14 +159,21 @@ inline bool checkHasUpdate(const InstalledTitle& title,
             }
 
             if (match) {
-                if (entry.updateVersion > 0 && entry.updateVersion > title.internalVersion) {
+                if (latestVer > 0 && latestVer > title.internalVersion) {
+                    return true;
+                }
+                std::string lower = entry.title;
+                std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+                if (lower.find("upd") != std::string::npos || lower.find("patch") != std::string::npos ||
+                    lower.find("update") != std::string::npos || lower.find("dlc") != std::string::npos) {
                     return true;
                 }
             }
         }
+        return false;
     }
 
-    return false;
+    return (latestVer > 0 && latestVer > title.internalVersion);
 }
 
 class InstalledGridItem : public brls::Box {
@@ -605,50 +612,24 @@ private:
             std::transform(aLower.begin(), aLower.end(), aLower.begin(), ::tolower);
             std::transform(bLower.begin(), bLower.end(), bLower.begin(), ::tolower);
 
-            bool aHasUpd = (a.updateVersion > 0 || aLower.find("upd") != std::string::npos || aLower.find("patch") != std::string::npos || aLower.find("dlc") != std::string::npos);
-            bool bHasUpd = (b.updateVersion > 0 || bLower.find("upd") != std::string::npos || bLower.find("patch") != std::string::npos || bLower.find("dlc") != std::string::npos);
+            bool aHasUpd = (a.updateVersion > 0 || aLower.find("upd") != std::string::npos || aLower.find("patch") != std::string::npos || aLower.find("dlc") != std::string::npos || aLower.find("update") != std::string::npos);
+            bool bHasUpd = (b.updateVersion > 0 || bLower.find("upd") != std::string::npos || bLower.find("patch") != std::string::npos || bLower.find("dlc") != std::string::npos || bLower.find("update") != std::string::npos);
             if (aHasUpd != bHasUpd) return aHasUpd;
 
             if (a.peerCount != b.peerCount) return a.peerCount > b.peerCount;
             return a.topicId > b.topicId;
         });
 
-        if (matching.size() == 1) {
-            brls::Application::pushActivity(
-                new GameDetailActivity(matching.front(), "", manager_, metadata_, this->installed_, settings_,
-                    [](const std::string&, const std::string&){},
-                    [this](){ this->refresh(); },
-                    [this](){ this->refresh(); }));
-            return;
+        CatalogEntry bestEntry = matching.front();
+        if (bestEntry.titleId.empty()) {
+            bestEntry.titleId = title.titleId;
         }
 
-        // Multiple releases found! Show release selector dropdown so the user can choose
-        std::vector<std::string> labels;
-        for (size_t i = 0; i < matching.size(); ++i) {
-            const auto& e = matching[i];
-            std::string label = (i == 0 ? "\u2605 " : "") + cleanTitle(e.title);
-            if (e.size > 0) label += "  \u2022  " + formatBytes(e.size);
-            if (e.peerCount > 0) label += "  \u2022  " + std::to_string(e.peerCount) + " peers";
-            labels.push_back(label);
-        }
-
-        auto matchingList = std::make_shared<std::vector<CatalogEntry>>(matching);
-        auto chosen = std::make_shared<int>(-1);
-        auto* dropdown = new brls::Dropdown(
-            "Seleccionar version / release", labels,
-            [chosen](int sel) { *chosen = sel; },
-            0,
-            [this, matchingList, chosen](int) {
-                if (*chosen >= 0 && *chosen < static_cast<int>(matchingList->size())) {
-                    const CatalogEntry& selEntry = (*matchingList)[static_cast<size_t>(*chosen)];
-                    brls::Application::pushActivity(
-                        new GameDetailActivity(selEntry, "", manager_, metadata_, this->installed_, settings_,
-                            [](const std::string&, const std::string&){},
-                            [this](){ this->refresh(); },
-                            [this](){ this->refresh(); }));
-                }
-            });
-        brls::Application::pushActivity(new brls::Activity(dropdown));
+        brls::Application::pushActivity(
+            new GameDetailActivity(bestEntry, "", manager_, metadata_, this->installed_, settings_,
+                [](const std::string&, const std::string&){},
+                [this](){ this->refresh(); },
+                [this](){ this->refresh(); }));
     }
 
     void updateViewMode() {

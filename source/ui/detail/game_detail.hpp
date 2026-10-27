@@ -90,6 +90,15 @@ public:
         const GameMetadata* found = metadata_->findByInfoHash(entry_.infoHash);
         presentation_ = resolveCatalogPresentation(entry_, found);
         titleId_ = presentation_.titleId;
+        if (titleId_.empty() && !entry_.titleId.empty()) {
+            titleId_ = entry_.titleId;
+        }
+        if (titleId_.empty()) {
+            uint64_t parsed = parseTitleIdFromFileName(entry_.title);
+            if (parsed != 0) {
+                titleId_ = InstalledTitleService::formatTitleId(parsed);
+            }
+        }
 
         // F3: eShop-style two-column page. Left column is fixed (cover +
         // install button + size/status); the right column scrolls on its own.
@@ -631,10 +640,17 @@ private:
         }
 
         // Packages present. Install them silently.
-        bool hasBaseGame = installed_ && installed_->contains(titleId_);
+        bool hasBaseGame = false;
         uint64_t appId = 0;
         if (!titleId_.empty()) {
             try { appId = std::stoull(titleId_, nullptr, 16); } catch (...) {}
+        }
+        if (installed_) {
+            if (!titleId_.empty() && installed_->contains(titleId_)) {
+                hasBaseGame = true;
+            } else if (appId != 0 && installed_->findByApplicationId(appId).has_value()) {
+                hasBaseGame = true;
+            }
         }
         
         uint32_t extras = preview.fileCount - preview.packageCount;
@@ -681,7 +697,7 @@ private:
                 dialog->addButton("Ver archivos", [this, path, preview = std::move(preview), peers = std::move(initialPeers)]() mutable {
                     openSelection(path, std::move(preview), std::move(peers));
                 });
-                dialog->addButton("Cancelar", [path]() {
+                dialog->addButton("Aceptar", [path]() {
                     ::unlink(path.c_str());
                 });
                 dialog->open();

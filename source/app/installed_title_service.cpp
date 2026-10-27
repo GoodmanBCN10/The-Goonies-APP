@@ -129,6 +129,15 @@ bool InstalledTitleService::isPackageInstalled(const PackageInfo& pkg) const {
     std::string baseIdStr = formatTitleId(baseId);
     bool hasBase = contains(baseIdStr);
     if (!hasBase) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const auto& t : titles_) {
+            if ((t.applicationId & ~0x1FFFULL) == baseId) {
+                hasBase = true;
+                break;
+            }
+        }
+    }
+    if (!hasBase) {
         return false;
     }
 
@@ -299,16 +308,14 @@ bool InstalledTitleService::refresh(std::string& error) {
         if (has_db_sd) queryDb(&db_sd);
         if (has_db_nand) queryDb(&db_nand);
 
-        // Fallback: Also check GetLatestContentMetaKey for patchId
-        if (installedVer == 0) {
-            uint64_t patchId = (record.application_id & ~0x1FFFULL) | 0x800ULL;
-            NcmContentMetaKey pKey;
-            if (has_db_sd && R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db_sd, &pKey, patchId))) {
-                if (pKey.version > installedVer) installedVer = pKey.version;
-            }
-            if (has_db_nand && R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db_nand, &pKey, patchId))) {
-                if (pKey.version > installedVer) installedVer = pKey.version;
-            }
+        // Always check GetLatestContentMetaKey for patchId to ensure installed update version is captured
+        uint64_t patchId = (record.application_id & ~0x1FFFULL) | 0x800ULL;
+        NcmContentMetaKey pKey;
+        if (has_db_sd && R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db_sd, &pKey, patchId))) {
+            if (pKey.version > installedVer) installedVer = pKey.version;
+        }
+        if (has_db_nand && R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db_nand, &pKey, patchId))) {
+            if (pKey.version > installedVer) installedVer = pKey.version;
         }
 
         title.internalVersion = installedVer;

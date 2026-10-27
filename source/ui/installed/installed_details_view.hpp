@@ -253,10 +253,49 @@ public:
                     }
                 }
 
-                // Fallback check if list was empty
-                if (gameContents.empty()) {
+                // Ensure Base is present if not enumerated
+                bool hasBaseInList = false;
+                bool hasPatchInList = false;
+                for (const auto& item : gameContents) {
+                    if (item.type == "Base" && item.storage == storageNames[s]) hasBaseInList = true;
+                    if (item.type == "Update" && item.storage == storageNames[s]) hasPatchInList = true;
+                }
+
+                if (!hasBaseInList) {
                     fetchContentsFromDB(&db, baseId, "Base", storageNames[s], gameContents);
+                    NcmContentMetaKey baseKey = {0};
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &baseKey, baseId))) {
+                        uint32_t bReqV = 0;
+                        if (R_SUCCEEDED(ncmContentMetaDatabaseGetRequiredSystemVersion(&db, &bReqV, &baseKey))) {
+                            if (bReqV > highestReqV) highestReqV = bReqV;
+                        }
+                    }
+                }
+
+                if (!hasPatchInList) {
                     fetchContentsFromDB(&db, patchId, "Update", storageNames[s], gameContents);
+                    NcmContentMetaKey patchKey = {0};
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &patchKey, patchId))) {
+                        uint32_t pReqV = 0;
+                        if (R_SUCCEEDED(ncmContentMetaDatabaseGetRequiredSystemVersion(&db, &pReqV, &patchKey))) {
+                            if (pReqV > highestReqV) highestReqV = pReqV;
+                        }
+                    }
+                }
+
+                // Check DLCs if not enumerated
+                bool hasDlcInList = false;
+                for (const auto& item : gameContents) {
+                    if (item.type == "DLC" && item.storage == storageNames[s]) {
+                        hasDlcInList = true;
+                        break;
+                    }
+                }
+                if (!hasDlcInList) {
+                    uint64_t dlcBase = baseId | 0x1000ULL;
+                    for (int i = 0; i < 256; i++) {
+                        fetchContentsFromDB(&db, dlcBase + i, "DLC", storageNames[s], gameContents);
+                    }
                 }
 
                 ncmContentMetaDatabaseClose(&db);

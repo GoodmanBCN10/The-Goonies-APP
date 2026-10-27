@@ -1,4 +1,6 @@
 #include "catalog_service.hpp"
+#include "installed_title_service.hpp"
+#include "package_utils.hpp"
 #include "magnet_resolver.hpp"
 
 extern "C" {
@@ -458,6 +460,12 @@ bool CatalogService::parseJson(const std::string& json,
         entry.size = readFlexibleSize(item, "size");
         entry.topicId = readFlexibleUnsigned(item, "topic_id");
         entry.titleId = readString(item, "title_id", 32);
+        if (entry.titleId.empty()) {
+            uint64_t parsed = parseTitleIdFromFileName(entry.title);
+            if (parsed != 0) {
+                entry.titleId = InstalledTitleService::formatTitleId(parsed);
+            }
+        }
         // Langegen inline metadata: shown on the detail card, which never
         // matches these entries in the bundled game_metadata_index.
         entry.year = readString(item, "year", 32);
