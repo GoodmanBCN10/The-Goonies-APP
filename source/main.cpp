@@ -329,13 +329,37 @@ int main(int argc, char* argv[]) {
         brls::Application::getPlatform()->setThemeVariant(brls::ThemeVariant::DARK);
         writeLog("createWindow OK");
 
-        // 3. Initialize Sockets & System Services in background after window is visible
-        if (R_SUCCEEDED(socketInitializeDefault())) {
+        // 3. Initialize Sockets with expanded pool (~13 MB, matching TorrentShopNX 2.18)
+        // Eliminates ENOBUFS errors when downloading via torrent / curl with many peers
+#ifdef __SWITCH__
+        SocketInitConfig cfg = *(socketGetDefaultInitConfig());
+        cfg.num_bsd_sessions = 16;
+        cfg.sb_efficiency = 8;
+        cfg.tcp_tx_buf_size = 0x8000;         // 32 KB
+        cfg.tcp_rx_buf_size = 0x10000;        // 64 KB
+        cfg.tcp_tx_buf_max_size = 0x40000;    // 256 KB
+        cfg.tcp_rx_buf_max_size = 0x180000;   // 1.5 MB
+        cfg.udp_rx_buf_size = 0x8000;         // 32 KB
+        cfg.udp_tx_buf_size = 0x4000;         // 16 KB
+
+        Result sockRc = socketInitialize(&cfg);
+        if (R_FAILED(sockRc)) {
+            // Smaller pool (~6.4 MB) fallback if needed
+            cfg.sb_efficiency = 4;
+            sockRc = socketInitialize(&cfg);
+        }
+        if (R_FAILED(sockRc)) {
+            sockRc = socketInitializeDefault();
+        }
+        if (R_SUCCEEDED(sockRc)) {
             socketReady = true;
-            writeLog("socketInitialize OK");
+            writeLog("socketInitialize OK (13MB pool)");
         } else {
             writeLog("socketInitialize FAILED (non-fatal)");
         }
+#else
+        socketReady = true;
+#endif
 
         // (usbHsFsInitialize moved down)
 

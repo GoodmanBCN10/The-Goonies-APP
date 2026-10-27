@@ -28,6 +28,8 @@ namespace {
 #define THEGOONIES_VERSION "0.0.0"
 #endif
 
+constexpr const char* kRawVersionUrl =
+    "https://raw.githubusercontent.com/GoodmanBCN10/The-Goonies-APP/main/version.json";
 constexpr const char* kLatestReleaseUrl =
     "https://api.github.com/repos/GoodmanBCN10/The-Goonies-APP/releases/latest";
 constexpr const char* kReleaseAssetPrefix =
@@ -425,11 +427,23 @@ bool UpdateService::parseRelease(const std::string& json, ReleaseInfo& release,
 UpdateCheckResult UpdateService::check() const {
     UpdateCheckResult result;
     std::string body;
-    if (!fetchWithRetry([&] {
+    // 1. Try Fastly CDN raw URL first (immune to GitHub API 60 req/hr rate limit)
+    bool fetched = fetchWithRetry([&] {
+        return metadataFetcher_(kRawVersionUrl, kMetadataLimit, body,
+                                result.error);
+    }, result.error);
+
+    // 2. Fallback to GitHub API if raw version failed
+    if (!fetched) {
+        fetched = fetchWithRetry([&] {
             return metadataFetcher_(kLatestReleaseUrl, kMetadataLimit, body,
                                     result.error);
-        }, result.error))
+        }, result.error);
+    }
+
+    if (!fetched)
         return result;
+
     if (!parseRelease(body, result.release, result.error))
         return result;
     result.ok = true;

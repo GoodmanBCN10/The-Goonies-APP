@@ -53,7 +53,7 @@
 #define HEDGE_MIN_LATENCY_PEERS 2
 #define MAX_PEER_TELEMETRY    8
 #define PEER_BLOCKLIST_SIZE   256
-#define PEER_BLOCKLIST_MS     60000
+#define PEER_BLOCKLIST_MS     300000ULL
 
 struct peer_addr {
     uint32_t ip;   /* network byte order */

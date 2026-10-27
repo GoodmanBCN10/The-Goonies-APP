@@ -12,6 +12,7 @@ build-cmake/
 *.zip
 *.txt
 *.json
+!version.json
 !romfs/**/*.json
 !package.json
 temp*

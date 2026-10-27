@@ -17,6 +17,7 @@
 #include "app/catalog_service.hpp"
 #include "app/app_settings.hpp"
 #include "ui/detail/game_detail.hpp"
+#include "app/nx_versions_service.hpp"
 #include <algorithm>
 #include <algorithm>
 
@@ -65,19 +66,15 @@ public:
             subtitle += "   ";
         subtitle += title.titleId;
 
-        if (isUpdateList && metadata && catalog) {
-            auto meta = metadata->findByTitleId(title.titleId);
-            if (meta && meta->latestVersion > 0) {
-                std::string versionStr = "v" + std::to_string(meta->latestVersion / 65536);
-                subtitle += "   (" + versionStr;
-                
-                for (const auto& entry : catalog->entries()) {
-                    if (entry.infoHash == meta->infoHash && entry.size > 0) {
-                        subtitle += " - " + formatBytes(entry.size);
-                        break;
-                    }
-                }
-                subtitle += ")";
+        if (isUpdateList) {
+            uint32_t latestVer = NxVersionsService::instance().getLatestVersion(title.titleId);
+            if (latestVer == 0 && metadata) {
+                auto meta = metadata->findByTitleId(title.titleId);
+                if (meta) latestVer = meta->latestVersion;
+            }
+            if (latestVer > 0) {
+                std::string versionStr = "v" + std::to_string(latestVer / 65536);
+                subtitle += "   (" + versionStr + ")";
             }
         }
 
@@ -159,24 +156,15 @@ public:
         subtitle_->setText(title.publisher.empty() ? title.titleId : title.publisher);
         setArtworkUrl(image_, metadata, title.iconPath, currentIconPath_, imageState_);
 
-        if (metadata) {
+        bool hasUpdate = NxVersionsService::instance().hasUpdate(title.titleId, title.internalVersion);
+        if (!hasUpdate && metadata) {
             auto meta = metadata->findByTitleId(title.titleId);
-            bool hasUpdate = false;
-            if (meta) {
-                // Determine if an update is available.
-                // In game_metadata_service, latestVersion is parsed from update versions (which are > 65536).
-                // If internalVersion is the base game version (which is often 0), and an update exists, it will be greater.
-                // However, some base games might have latestVersion == 0 if no updates exist.
-                // To be safe, if latestVersion > 0 and latestVersion > title.internalVersion, we consider it an update.
-                if (meta->latestVersion > 0 && meta->latestVersion > title.internalVersion) {
-                    hasUpdate = true;
-                }
+            if (meta && meta->latestVersion > 0 && meta->latestVersion > title.internalVersion) {
+                hasUpdate = true;
             }
-            if (updateBadgeBox_) {
-                updateBadgeBox_->setVisibility(hasUpdate ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
-            }
-        } else {
-            if (updateBadgeBox_) updateBadgeBox_->setVisibility(brls::Visibility::GONE);
+        }
+        if (updateBadgeBox_) {
+            updateBadgeBox_->setVisibility(hasUpdate ? brls::Visibility::VISIBLE : brls::Visibility::GONE);
         }
 
         this->registerClickAction([title, metadata, onClick](brls::View* view) {
@@ -273,8 +261,8 @@ public:
         
         for (const auto& t : titles) {
             if (showUpdatesOnly_) {
-                bool hasUpdate = false;
-                if (metadata_) {
+                bool hasUpdate = NxVersionsService::instance().hasUpdate(t.titleId, t.internalVersion);
+                if (!hasUpdate && metadata_) {
                     auto meta = metadata_->findByTitleId(t.titleId);
                     if (meta && meta->latestVersion > 0 && meta->latestVersion > t.internalVersion) {
                         hasUpdate = true;
@@ -366,6 +354,8 @@ public:
                   GameMetadataService* metadata, CatalogService* catalog, AppSettings* settings)
         : brls::Box(brls::Axis::COLUMN), installed_(installed),
           manager_(manager), metadata_(metadata), catalog_(catalog), settings_(settings), alive_(std::make_shared<std::atomic<bool>>(true)) {
+        NxVersionsService::instance().init();
+
         status_ = new brls::Label();
         status_->setFontSize(15);
         status_->setMarginTop(10);
@@ -395,16 +385,29 @@ public:
         recycler_->registerCell("Message", [] { return new TextMessageCell(); });
         
         auto onClick = [this, manager, metadata, catalog, settings](const InstalledTitle& title) {
-            if (showUpdatesOnly_ && metadata) {
-                auto meta = metadata->findByTitleId(title.titleId);
-                if (meta) {
-                    for (const auto& entry : catalog->entries()) {
-                        if (entry.infoHash == meta->infoHash) {
-                            brls::Application::pushActivity(
-                                new GameDetailActivity(entry, "", manager, metadata, this->installed_, settings,
-                                    [](const std::string&, const std::string&){},
-                                    [](){}));
-                            return;
+            if (showUpdatesOnly_ && catalog) {
+                // First try matching catalog entry directly by titleId
+                for (const auto& entry : catalog->entries()) {
+                    if (!entry.titleId.empty() && strcasecmp(entry.titleId.c_str(), title.titleId.c_str()) == 0) {
+                        brls::Application::pushActivity(
+                            new GameDetailActivity(entry, "", manager, metadata, this->installed_, settings,
+                                [](const std::string&, const std::string&){},
+                                [](){}));
+                        return;
+                    }
+                }
+                // Next try matching via metadata
+                if (metadata) {
+                    auto meta = metadata->findByTitleId(title.titleId);
+                    if (meta) {
+                        for (const auto& entry : catalog->entries()) {
+                            if (entry.infoHash == meta->infoHash) {
+                                brls::Application::pushActivity(
+                                    new GameDetailActivity(entry, "", manager, metadata, this->installed_, settings,
+                                        [](const std::string&, const std::string&){},
+                                        [](){}));
+                                return;
+                            }
                         }
                     }
                 }

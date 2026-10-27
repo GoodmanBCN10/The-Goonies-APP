@@ -22,6 +22,7 @@ struct CatalogEntry {
     std::string magnetUri;
     std::string trackerUrl;
     std::string posterUrl;
+    std::string titleId;
     std::vector<std::string> screenshots;
     std::string healthReason;
     

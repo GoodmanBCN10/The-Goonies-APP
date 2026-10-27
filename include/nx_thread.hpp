@@ -12,6 +12,30 @@
 
 namespace nx {
 
+#define NX_CORE_UI    0
+#define NX_CORE_WORK  1
+#define NX_CORE_NET   2
+
+#define NX_PRIO_NETLOOP   0x2B
+#define NX_PRIO_WORKER    0x2C
+#define NX_PRIO_WRITER    0x2D
+#define NX_PRIO_IMAGE     0x2D
+
+static inline void pin_self(int core, int prio) {
+#ifdef __SWITCH__
+    u64 mask = 0;
+    if (R_SUCCEEDED(svcGetInfo(&mask, InfoType_CoreMask, CUR_PROCESS_HANDLE, 0))) {
+        if (core >= 0 && core < 4 && (mask & (1ULL << core))) {
+            svcSetThreadCoreMask(CUR_THREAD_HANDLE, core, 1ULL << core);
+        }
+    }
+    svcSetThreadPriority(CUR_THREAD_HANDLE, static_cast<u32>(prio));
+#else
+    (void)core;
+    (void)prio;
+#endif
+}
+
 #ifdef __SWITCH__
 class thread {
 public:

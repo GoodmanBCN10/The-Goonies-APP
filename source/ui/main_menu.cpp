@@ -474,9 +474,8 @@ MainMenu::MainMenu(goonies::DownloadManager* manager, goonies::CatalogService* c
     if (updater_) {
         updater_->checkAsync([this](goonies::UpdateCheckResult result) {
             if (!result.ok) {
-                brls::sync([this, error = result.error]() {
-                    brls::Application::notify("Update error: " + error);
-                });
+                // Log failure without popping up toast dialog during startup
+                log_msg("[update] Startup check error: %s\n", result.error.c_str());
             } else if (result.updateAvailable) {
                 brls::sync([this, release = result.release]() {
                     std::string esText = "Hay una nueva versiÃ³n de The Goonies APP disponible (" + release.version + "). Â¿Deseas descargarla e instalarla ahora?";

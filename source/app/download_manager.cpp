@@ -1,4 +1,4 @@
-﻿#include <filesystem>
+#include <filesystem>
 #include "download_manager.hpp"
 #include "request_gate.hpp"
 #include "stream_ram_budget.hpp"
@@ -895,6 +895,7 @@ public:
     }
 
     void installMain() {
+        nx::pin_self(NX_CORE_WORK, NX_PRIO_WORKER);
         log_msg("[install] worker started queue=%zu buffer=%zu window=%llu bytes\n",
                 maxQueuedBytes_, maxBufferedBytes_,
                 static_cast<unsigned long long>(requestAheadBytes_));
@@ -1904,6 +1905,7 @@ bool DownloadManager::removeLocked(const std::string& id, bool deleteData,
 }
 
 void DownloadManager::workerMain() {
+    nx::pin_self(NX_CORE_NET, NX_PRIO_NETLOOP);
     while (!stopping_) {
         std::string activeId;
         std::string metainfoPath;

@@ -457,6 +457,7 @@ bool CatalogService::parseJson(const std::string& json,
         }
         entry.size = readFlexibleSize(item, "size");
         entry.topicId = readFlexibleUnsigned(item, "topic_id");
+        entry.titleId = readString(item, "title_id", 32);
         // Langegen inline metadata: shown on the detail card, which never
         // matches these entries in the bundled game_metadata_index.
         entry.year = readString(item, "year", 32);

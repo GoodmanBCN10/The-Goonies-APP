@@ -1,0 +1,17 @@
+{
+  "tag_name": "v2.1.24-BETA",
+  "name": "The Goonies APP v2.1.24-BETA",
+  "draft": false,
+  "prerelease": false,
+  "body": "The Goonies APP v2.1.24-BETA\n\n- Detección de actualizaciones de juegos instalados con base de datos nx-versions.\n- Eliminación del error HTTP 403 en el actualizador automático (consulta vía CDN).\n- Búfer de sockets BSD ampliado a 13 MB (erradicación de errores ENOBUFS).\n- Afinidad multinúcleo de hilos (Core 0 para interfaz fluida, Core 1 para instalación y Core 2 para red).\n- Filtro del catálogo para que 'Todo' muestre solo juegos y Ports The Goonies.",
+  "assets": [
+    {
+      "name": "TheGooniesInstaller.nro",
+      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v2.1.24-BETA/TheGooniesInstaller.nro"
+    },
+    {
+      "name": "TheGooniesInstaller.nro.sha256",
+      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v2.1.24-BETA/TheGooniesInstaller.nro.sha256"
+    }
+  ]
+}

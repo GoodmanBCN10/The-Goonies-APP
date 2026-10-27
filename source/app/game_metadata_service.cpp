@@ -1098,6 +1098,7 @@ void GameMetadataService::cacheImageLocked(
 }
 
 void GameMetadataService::imageWorkerMain() const {
+    nx::pin_self(NX_CORE_WORK, NX_PRIO_IMAGE);
     while (true) {
         std::string url;
         {
