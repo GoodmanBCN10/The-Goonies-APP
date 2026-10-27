@@ -54,6 +54,7 @@ struct CatalogEntry {
     uint32_t forumId = 0;
     uint32_t trackerId = 0;
     uint32_t peerCount = 0;
+    uint32_t updateVersion = 0;
     CatalogHealth health = CatalogHealth::Unknown;
     bool metadataOk = false;
 

@@ -9,6 +9,8 @@
 
 #include "app/download_manager.hpp"
 #include "app/install_space.hpp"
+#include "app/installed_title_service.hpp"
+#include "app/package_utils.hpp"
 #include "ui/common/ui_helpers.hpp"
 #include "ui/theme.hpp"
 
@@ -18,6 +20,8 @@ struct TorrentSelectionEntry {
     std::string path;
     uint64_t length = 0;
     bool package = false;
+    bool installed = false;
+    std::string kindText;
     FileAction action = FileAction::Download;
 };
 
@@ -70,10 +74,18 @@ public:
         title_->setText(entry.path);
         std::string meta = formatBytes(entry.length);
         meta += "   ";
-        meta += entry.package ? "NSP/NSZ package" : "Other file";
+        meta += entry.package ? (entry.kindText.empty() ? "NSP/NSZ package" : entry.kindText) : "Other file";
+        if (entry.installed) {
+            meta += "   (Instalado)";
+        }
         meta += "   ";
         meta += actionLabel(entry.action);
         meta_->setText(meta);
+        if (entry.installed) {
+            title_->setTextColor(theme::textTertiary());
+        } else {
+            title_->setTextColor(theme::textPrimary());
+        }
     }
 
 private:
@@ -168,11 +180,14 @@ public:
                              goonies::TorrentPreview preview,
                              TransferMode preferred,
                              StreamSelection initialSelection,
-                             std::vector<uint8_t> initialPeers = {})
+                             std::vector<uint8_t> initialPeers = {},
+                             InstalledTitleService* installed = nullptr,
+                             uint64_t appId = 0)
         : manager_(manager), path_(std::move(path)),
           preview_(std::move(preview)), preferred_(preferred),
           initialSelection_(initialSelection),
-          initialPeers_(std::move(initialPeers)) {
+          initialPeers_(std::move(initialPeers)),
+          installed_(installed), appId_(appId) {
         auto* content = new brls::Box(brls::Axis::COLUMN);
         content->setGrow(1);
         content->setPadding(24, 38, 24, 34);
@@ -289,11 +304,23 @@ private:
             entry.path = file.path;
             entry.length = file.length;
             entry.package = file.package;
+            if (file.package && installed_) {
+                PackageInfo pkg = classifyPackage(file.path, appId_);
+                entry.installed = installed_->isPackageInstalled(pkg);
+                if (pkg.kind == PackageKind::Update) {
+                    entry.kindText = "Update";
+                } else if (pkg.kind == PackageKind::DLC) {
+                    entry.kindText = "DLC";
+                } else if (pkg.kind == PackageKind::BaseGame) {
+                    entry.kindText = "Base";
+                }
+            }
+
             if (preferred_ == TransferMode::StreamInstall && file.package) {
-                entry.action = FileAction::Install;
+                entry.action = entry.installed ? FileAction::Skip : FileAction::Install;
             } else if (initialSelection_ == StreamSelection::AllFiles ||
                        preferred_ != TransferMode::StreamInstall) {
-                entry.action = FileAction::Download;
+                entry.action = entry.installed ? FileAction::Skip : FileAction::Download;
             } else {
                 entry.action = FileAction::Skip;
             }
@@ -395,6 +422,8 @@ private:
     TransferMode preferred_;
     StreamSelection initialSelection_;
     std::vector<uint8_t> initialPeers_;
+    InstalledTitleService* installed_ = nullptr;
+    uint64_t appId_ = 0;
     brls::AppletFrame* frame_ = nullptr;
     brls::Label* title_ = nullptr;
     brls::Label* summary_ = nullptr;

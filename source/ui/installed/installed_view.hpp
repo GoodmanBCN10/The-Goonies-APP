@@ -18,8 +18,7 @@
 #include "app/app_settings.hpp"
 #include "ui/detail/game_detail.hpp"
 #include "app/nx_versions_service.hpp"
-#include <algorithm>
-#include <algorithm>
+#include "app/package_utils.hpp"
 
 namespace goonies::ui {
 
@@ -384,37 +383,12 @@ public:
         recycler_->registerCell("GridRow", [this] { return new InstalledGridRow(columns_); });
         recycler_->registerCell("Message", [] { return new TextMessageCell(); });
         
-        auto onClick = [this, manager, metadata, catalog, settings](const InstalledTitle& title) {
-            if (showUpdatesOnly_ && catalog) {
-                // First try matching catalog entry directly by titleId
-                for (const auto& entry : catalog->entries()) {
-                    if (!entry.titleId.empty() && strcasecmp(entry.titleId.c_str(), title.titleId.c_str()) == 0) {
-                        brls::Application::pushActivity(
-                            new GameDetailActivity(entry, "", manager, metadata, this->installed_, settings,
-                                [](const std::string&, const std::string&){},
-                                [this](){ this->refresh(); },
-                                [this](){ this->refresh(); }));
-                        return;
-                    }
-                }
-                // Next try matching via metadata
-                if (metadata) {
-                    auto meta = metadata->findByTitleId(title.titleId);
-                    if (meta) {
-                        for (const auto& entry : catalog->entries()) {
-                            if (entry.infoHash == meta->infoHash) {
-                                brls::Application::pushActivity(
-                                    new GameDetailActivity(entry, "", manager, metadata, this->installed_, settings,
-                                        [](const std::string&, const std::string&){},
-                                        [this](){ this->refresh(); },
-                                        [this](){ this->refresh(); }));
-                                return;
-                            }
-                        }
-                    }
-                }
+        auto onClick = [this](const InstalledTitle& title) {
+            if (showUpdatesOnly_ && catalog_) {
+                openUpdateForTitle(title);
+                return;
             }
-            brls::Application::pushActivity(new brls::Activity(new InstalledDetailsView(title, metadata)));
+            brls::Application::pushActivity(new brls::Activity(new InstalledDetailsView(title, metadata_)));
         };
         
         dataSource_ = new InstalledDataSource(metadata, catalog, settings, manager, onClick);
@@ -486,6 +460,120 @@ private:
         } else {
             sortLabel_->setText("Ordenado por: Última partida");
         }
+    }
+
+    void openUpdateForTitle(const InstalledTitle& title) {
+        if (!catalog_) {
+            brls::Application::pushActivity(new brls::Activity(new InstalledDetailsView(title, metadata_)));
+            return;
+        }
+
+        uint64_t baseAppId = title.applicationId & ~0x1FFFULL;
+        std::vector<CatalogEntry> matching;
+
+        // 1. Search catalog entries matching baseAppId or titleId
+        for (const auto& entry : catalog_->entries()) {
+            if (entry.isHiddenByDefault()) continue;
+            
+            bool match = false;
+            if (!entry.titleId.empty()) {
+                try {
+                    uint64_t tid = std::stoull(entry.titleId, nullptr, 16);
+                    if ((tid & ~0x1FFFULL) == baseAppId) match = true;
+                } catch (...) {}
+            }
+            if (!match && metadata_) {
+                const GameMetadata* meta = metadata_->findByInfoHash(entry.infoHash);
+                if (meta && !meta->titleId.empty()) {
+                    try {
+                        uint64_t tid = std::stoull(meta->titleId, nullptr, 16);
+                        if ((tid & ~0x1FFFULL) == baseAppId) match = true;
+                    } catch (...) {}
+                }
+            }
+            if (!match) {
+                if (releaseNameMatches(title.name, entry.title)) {
+                    match = true;
+                }
+            }
+
+            if (match) {
+                matching.push_back(entry);
+            }
+        }
+
+        if (matching.empty()) {
+            uint32_t latestVer = NxVersionsService::instance().getLatestVersion(title.titleId);
+            std::string verText = "";
+            if (latestVer > 0) {
+                verText = " (v" + std::to_string(latestVer / 65536) + " / #" + std::to_string(latestVer) + ")";
+            }
+            std::string msg = "Actualizacion no disponible en el catalogo\n\n" + title.name +
+                              " tiene una actualizacion oficial disponible en Nintendo" + verText +
+                              ", pero actualmente no hay ningun torrent disponible en el catalogo para este juego.";
+            auto* dialog = new brls::Dialog(msg);
+            dialog->addButton("Ver detalles", [this, title]() {
+                brls::Application::pushActivity(new brls::Activity(new InstalledDetailsView(title, metadata_)));
+            });
+            dialog->addButton("Aceptar", []() {});
+            dialog->open();
+            return;
+        }
+
+        // Rank releases:
+        // 1. Releases that mention update/patch/dlc or have updateVersion > 0
+        // 2. More peers
+        // 3. Newer topicId / publishedAt
+        std::stable_sort(matching.begin(), matching.end(), [](const CatalogEntry& a, const CatalogEntry& b) {
+            std::string aLower = a.title;
+            std::string bLower = b.title;
+            std::transform(aLower.begin(), aLower.end(), aLower.begin(), ::tolower);
+            std::transform(bLower.begin(), bLower.end(), bLower.begin(), ::tolower);
+
+            bool aHasUpd = (a.updateVersion > 0 || aLower.find("upd") != std::string::npos || aLower.find("patch") != std::string::npos || aLower.find("dlc") != std::string::npos);
+            bool bHasUpd = (b.updateVersion > 0 || bLower.find("upd") != std::string::npos || bLower.find("patch") != std::string::npos || bLower.find("dlc") != std::string::npos);
+            if (aHasUpd != bHasUpd) return aHasUpd;
+
+            if (a.peerCount != b.peerCount) return a.peerCount > b.peerCount;
+            return a.topicId > b.topicId;
+        });
+
+        if (matching.size() == 1) {
+            brls::Application::pushActivity(
+                new GameDetailActivity(matching.front(), "", manager_, metadata_, this->installed_, settings_,
+                    [](const std::string&, const std::string&){},
+                    [this](){ this->refresh(); },
+                    [this](){ this->refresh(); }));
+            return;
+        }
+
+        // Multiple releases found! Show release selector dropdown so the user can choose
+        std::vector<std::string> labels;
+        for (size_t i = 0; i < matching.size(); ++i) {
+            const auto& e = matching[i];
+            std::string label = (i == 0 ? "\u2605 " : "") + cleanTitle(e.title);
+            if (e.size > 0) label += "  \u2022  " + formatBytes(e.size);
+            if (e.peerCount > 0) label += "  \u2022  " + std::to_string(e.peerCount) + " peers";
+            labels.push_back(label);
+        }
+
+        auto matchingList = std::make_shared<std::vector<CatalogEntry>>(matching);
+        auto chosen = std::make_shared<int>(-1);
+        auto* dropdown = new brls::Dropdown(
+            "Seleccionar version / release", labels,
+            [chosen](int sel) { *chosen = sel; },
+            0,
+            [this, matchingList, chosen](int) {
+                if (*chosen >= 0 && *chosen < static_cast<int>(matchingList->size())) {
+                    const CatalogEntry& selEntry = (*matchingList)[static_cast<size_t>(*chosen)];
+                    brls::Application::pushActivity(
+                        new GameDetailActivity(selEntry, "", manager_, metadata_, this->installed_, settings_,
+                            [](const std::string&, const std::string&){},
+                            [this](){ this->refresh(); },
+                            [this](){ this->refresh(); }));
+                }
+            });
+        brls::Application::pushActivity(new brls::Activity(dropdown));
     }
 
     void updateViewMode() {

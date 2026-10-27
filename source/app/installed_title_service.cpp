@@ -91,6 +91,88 @@ bool InstalledTitleService::contains(const std::string& titleId) const {
     return !titleId.empty() && titleIds_.count(upperAscii(titleId)) != 0;
 }
 
+std::optional<InstalledTitle> InstalledTitleService::find(const std::string& titleId) const {
+    if (titleId.empty()) return std::nullopt;
+    std::string upper = upperAscii(titleId);
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (const auto& t : titles_) {
+        if (upperAscii(t.titleId) == upper)
+            return t;
+    }
+    return std::nullopt;
+}
+
+std::optional<InstalledTitle> InstalledTitleService::findByApplicationId(uint64_t appId) const {
+    if (appId == 0) return std::nullopt;
+    uint64_t baseId = appId & ~0x1FFFULL;
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (const auto& t : titles_) {
+        if ((t.applicationId & ~0x1FFFULL) == baseId)
+            return t;
+    }
+    return std::nullopt;
+}
+
+uint32_t InstalledTitleService::getInstalledVersion(uint64_t appId) const {
+    auto title = findByApplicationId(appId);
+    return title ? title->internalVersion : 0;
+}
+
+bool InstalledTitleService::isPackageInstalled(const PackageInfo& pkg) const {
+    uint64_t baseId = pkg.baseTitleId;
+    if (baseId == 0 && pkg.titleId != 0) {
+        baseId = pkg.titleId & ~0x1FFFULL;
+    }
+    if (baseId == 0) return false;
+
+    std::string baseIdStr = formatTitleId(baseId);
+    bool hasBase = contains(baseIdStr);
+    if (!hasBase) {
+        return false;
+    }
+
+    if (pkg.kind == PackageKind::BaseGame) {
+        return true;
+    }
+
+    if (pkg.kind == PackageKind::Update) {
+        uint32_t installedVer = 0;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            for (const auto& t : titles_) {
+                if ((t.applicationId & ~0x1FFFULL) == baseId) {
+                    installedVer = t.internalVersion;
+                    break;
+                }
+            }
+        }
+        if (pkg.version > 0) {
+            return installedVer >= pkg.version;
+        }
+        return (installedVer > 0);
+    }
+
+    if (pkg.kind == PackageKind::DLC) {
+        if (pkg.titleId != 0) {
+#if defined(__SWITCH__)
+            NcmStorageId storages[] = {NcmStorageId_SdCard, NcmStorageId_BuiltInUser};
+            for (int s = 0; s < 2; s++) {
+                NcmContentMetaDatabase db;
+                if (R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, storages[s]))) {
+                    NcmContentMetaKey key;
+                    Result rc = ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, pkg.titleId);
+                    ncmContentMetaDatabaseClose(&db);
+                    if (R_SUCCEEDED(rc)) return true;
+                }
+            }
+#endif
+        }
+        return false;
+    }
+
+    return false;
+}
+
 std::vector<InstalledTitle> InstalledTitleService::titles() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return titles_;

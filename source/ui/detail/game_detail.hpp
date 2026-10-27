@@ -632,13 +632,17 @@ private:
 
         // Packages present. Install them silently.
         bool hasBaseGame = installed_ && installed_->contains(titleId_);
-        std::string lowerTitleId = catalogLower(titleId_);
+        uint64_t appId = 0;
+        if (!titleId_.empty()) {
+            try { appId = std::stoull(titleId_, nullptr, 16); } catch (...) {}
+        }
         
         uint32_t extras = preview.fileCount - preview.packageCount;
         std::vector<uint8_t> mask;
         mask.reserve(preview.files.size());
         
         bool anySelected = false;
+        size_t skippedPackages = 0;
         
         for (const auto& file : preview.files) {
             if (!file.package) {
@@ -646,57 +650,43 @@ private:
                 continue;
             }
             
-            bool skip = false;
-            if (hasBaseGame) {
-                std::string lowerPath = catalogLower(file.path);
-                size_t lastSlash = lowerPath.find_last_of("/\\");
-                std::string filename = (lastSlash != std::string::npos) ? lowerPath.substr(lastSlash + 1) : lowerPath;
-                
-                bool isUpdateOrDlc = (filename.find("[upd") != std::string::npos ||
-                                      filename.find("(upd") != std::string::npos ||
-                                      filename.find("update") != std::string::npos ||
-                                      filename.find("patch") != std::string::npos ||
-                                      filename.find("[dlc") != std::string::npos ||
-                                      filename.find("(dlc") != std::string::npos ||
-                                      filename.find("800]") != std::string::npos ||
-                                      filename.find("800)") != std::string::npos);
-                
-                if (!isUpdateOrDlc) {
-                    size_t vPos = filename.find("[v");
-                    if (vPos != std::string::npos) {
-                        size_t endPos = filename.find("]", vPos);
-                        if (endPos != std::string::npos) {
-                            std::string verStr = filename.substr(vPos + 2, endPos - (vPos + 2));
-                            if (verStr != "0") {
-                                try {
-                                    if (std::stoull(verStr) > 0) isUpdateOrDlc = true;
-                                } catch (...) {}
-                            }
-                        }
-                    }
-                }
-                
-                if (!isUpdateOrDlc) {
-                    if (filename.find("[v0]") != std::string::npos ||
-                        filename.find("[base") != std::string::npos ||
-                        filename.find("(base") != std::string::npos ||
-                        (!lowerTitleId.empty() && filename.find(lowerTitleId) != std::string::npos)) {
-                        skip = true;
-                    }
-                }
-            }
+            PackageInfo pkg = classifyPackage(file.path, appId);
+            bool isInst = installed_ && installed_->isPackageInstalled(pkg);
             
-            if (!skip) {
+            if (isInst) {
+                mask.push_back(0);
+                skippedPackages++;
+            } else {
                 mask.push_back(1);
                 anySelected = true;
-            } else {
-                mask.push_back(0);
             }
         }
         
         if (!anySelected) {
-            // Todos los paquetes fueron omitidos (por ejemplo, solo estaba el juego base y ya estaba instalado)
-            // Abrimos el selector manual en lugar de fallar silenciosamente.
+            // Check if all packages were skipped because they are already installed
+            if (hasBaseGame && skippedPackages > 0) {
+                uint32_t installedVer = 0;
+                if (installed_) {
+                    auto itTitle = installed_->find(titleId_);
+                    if (itTitle) installedVer = itTitle->internalVersion;
+                }
+                std::string msg = "Este torrent no contiene ninguna actualizacion nueva.\n\n"
+                                  "El contenido del torrent ya esta instalado en tu consola";
+                if (installedVer > 0) {
+                    msg += " (v" + std::to_string(installedVer / 65536) + " / #" + std::to_string(installedVer) + ")";
+                }
+                msg += ".\n\nNo se iniciara la descarga para evitar descargas innecesarias.";
+                
+                auto* dialog = new brls::Dialog(msg);
+                dialog->addButton("Ver archivos", [this, path, preview = std::move(preview), peers = std::move(initialPeers)]() mutable {
+                    openSelection(path, std::move(preview), std::move(peers));
+                });
+                dialog->addButton("Cancelar", [path]() {
+                    ::unlink(path.c_str());
+                });
+                dialog->open();
+                return;
+            }
             openSelection(path, std::move(preview), std::move(initialPeers));
             return;
         }
@@ -738,9 +728,13 @@ private:
                        std::vector<uint8_t> initialPeers) {
         StreamSelection selection = settings_
             ? settings_->get().streamSelection : StreamSelection::AllFiles;
+        uint64_t appId = 0;
+        if (!titleId_.empty()) {
+            try { appId = std::stoull(titleId_, nullptr, 16); } catch (...) {}
+        }
         brls::Application::pushActivity(new TorrentSelectionActivity(
             manager_, path, std::move(preview), TransferMode::StreamInstall,
-            selection, std::move(initialPeers)));
+            selection, std::move(initialPeers), installed_, appId));
     }
 
     CatalogEntry entry_;

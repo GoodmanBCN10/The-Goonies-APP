@@ -470,7 +470,8 @@ bool CatalogService::parseJson(const std::string& json,
             static_cast<uint32_t>(readUnsigned(item, "tracker_id"));
         entry.peerCount =
             static_cast<uint32_t>(readUnsigned(item, "peer_count"));
-        entry.topicId = readSigned(item, "published_date");
+        entry.publishedAt = readSigned(item, "published_date");
+        entry.updateVersion = static_cast<uint32_t>(readUnsigned(item, "update_version"));
         entry.sourceUpdatedAt = readSigned(item, "source_updated_at");
         entry.catalogGeneratedAt = readSigned(item, "catalog_generated_at");
         entry.lastCheckedAt = readSigned(item, "last_checked_at");

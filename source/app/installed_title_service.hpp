@@ -2,9 +2,11 @@
 
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
+#include "app/package_utils.hpp"
 
 namespace goonies {
 
@@ -27,6 +29,10 @@ public:
 
     bool refresh(std::string& error);
     bool contains(const std::string& titleId) const;
+    std::optional<InstalledTitle> find(const std::string& titleId) const;
+    std::optional<InstalledTitle> findByApplicationId(uint64_t appId) const;
+    uint32_t getInstalledVersion(uint64_t appId) const;
+    bool isPackageInstalled(const PackageInfo& pkg) const;
 
     std::vector<InstalledTitle> titles() const;
     uint64_t generation() const;
