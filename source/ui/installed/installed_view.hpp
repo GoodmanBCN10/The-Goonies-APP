@@ -126,11 +126,14 @@ private:
 inline bool checkHasUpdate(const InstalledTitle& title,
                            GameMetadataService* metadata,
                            CatalogService* catalog) {
-    if (metadata) {
+    uint32_t latestVer = NxVersionsService::instance().getLatestVersion(title.titleId);
+    if (latestVer == 0 && metadata) {
         auto meta = metadata->findByTitleId(title.titleId);
-        if (meta && meta->latestVersion > 0 && meta->latestVersion > title.internalVersion) {
-            return true;
-        }
+        if (meta) latestVer = meta->latestVersion;
+    }
+
+    if (latestVer > 0) {
+        return latestVer > title.internalVersion;
     }
 
     if (catalog) {
@@ -158,16 +161,6 @@ inline bool checkHasUpdate(const InstalledTitle& title,
             if (match) {
                 if (entry.updateVersion > 0 && entry.updateVersion > title.internalVersion) {
                     return true;
-                }
-                std::string lowerTitle = entry.title;
-                std::transform(lowerTitle.begin(), lowerTitle.end(), lowerTitle.begin(), ::tolower);
-                if (lowerTitle.find("[upd") != std::string::npos ||
-                    lowerTitle.find("update") != std::string::npos ||
-                    lowerTitle.find("patch") != std::string::npos ||
-                    lowerTitle.find("+ upd") != std::string::npos) {
-                    if (title.internalVersion == 0) {
-                        return true;
-                    }
                 }
             }
         }
@@ -441,6 +434,9 @@ public:
         topBar->addView(sortLabel_);
         addView(topBar);
 
+        contentBox_ = new brls::Box(brls::Axis::COLUMN);
+        contentBox_->setGrow(1);
+
         recycler_ = new brls::RecyclerFrame();
         recycler_->setGrow(1);
         recycler_->setPadding(6, 32, 6, 32);
@@ -459,9 +455,17 @@ public:
         
         dataSource_ = new InstalledDataSource(metadata, catalog, settings, manager, onClick);
         recycler_->setDataSource(dataSource_);
-        addView(recycler_);
+        contentBox_->addView(recycler_);
+
+        emptyState_ = new EmptyStateView();
+        emptyState_->setGrow(1);
+        emptyState_->setVisibility(brls::Visibility::GONE);
+        contentBox_->addView(emptyState_);
+
+        addView(contentBox_);
         
-        addView(new brls::BottomBar());
+        bottomBar_ = new brls::BottomBar();
+        addView(bottomBar_);
         
         updateViewMode();
         reload();
@@ -480,17 +484,7 @@ public:
             return true;
         });
 
-        registerAction(t("Ver Updates", "View Updates", "Ver Atualiz."), brls::BUTTON_Y, [this](brls::View*) {
-            showUpdatesOnly_ = !showUpdatesOnly_;
-            updateViewMode();
-            dataSource_->setFilterUpdates(showUpdatesOnly_);
-            reload();
-            if (dataSource_->count() > 0) {
-                recycler_->selectRowAt(brls::IndexPath(0, 0), false);
-                brls::Application::giveFocus(recycler_);
-            }
-            return true;
-        });
+        updateFilterAction();
 
         registerAction("Ordenar", brls::BUTTON_X, [this](brls::View*) {
             auto current = dataSource_->getSortType();
@@ -516,6 +510,19 @@ public:
     }
 
     ~InstalledView() override { alive_->store(false); }
+
+    brls::View* getDefaultFocus() override {
+        if (showUpdatesOnly_ && dataSource_ && dataSource_->count() == 0 && emptyState_) {
+            return emptyState_->getDefaultFocus();
+        }
+        if (recycler_ && recycler_->getVisibility() == brls::Visibility::VISIBLE) {
+            return recycler_;
+        }
+        if (emptyState_ && emptyState_->getVisibility() == brls::Visibility::VISIBLE) {
+            return emptyState_->getDefaultFocus();
+        }
+        return brls::Box::getDefaultFocus();
+    }
 
 private:
     void updateSortLabel() {
@@ -654,16 +661,30 @@ private:
         }
     }
 
+    void updateFilterAction() {
+        if (updateActionId_ != 0) {
+            unregisterAction(updateActionId_);
+            updateActionId_ = 0;
+        }
+        std::string label = showUpdatesOnly_ ? t("Ver Todos", "View All", "Ver Todos")
+                                             : t("Ver Updates", "View Updates", "Ver Atualiz.");
+        updateActionId_ = registerAction(label, brls::BUTTON_Y, [this](brls::View*) {
+            showUpdatesOnly_ = !showUpdatesOnly_;
+            updateViewMode();
+            updateFilterAction();
+            dataSource_->setFilterUpdates(showUpdatesOnly_);
+            reload();
+            if (dataSource_->count() > 0) {
+                recycler_->selectRowAt(brls::IndexPath(0, 0), false);
+                brls::Application::giveFocus(recycler_);
+            } else if (emptyState_) {
+                brls::Application::giveFocus(emptyState_->getDefaultFocus());
+            }
+            return true;
+        });
+    }
+
     EmptyStateView* ensureEmptyState() {
-        if (emptyState_)
-            return emptyState_;
-        emptyState_ = new EmptyStateView();
-        emptyState_->setContent(
-            "No installed applications",
-            "Refresh this list after your first install or when you return "
-            "from Home.",
-            "Refresh installed", [this] { refresh(); });
-        addView(emptyState_);
         return emptyState_;
     }
 
@@ -691,22 +712,29 @@ private:
         const bool empty = (count == 0);
         if (empty) {
             if (showUpdatesOnly_) {
-                ensureEmptyState()->setContent(
+                emptyState_->setContent(
                     "No hay actualizaciones disponibles",
                     "Todos tus juegos instalados están al día con el catálogo.",
                     "Refrescar", [this] { refresh(); });
             } else {
-                ensureEmptyState()->setContent(
+                emptyState_->setContent(
                     "No hay aplicaciones instaladas",
                     "Refresca la lista tras instalar juegos o al volver del menú Home.",
                     "Refrescar instalados", [this] { refresh(); });
             }
-            ensureEmptyState()->setVisibility(brls::Visibility::VISIBLE);
-        } else if (emptyState_) {
+            recycler_->setVisibility(brls::Visibility::GONE);
+            recycler_->setFocusable(false);
+            emptyState_->setVisibility(brls::Visibility::VISIBLE);
+            emptyState_->setFocusable(true);
+            if (emptyState_->getDefaultFocus()) {
+                brls::Application::giveFocus(emptyState_->getDefaultFocus());
+            }
+        } else {
             emptyState_->setVisibility(brls::Visibility::GONE);
+            emptyState_->setFocusable(false);
+            recycler_->setVisibility(brls::Visibility::VISIBLE);
+            recycler_->setFocusable(true);
         }
-        recycler_->setVisibility(empty ? brls::Visibility::GONE
-                                       : brls::Visibility::VISIBLE);
 
         if (showUpdatesOnly_) {
             status_->setText(std::to_string(count) +
@@ -755,13 +783,16 @@ private:
     std::shared_ptr<std::atomic<bool>> alive_;
     brls::Label* status_;
     brls::Label* sortLabel_;
+    brls::Box* contentBox_ = nullptr;
     brls::RecyclerFrame* recycler_;
+    brls::BottomBar* bottomBar_ = nullptr;
     InstalledDataSource* dataSource_;
     EmptyStateView* emptyState_ = nullptr;
     bool refreshing_ = false;
     int columns_ = 6;
     std::string searchQuery_ = "";
     bool showUpdatesOnly_ = false;
+    brls::ActionIdentifier updateActionId_ = 0;
 };
 
 }  // namespace goonies::ui

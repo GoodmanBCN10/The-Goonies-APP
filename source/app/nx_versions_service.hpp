@@ -39,13 +39,11 @@ public:
         std::lock_guard<std::mutex> lock(mutex_);
         if (loaded_) return;
 
-        // Try to load cached file first for immediate availability
+        // Try to load cached file or bundled romfs first for immediate availability
         loadCacheLocked();
 
-        // Refresh in background if missing or older than 24h
-        time_t mtime = getFileMtime(cachePath_);
-        time_t now = std::time(nullptr);
-        if (!loaded_ || mtime == 0 || (now - mtime > 24 * 3600)) {
+        // If still not loaded from cache or romfs, try remote fetch
+        if (!loaded_) {
             fetchRemoteLocked();
         }
     }
@@ -87,6 +85,9 @@ private:
 
     void loadCacheLocked() {
         FILE* f = std::fopen(cachePath_.c_str(), "rb");
+        if (!f) {
+            f = std::fopen("romfs:/versions.txt", "rb");
+        }
         if (!f) return;
         std::fseek(f, 0, SEEK_END);
         long len = std::ftell(f);
@@ -104,7 +105,7 @@ private:
         parseVersionsTxtLocked(text);
         if (!versions_.empty()) {
             loaded_ = true;
-            log_msg("[nx_versions] Loaded %zu title versions from cache\n", versions_.size());
+            log_msg("[nx_versions] Loaded %zu title versions\n", versions_.size());
         }
     }
 

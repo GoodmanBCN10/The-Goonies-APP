@@ -101,6 +101,12 @@ public:
         }
     }
 
+    brls::View* getDefaultFocus() override {
+        if (action_ && action_->getVisibility() == brls::Visibility::VISIBLE)
+            return action_;
+        return card_;
+    }
+
 private:
     brls::Box* card_ = nullptr;
     brls::Label* title_ = nullptr;

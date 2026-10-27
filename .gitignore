@@ -14,6 +14,7 @@ build-cmake/
 *.json
 !version.json
 !romfs/**/*.json
+!romfs/versions.txt
 !package.json
 temp*
 .DS_Store
