@@ -7,6 +7,7 @@ namespace goonies::ui {
 SavesView::SavesView(InstalledTitleService* installedService, GameMetadataService* metadata)
     : brls::Box(brls::Axis::COLUMN), installedService_(installedService), metadata_(metadata) {
     
+    this->setBackgroundColor(nvgRGB(18, 19, 24));
     this->setAlignItems(brls::AlignItems::STRETCH);
 
     brls::Box* header = new brls::Box(brls::Axis::ROW);

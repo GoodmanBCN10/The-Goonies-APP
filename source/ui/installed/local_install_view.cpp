@@ -8,7 +8,8 @@ namespace goonies::ui {
 
 static Installer::Core* g_localInstallerCore = nullptr;
 
-LocalInstallView::LocalInstallView(const std::vector<std::string>& queue) : brls::Box(brls::Axis::COLUMN) {
+LocalInstallView::LocalInstallView(const std::vector<std::string>& queue, goonies::install::InstallStorageTarget target) 
+    : brls::Box(brls::Axis::COLUMN), target_(target) {
     this->setFocusable(true);
     this->setJustifyContent(brls::JustifyContent::CENTER);
     this->setAlignItems(brls::AlignItems::CENTER);
@@ -25,7 +26,7 @@ LocalInstallView::LocalInstallView(const std::vector<std::string>& queue) : brls
 
     // --- Premium Title and Instructions ---
     titleLabel_ = new brls::Label();
-    titleLabel_->setText(t("Instalar por Cola Local", "Local Queue Installer", "Instalar via fila local"));
+    titleLabel_->setText(t("Instalando a MicroSD", "Installing to MicroSD", "Instalando no MicroSD"));
     titleLabel_->setFontSize(36);
     titleLabel_->setTextColor(brls::Application::getTheme().getColor("brls/accent"));
     titleLabel_->setMarginBottom(10);
@@ -215,7 +216,7 @@ void LocalInstallView::installNext() {
     activeFilenameLabel_->setText(fmt::format("{}: {}", t("Instalando", "Installing", "Instalando"), fn));
     
     brls::Logger::info("LocalInstallView::installNext calling StartInstallation for {}", fn);
-    if (g_localInstallerCore->StartInstallation(fn)) {
+    if (g_localInstallerCore->StartInstallation(fn, target_)) {
         brls::Logger::info("LocalInstallView::installNext StartInstallation returned true");
         readThreadActive_ = true;
         if (readThread_.joinable()) readThread_.join();

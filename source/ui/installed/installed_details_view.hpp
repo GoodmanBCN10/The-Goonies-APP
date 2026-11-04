@@ -170,10 +170,9 @@ public:
         brls::Label* titleLabel = new brls::Label();
         titleLabel->setText(title.name);
         titleLabel->setSingleLine(true);
-        titleLabel->setFocusable(true);
         titleLabel->setFontSize(28);
         titleLabel->setMarginBottom(10);
-        titleLabel->setTextColor(theme::accent());
+        titleLabel->setTextColor(theme::neonPurple());
         infoBox->addView(titleLabel);
 
         brls::Label* titleIdLabel = new brls::Label();
@@ -412,7 +411,7 @@ public:
         contentTitle->setText("Archivos Instalados");
         contentTitle->setFontSize(26);
         contentTitle->setMarginBottom(20);
-        contentTitle->setTextColor(theme::accent());
+        contentTitle->setTextColor(theme::neonPurple());
         rightColumn->addView(contentTitle);
 
         brls::ScrollingFrame* list = new brls::ScrollingFrame();

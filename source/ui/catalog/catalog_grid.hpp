@@ -27,19 +27,19 @@ namespace goonies::ui {
 namespace grid {
 
 inline constexpr int kColumns = 5;
-inline constexpr float kCardWidth = 180.0f;
-inline constexpr float kCoverHeight = 180.0f;
+inline constexpr float kCardWidth = 216.0f;
+inline constexpr float kCoverHeight = 196.0f;
 // Langegen/games covers are Nintendo box-art images (~393x640), not square
 // eShop icons. Render them at their natural portrait aspect inside the same
-// 180px card slot so they do not get stretched/cropped like square icons.
-inline constexpr float kGameCoverWidth = 112.0f;
+// 216px card slot so they do not get stretched/cropped like square icons.
+inline constexpr float kGameCoverWidth = 135.0f;
 // Cover + name line (17px) + sub line (15px) + inner margins.
-inline constexpr float kCardHeight = 232.0f;
-inline constexpr float kRowHeight = 248.0f;
+inline constexpr float kCardHeight = 276.0f;
+inline constexpr float kRowHeight = 296.0f;
 inline constexpr int kShelfItems = 15;
-inline constexpr float kShelfSpacing = 2 * theme::kSpacingUnit;
+inline constexpr float kShelfSpacing = 18.0f;
 // Shelf title (21px) + margin + card strip + bottom breathing room.
-inline constexpr float kShelfHeight = 284.0f;
+inline constexpr float kShelfHeight = 330.0f;
 // UI_PLAN F5: minimum cards for an optional shelf (New / Updated / genre)
 // to appear at all; "Popular" is exempt — it never hides silently.
 inline constexpr int kMinShelfItems = 4;
@@ -47,7 +47,7 @@ inline constexpr int kMinShelfItems = 4;
 inline constexpr float kHeroCardHeight = 280.0f;
 inline constexpr float kHeroHeight = 300.0f;
 // Subtle cover zoom while a card is focused (F5 focus-scale).
-inline constexpr float kFocusZoom = 1.06f;
+inline constexpr float kFocusZoom = 1.05f;
 
 }  // namespace grid
 
@@ -76,14 +76,17 @@ public:
         setFocusable(true);
         setWidth(grid::kCardWidth);
         setHeight(grid::kCardHeight);
-        setCornerRadius(theme::kRadiusMedium);
+        setCornerRadius(14.0f);
+        setHighlightCornerRadius(14.0f);
+        setHideHighlightBorder(true);
+        setHideHighlightBackground(true);
 
         // Cover box doubles as the placeholder tile until art arrives.
         cover_ = new brls::Box();
         cover_->setWidth(grid::kCardWidth);
         cover_->setHeight(grid::kCoverHeight);
-        cover_->setCornerRadius(theme::kRadiusMedium);
-        cover_->setBackgroundColor(theme::surface());
+        cover_->setCornerRadius(14.0f);
+        cover_->setBackgroundColor(nvgRGB(22, 24, 30));
         cover_->setAlignItems(brls::AlignItems::CENTER);
         cover_->setJustifyContent(brls::JustifyContent::CENTER);
         // Focus zoom scales the cover art past the cover box bounds.
@@ -98,19 +101,19 @@ public:
         image_->setPositionType(brls::PositionType::ABSOLUTE);
         image_->setPositionTop(0);
         image_->setPositionLeft(0);
-        image_->setCornerRadius(theme::kRadiusMedium);
+        image_->setCornerRadius(14.0f);
         image_->setScalingType(brls::ImageScalingType::FILL);
         cover_->addView(image_);
 
         // Batch-mode selection chip (top-left corner of the cover).
         markBox_ = new brls::Box();
         markBox_->setPositionType(brls::PositionType::ABSOLUTE);
-        markBox_->setPositionTop(theme::kSpacingUnit);
-        markBox_->setPositionLeft(theme::kSpacingUnit);
-        markBox_->setWidth(36);
-        markBox_->setHeight(36);
-        markBox_->setCornerRadius(theme::kRadiusSmall);
-        markBox_->setBackgroundColor(theme::overlay());
+        markBox_->setPositionTop(8);
+        markBox_->setPositionLeft(8);
+        markBox_->setWidth(32);
+        markBox_->setHeight(32);
+        markBox_->setCornerRadius(8);
+        markBox_->setBackgroundColor(nvgRGBA(0, 0, 0, 190));
         markBox_->setAlignItems(brls::AlignItems::CENTER);
         markBox_->setJustifyContent(brls::JustifyContent::CENTER);
         mark_ = new brls::Label();
@@ -125,16 +128,21 @@ public:
         name_->setSingleLine(true);
         // Keep ellipsis at rest and marquee only the focused card title.
         name_->setAutoAnimate(false);
-        name_->setFontSize(theme::kFontSmall);
-        name_->setMarginTop(6);
+        name_->setFontSize(15);
+        name_->setMarginTop(8);
+        name_->setMarginLeft(10);
+        name_->setMarginRight(10);
+        name_->setTextColor(theme::textPrimary());
         addView(name_);
 
         sub_ = new brls::Label();
         sub_->setSingleLine(true);
         sub_->setAutoAnimate(false);
-        sub_->setFontSize(theme::kFontCaption);
+        sub_->setFontSize(13);
         sub_->setMarginTop(2);
-        sub_->setTextColor(theme::textTertiary());
+        sub_->setMarginLeft(10);
+        sub_->setMarginRight(10);
+        sub_->setTextColor(theme::neonCyan());
         addView(sub_);
 
         registerClickAction([this](brls::View*) {
@@ -157,8 +165,8 @@ public:
         name_->setText(info.title);
         placeholder_->setText(placeholderLetter(info.title));
         sub_->setText(info.sub);
-        sub_->setTextColor(info.subIsBadge ? theme::accent()
-                                           : theme::textTertiary());
+        sub_->setTextColor(info.subIsBadge ? theme::neonGreen()
+                                           : theme::neonCyan());
         markBox_->setVisibility(info.selectionMode ? brls::Visibility::VISIBLE
                                                    : brls::Visibility::GONE);
         mark_->setText(!info.selectable ? "-" : info.selected ? "x" : " ");
@@ -186,10 +194,49 @@ public:
         onFocus_ = nullptr;
     }
 
+    void draw(NVGcontext* vg, float x, float y, float width, float height,
+              brls::Style style, brls::FrameContext* ctx) override {
+        bool focused = this->isFocused();
+        float r = 14.0f;
+
+        if (focused) {
+            NVGpaint glow = nvgBoxGradient(vg, x, y, width, height, r, 14.0f,
+                                           nvgRGBA(0, 210, 247, 95),
+                                           nvgRGBA(0, 0, 0, 0));
+            nvgBeginPath(vg);
+            nvgRect(vg, x - 10, y - 10, width + 20, height + 20);
+            nvgFillPaint(vg, glow);
+            nvgFill(vg);
+        }
+
+        // Draw solid card background
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, r);
+        nvgFillColor(vg, focused ? nvgRGBA(26, 32, 46, 250) : nvgRGBA(18, 21, 29, 235));
+        nvgFill(vg);
+
+        // Draw card border
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, r);
+        if (focused) {
+            nvgStrokeWidth(vg, 2.0f);
+            nvgStrokeColor(vg, goonies::ui::theme::neonCyan());
+        } else {
+            nvgStrokeWidth(vg, 1.0f);
+            nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 12));
+        }
+        nvgStroke(vg);
+
+        brls::Box::draw(vg, x, y, width, height, style, ctx);
+    }
+
     void onFocusGained() override {
         brls::Box::onFocusGained();
         applyZoom(true);
-        name_->setAnimated(true);
+        if (name_) {
+            name_->setAnimated(true);
+            name_->setTextColor(theme::neonCyan());
+        }
         if (onFocus_)
             onFocus_();
     }
@@ -197,7 +244,10 @@ public:
     void onFocusLost() override {
         brls::Box::onFocusLost();
         applyZoom(false);
-        name_->setAnimated(false);
+        if (name_) {
+            name_->setAnimated(false);
+            name_->setTextColor(theme::textPrimary());
+        }
     }
 
     int entryIndex() const { return entryIndex_; }
@@ -415,19 +465,29 @@ public:
         header_->setHeight(32);
         header_->setShrink(0.0f);
         header_->setMarginBottom(theme::kSpacingUnit);
+        header_->setAlignItems(brls::AlignItems::CENTER);
+
+        auto* accentBar = new brls::Box();
+        accentBar->setWidth(4);
+        accentBar->setHeight(18);
+        accentBar->setCornerRadius(2);
+        accentBar->setBackgroundColor(theme::neonCyan());
+        accentBar->setMarginRight(8);
+        header_->addView(accentBar);
+
         title_ = new brls::Label();
-        title_->setFontSize(theme::kFontBody);
+        title_->setFontSize(20);
         title_->setTextColor(theme::textPrimary());
         title_->setGrow(1);
         seeAll_ = new brls::Button();
         seeAll_->setStyle(&brls::BUTTONSTYLE_BORDERLESS);
         seeAll_->setHeight(32);
         seeAll_->setFontSize(theme::kFontCaption);
-        seeAll_->setTextColor(theme::textTertiary());
+        seeAll_->setTextColor(theme::neonCyan());
         seeAll_->setPaddingLeft(12);
         seeAll_->setPaddingRight(12);
         seeAll_->setShrink(0.0f);
-        seeAll_->setText("See all");
+        seeAll_->setText("Ver todo >");
         seeAll_->registerClickAction([this](brls::View*) {
             if (seeAllAction_)
                 seeAllAction_();
@@ -480,9 +540,12 @@ public:
     HeroCard() : brls::Box(brls::Axis::COLUMN) {
         setFocusable(true);
         setHeight(grid::kHeroCardHeight);
-        setCornerRadius(theme::kRadiusLarge);
+        setCornerRadius(16.0f);
+        setHighlightCornerRadius(16.0f);
+        setHideHighlightBorder(true);
+        setHideHighlightBackground(true);
         setClipsToBounds(true);
-        setBackgroundColor(theme::surface());
+        setBackgroundColor(nvgRGB(20, 22, 28));
         setJustifyContent(brls::JustifyContent::FLEX_END);
 
         image_ = new AsyncRgbaImage();
@@ -496,13 +559,13 @@ public:
 
         auto* overlay = new brls::Box(brls::Axis::COLUMN);
         overlay->setWidthPercentage(100);
-        overlay->setBackgroundColor(theme::overlay());
+        overlay->setBackgroundColor(nvgRGBA(12, 14, 18, 220));
         overlay->setPadding(2 * theme::kSpacingUnit, 3 * theme::kSpacingUnit,
                             2 * theme::kSpacingUnit, 3 * theme::kSpacingUnit);
         kicker_ = new brls::Label();
         kicker_->setFontSize(theme::kFontCaption);
-        kicker_->setTextColor(theme::accent());
-        kicker_->setText("Featured");
+        kicker_->setTextColor(theme::gold());
+        kicker_->setText("DESTACADO");
         title_ = new brls::Label();
         title_->setSingleLine(true);
         title_->setFontSize(theme::kFontHeading);
@@ -523,6 +586,33 @@ public:
             return true;
         });
         addGestureRecognizer(new brls::TapGestureRecognizer(this));
+    }
+
+    void draw(NVGcontext* vg, float x, float y, float width, float height,
+              brls::Style style, brls::FrameContext* ctx) override {
+        bool focused = this->isFocused();
+        float r = 16.0f;
+
+        if (focused) {
+            NVGcolor glowColor = goonies::ui::theme::gold();
+            NVGpaint glow = nvgBoxGradient(vg, x, y, width, height, r, 14.0f,
+                                           nvgRGBAf(glowColor.r, glowColor.g, glowColor.b, 0.40f),
+                                           nvgRGBA(0, 0, 0, 0));
+            nvgBeginPath(vg);
+            nvgRect(vg, x - 8, y - 8, width + 16, height + 16);
+            nvgFillPaint(vg, glow);
+            nvgFill(vg);
+        }
+
+        brls::Box::draw(vg, x, y, width, height, style, ctx);
+
+        if (focused) {
+            nvgBeginPath(vg);
+            nvgRoundedRect(vg, x, y, width, height, r);
+            nvgStrokeWidth(vg, 2.5f);
+            nvgStrokeColor(vg, goonies::ui::theme::gold());
+            nvgStroke(vg);
+        }
     }
 
     void setHero(const GridCardInfo& info, const std::string& imageUrl,

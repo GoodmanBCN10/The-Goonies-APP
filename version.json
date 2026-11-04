@@ -1,17 +1,17 @@
 {
-  "tag_name": "v3.0.0",
-  "name": "The Goonies APP v3.0",
+  "tag_name": "v3.0.1",
+  "name": "The Goonies APP v3.0.1",
   "draft": false,
   "prerelease": false,
-  "body": "The Goonies APP v3.0\n\n- RediseÒo visual completo OLED Edition (fondo negro puro #121318, paleta por secciones sincronizada).\n- Sonidos nativos de interfaz de Nintendo Switch suaves y org·nicos con interruptor on/off en Ajustes.\n- Transiciones instant·neas sin parpadeo ni solapamientos entre men˙s.\n- CorrecciÛn de navegaciÛn vertical con cruceta (D-pad) en men˙ principal y cuadrÌculas de juegos instalados.\n- OptimizaciÛn del motor de resoluciÛn de enlaces magnet y torrents (soporte de tramas grandes, ampliaciÛn de DHT/PEX y trackers globales).\n- DetecciÛn y descarga estable de actualizaciones y juegos del cat·logo.",
+  "body": "The Goonies APP v3.0.1\n\n- Redise√±o completo de la interfaz de descargas: barra de progreso a pantalla completa (100% de ancho) con telemetr√≠a integrada debajo.\n- Redise√±o del cat√°logo: nuevo ribbon horizontal superior de categor√≠as y ordenaci√≥n por c√°psulas, eliminando la barra lateral antigua.\n- Priorizaci√≥n de Ports The Goonies en la parte superior del cat√°logo ordenados por m√°s recientes.\n- Correcci√≥n tipogr√°fica y alineaci√≥n en una sola l√≠nea del porcentaje de progreso.\n- Optimizaci√≥n y mejoras de rendimiento generales.",
   "assets": [
     {
       "name": "TheGooniesInstaller.nro",
-      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v3.0.0/TheGooniesInstaller.nro"
+      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v3.0.1/TheGooniesInstaller.nro"
     },
     {
       "name": "TheGooniesInstaller.nro.sha256",
-      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v3.0.0/TheGooniesInstaller.nro.sha256"
+      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v3.0.1/TheGooniesInstaller.nro.sha256"
     }
   ]
 }

@@ -107,6 +107,7 @@ static void ExtractZip(const std::string& temp_zip, const std::string& target_di
 }
 
 UpdaterView::UpdaterView(UpdateMode mode) : brls::Box(brls::Axis::COLUMN), is_fetching(true), is_updating(false), current_mode(mode) {
+    this->setBackgroundColor(nvgRGB(18, 19, 24));
     this->setAlignItems(brls::AlignItems::STRETCH);
 
     centerBox = new brls::Box(brls::Axis::COLUMN);

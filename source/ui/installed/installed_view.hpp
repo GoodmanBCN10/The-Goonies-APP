@@ -18,6 +18,8 @@
 #include "app/app_settings.hpp"
 #include "ui/detail/game_detail.hpp"
 #include "app/nx_versions_service.hpp"
+#include "app/update_dismiss_store.hpp"
+#include "app/update_verifier.hpp"
 #include "app/package_utils.hpp"
 
 namespace goonies::ui {
@@ -108,22 +110,22 @@ private:
 
 class CatalogUpdateIndex {
 public:
-    struct UpdateEntry {
+    struct Candidate {
         const CatalogEntry* entry = nullptr;
         uint32_t version = 0;
         bool isExplicitUpdate = false;
     };
 
-    void build(const std::vector<CatalogEntry>& entries, GameMetadataService* metadata) {
+    void build(const std::vector<CatalogEntry>& entries, GameMetadataService* metadata, bool force = false) {
+        if (built_ && !force && entries.size() == lastSize_) {
+            return;
+        }
+
+        metadata_ = metadata;
         byBaseAppId_.clear();
-        byCleanName_.clear();
 
         for (const auto& entry : entries) {
             if (entry.isHiddenByDefault()) continue;
-
-            UpdateEntry u;
-            u.entry = &entry;
-            u.version = entry.updateVersion;
 
             uint64_t tid = 0;
             if (!entry.titleId.empty()) {
@@ -135,139 +137,167 @@ public:
                     try { tid = std::stoull(meta->titleId, nullptr, 16); } catch (...) {}
                 }
             }
-
-            if ((tid & 0x1FFFULL) == 0x800ULL) {
-                u.isExplicitUpdate = true;
+            if (tid == 0) {
+                tid = parseTitleIdFromFileName(entry.title);
             }
+            if (tid == 0) continue;
 
-            std::string lower = entry.title;
-            std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
-            if (lower.find("[upd") != std::string::npos ||
-                lower.find(" update") != std::string::npos ||
-                lower.find("+ update") != std::string::npos ||
-                lower.find("+update") != std::string::npos ||
-                lower.find("patch") != std::string::npos ||
-                lower.find("actualizacion") != std::string::npos) {
-                u.isExplicitUpdate = true;
-            }
+            Candidate c = evaluateEntry(entry, tid);
 
-            // Exclude entries that do not offer an update (base games, pure DLCs)
-            if (!u.isExplicitUpdate && u.version == 0) {
-                continue;
-            }
-
-            uint32_t parsedV = parseVersionFromFileName(entry.title);
-            if (parsedV > 0 && parsedV < 1000) {
-                parsedV *= 65536;
-            }
-            if (parsedV > u.version) {
-                u.version = parsedV;
-            }
-
-            uint64_t baseAppId = (tid != 0) ? (tid & ~0x1FFFULL) : 0;
+            uint64_t baseAppId = (tid & ~0x1FFFULL);
             if (baseAppId != 0) {
-                byBaseAppId_[baseAppId].push_back(u);
-            } else {
-                std::string clean = cleanTitle(entry.title);
-                std::transform(clean.begin(), clean.end(), clean.begin(), ::tolower);
-                byCleanName_.push_back({clean, u});
+                byBaseAppId_[baseAppId].push_back(c);
             }
         }
+
+        built_ = true;
+        lastSize_ = entries.size();
     }
 
-    static bool offersUpdate(const UpdateEntry& u, uint32_t installedVersion) {
-        if (!u.isExplicitUpdate && u.version == 0) return false;
-        if (u.version > 0) {
-            return u.version > installedVersion;
+    static Candidate evaluateEntry(const CatalogEntry& entry, uint64_t tid) {
+        Candidate c;
+        c.entry = &entry;
+        c.version = entry.updateVersion;
+
+        // Title ID ending in 0x800 is explicitly a patch
+        if (tid != 0 && (tid & 0x1FFFULL) == 0x800ULL) {
+            c.isExplicitUpdate = true;
         }
-        return (installedVersion == 0);
+
+        std::string lower = entry.title;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        if (lower.find("[upd") != std::string::npos ||
+            lower.find("(upd") != std::string::npos ||
+            lower.find(" update") != std::string::npos ||
+            lower.find("+ update") != std::string::npos ||
+            lower.find("+update") != std::string::npos ||
+            lower.find("+ upd") != std::string::npos ||
+            lower.find("+upd") != std::string::npos ||
+            lower.find("patch") != std::string::npos ||
+            lower.find("actualizacion") != std::string::npos ||
+            lower.find("actualización") != std::string::npos) {
+            c.isExplicitUpdate = true;
+        }
+
+        if (entry.updateVersion > 0) {
+            c.isExplicitUpdate = true;
+        }
+
+        uint32_t parsedV = parseVersionFromFileName(entry.title);
+        if (parsedV > 0 && parsedV < 1000) {
+            parsedV *= 65536;
+        }
+        if (parsedV > c.version) {
+            c.version = parsedV;
+        }
+
+        return c;
     }
 
-    bool hasUpdateFor(const InstalledTitle& title) const {
-        uint32_t latestVer = NxVersionsService::instance().getLatestVersion(title.titleId);
-        if (latestVer > 0 && latestVer <= title.internalVersion) {
-            return false;
-        }
+    static std::string lowerHash(const std::string& h) {
+        std::string s = h;
+        std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+        return s;
+    }
 
+    // Candidates for a game, best first: torrents verified to hold a newer
+    // update come before unverified ones.
+    std::vector<Candidate> sortedCandidates(const InstalledTitle& title) const {
         uint64_t baseAppId = title.applicationId & ~0x1FFFULL;
         auto it = byBaseAppId_.find(baseAppId);
-        if (it != byBaseAppId_.end()) {
-            for (const auto& u : it->second) {
-                if (offersUpdate(u, title.internalVersion)) {
-                    return true;
-                }
-            }
-        }
+        if (it == byBaseAppId_.end() || it->second.empty()) return {};
 
-        for (const auto& item : byCleanName_) {
-            if (releaseNameMatches(title.name, item.first)) {
-                if (offersUpdate(item.second, title.internalVersion)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    uint32_t getOfferedVersion(const InstalledTitle& title) const {
-        uint64_t baseAppId = title.applicationId & ~0x1FFFULL;
-        uint32_t bestV = 0;
-        auto it = byBaseAppId_.find(baseAppId);
-        if (it != byBaseAppId_.end()) {
-            for (const auto& u : it->second) {
-                if (offersUpdate(u, title.internalVersion) && u.version > bestV) {
-                    bestV = u.version;
-                }
-            }
-        }
-        if (bestV == 0) {
-            for (const auto& item : byCleanName_) {
-                if (releaseNameMatches(title.name, item.first)) {
-                    if (offersUpdate(item.second, title.internalVersion) && item.second.version > bestV) {
-                        bestV = item.second.version;
-                    }
-                }
-            }
-        }
-        return bestV;
-    }
-
-    const CatalogEntry* findBestUpdate(const InstalledTitle& title) const {
-        uint64_t baseAppId = title.applicationId & ~0x1FFFULL;
-        std::vector<UpdateEntry> candidates;
-
-        auto it = byBaseAppId_.find(baseAppId);
-        if (it != byBaseAppId_.end()) {
-            for (const auto& u : it->second) {
-                if (offersUpdate(u, title.internalVersion)) {
-                    candidates.push_back(u);
-                }
-            }
-        }
-
-        for (const auto& item : byCleanName_) {
-            if (releaseNameMatches(title.name, item.first)) {
-                if (offersUpdate(item.second, title.internalVersion)) {
-                    candidates.push_back(item.second);
-                }
-            }
-        }
-
-        if (candidates.empty()) return nullptr;
-
-        std::stable_sort(candidates.begin(), candidates.end(), [](const UpdateEntry& a, const UpdateEntry& b) {
+        std::vector<Candidate> candidates = it->second;
+        auto verified = [&](const Candidate& c) {
+            return UpdateVerifier::instance().check(
+                       lowerHash(c.entry->infoHash), title.internalVersion) ==
+                   UpdateVerifier::State::Yes;
+        };
+        std::stable_sort(candidates.begin(), candidates.end(), [&](const Candidate& a, const Candidate& b) {
+            bool va = verified(a), vb = verified(b);
+            if (va != vb) return va;
+            if (a.isExplicitUpdate != b.isExplicitUpdate) return a.isExplicitUpdate;
             if (a.version != b.version) return a.version > b.version;
             if (a.entry->peerCount != b.entry->peerCount) return a.entry->peerCount > b.entry->peerCount;
             return a.entry->topicId > b.entry->topicId;
         });
+        return candidates;
+    }
 
-        return candidates.front().entry;
+    const CatalogEntry* findBestUpdate(const InstalledTitle& title) const {
+        auto candidates = sortedCandidates(title);
+        return candidates.empty() ? nullptr : candidates.front().entry;
+    }
+
+    uint32_t officialLatest(const InstalledTitle& title) const {
+        uint32_t latest = NxVersionsService::instance().getLatestVersion(title.titleId);
+        if (latest == 0 && metadata_) {
+            auto meta = metadata_->findByTitleId(title.titleId);
+            if (meta) latest = meta->latestVersion;
+        }
+        return latest;
+    }
+
+    // Official version is newer than installed and the catalog has torrents
+    // for the game: worth inspecting, but not yet proven to be an update.
+    bool isScanCandidate(const InstalledTitle& title) const {
+        uint32_t latest = officialLatest(title);
+        return latest > 0 && title.internalVersion < latest &&
+               byBaseAppId_.count(title.applicationId & ~0x1FFFULL) != 0;
+    }
+
+    // Up to `limit` torrents of this game that still need inspecting.
+    std::vector<const CatalogEntry*> torrentsToScan(const InstalledTitle& title,
+                                                    size_t limit = 3) const {
+        std::vector<const CatalogEntry*> out;
+        if (!isScanCandidate(title)) return out;
+        for (const auto& c : sortedCandidates(title)) {
+            if (out.size() >= limit) break;
+            if (!UpdateVerifier::instance().isKnown(lowerHash(c.entry->infoHash)))
+                out.push_back(c.entry);
+        }
+        return out;
+    }
+
+    // An update is listed only when one of the game's catalog torrents was
+    // verified (by reading its file list) to contain a package newer than the
+    // installed version.
+    bool hasUpdateFor(const InstalledTitle& title) const {
+        if (!isScanCandidate(title)) return false;
+        for (const auto& c : sortedCandidates(title)) {
+            if (UpdateVerifier::instance().check(lowerHash(c.entry->infoHash),
+                                                 title.internalVersion) ==
+                UpdateVerifier::State::Yes)
+                return true;
+        }
+        return false;
+    }
+
+    uint32_t getOfferedVersion(const InstalledTitle& title) const {
+        const CatalogEntry* best = findBestUpdate(title);
+        if (best) {
+            uint32_t v = best->updateVersion;
+            uint32_t parsed = parseVersionFromFileName(best->title);
+            if (parsed > 0 && parsed < 1000) parsed *= 65536;
+            if (parsed > v) v = parsed;
+            if (v > 0) return v;
+        }
+        return officialLatest(title);
+    }
+
+    void setMetadataService(GameMetadataService* metadata) {
+        metadata_ = metadata;
+    }
+
+    void invalidate() {
+        built_ = false;
     }
 
 private:
-    std::unordered_map<uint64_t, std::vector<UpdateEntry>> byBaseAppId_;
-    std::vector<std::pair<std::string, UpdateEntry>> byCleanName_;
+    std::unordered_map<uint64_t, std::vector<Candidate>> byBaseAppId_;
+    GameMetadataService* metadata_ = nullptr;
+    bool built_ = false;
+    size_t lastSize_ = 0;
 };
 
 class InstalledGridItem : public brls::Box {
@@ -345,6 +375,7 @@ public:
         brls::Box::onFocusGained();
         title_->setAnimated(true);
         subtitle_->setAnimated(true);
+        if (onFocus_) onFocus_();
     }
 
     void onFocusLost() override {
@@ -353,7 +384,12 @@ public:
         subtitle_->setAnimated(false);
     }
 
+    void setOnFocus(std::function<void()> cb) {
+        onFocus_ = std::move(cb);
+    }
+
 private:
+    std::function<void()> onFocus_;
     brls::Box* cover_ = nullptr;
     AsyncRgbaImage* image_ = nullptr;
     brls::Label* title_ = nullptr;
@@ -366,7 +402,8 @@ private:
 
 class InstalledGridRow : public brls::RecyclerCell {
 public:
-    InstalledGridRow(int columns) {
+    InstalledGridRow(int columns, std::shared_ptr<int> focusColumn = nullptr)
+        : focusColumn_(std::move(focusColumn)) {
         setFocusable(false);
         setHeight(230);
         setAxis(brls::Axis::ROW);
@@ -377,6 +414,10 @@ public:
         for (int i = 0; i < columns; i++) {
             auto* item = new InstalledGridItem();
             item->setGrow(1);
+            std::shared_ptr<int> colPtr = focusColumn_;
+            item->setOnFocus([colPtr, i]() {
+                if (colPtr) *colPtr = i;
+            });
             items_.push_back(item);
             addView(item);
         }
@@ -394,7 +435,28 @@ public:
         }
     }
 
+    brls::View* getDefaultFocus() override {
+        int targetCol = (focusColumn_ ? *focusColumn_ : 0);
+        if (targetCol >= 0 && targetCol < (int)items_.size()) {
+            if (items_[targetCol] && items_[targetCol]->isFocusable() && items_[targetCol]->getVisibility() == brls::Visibility::VISIBLE) {
+                return items_[targetCol];
+            }
+            for (int i = targetCol - 1; i >= 0; i--) {
+                if (items_[i] && items_[i]->isFocusable() && items_[i]->getVisibility() == brls::Visibility::VISIBLE) {
+                    return items_[i];
+                }
+            }
+        }
+        for (auto* item : items_) {
+            if (item && item->isFocusable() && item->getVisibility() == brls::Visibility::VISIBLE) {
+                return item;
+            }
+        }
+        return nullptr;
+    }
+
 private:
+    std::shared_ptr<int> focusColumn_;
     std::vector<InstalledGridItem*> items_;
 };
 
@@ -515,18 +577,19 @@ public:
         : brls::Box(brls::Axis::COLUMN), installed_(installed),
           manager_(manager), metadata_(metadata), catalog_(catalog), settings_(settings), alive_(std::make_shared<std::atomic<bool>>(true)) {
         NxVersionsService::instance().init();
+        this->setBackgroundColor(nvgRGB(18, 19, 24));
 
         status_ = new brls::Label();
         status_->setFontSize(15);
         status_->setMarginTop(10);
         status_->setMarginLeft(34);
-        status_->setTextColor(theme::textTertiary());
+        status_->setTextColor(theme::neonPurple());
         
         sortLabel_ = new brls::Label();
         sortLabel_->setFontSize(15);
         sortLabel_->setMarginTop(10);
         sortLabel_->setMarginRight(34);
-        sortLabel_->setTextColor(theme::textTertiary());
+        sortLabel_->setTextColor(theme::neonPurple());
         sortLabel_->setHorizontalAlign(brls::HorizontalAlign::RIGHT);
         
         brls::Box* topBar = new brls::Box(brls::Axis::ROW);
@@ -541,10 +604,10 @@ public:
 
         recycler_ = new brls::RecyclerFrame();
         recycler_->setGrow(1);
-        recycler_->setPadding(6, 32, 28, 32);
+        recycler_->setPadding(6, 32, 60, 32);
         
         recycler_->registerCell("Installed", [] { return new InstalledCell(); });
-        recycler_->registerCell("GridRow", [this] { return new InstalledGridRow(columns_); });
+        recycler_->registerCell("GridRow", [this] { return new InstalledGridRow(columns_, focusColumn_); });
         recycler_->registerCell("Message", [] { return new TextMessageCell(); });
         
         auto onClick = [this](const InstalledTitle& title) {
@@ -590,6 +653,7 @@ public:
 
         registerAction("Ver Updates", brls::BUTTON_Y, [this](brls::View*) {
             showUpdatesOnly_ = !showUpdatesOnly_;
+            if (showUpdatesOnly_) startUpdateScan();
             updateViewMode();
             this->updateActionHint(brls::BUTTON_Y, showUpdatesOnly_ ? "Ver Todos" : "Ver Updates");
             dataSource_->setFilterUpdates(showUpdatesOnly_);
@@ -620,7 +684,10 @@ public:
         });
     }
 
-    ~InstalledView() override { alive_->store(false); }
+    ~InstalledView() override {
+        alive_->store(false);
+        UpdateVerifier::instance().cancel();
+    }
 
     brls::View* getDefaultFocus() override {
         if (showUpdatesOnly_ && dataSource_ && dataSource_->count() == 0 && emptyState_) {
@@ -673,11 +740,13 @@ private:
             bestEntry.titleId = title.titleId;
         }
 
-        brls::Application::pushActivity(
-            new GameDetailActivity(bestEntry, "", manager_, metadata_, this->installed_, settings_,
-                [](const std::string&, const std::string&){},
-                [this](){ this->refresh(); },
-                [this](){ this->refresh(); }));
+        brls::sync([this, bestEntry]() {
+            brls::Application::pushActivity(
+                new GameDetailActivity(bestEntry, "", manager_, metadata_, this->installed_, settings_,
+                    [](const std::string&, const std::string&){},
+                    [this](){ this->refresh(); },
+                    [this](){ this->refresh(); }));
+        });
     }
 
     void updateViewMode() {
@@ -714,6 +783,16 @@ private:
             catalogIndex_.build(catalog_->entries(), metadata_);
         }
 
+        // Only grab focus if this list currently owns it; a background refresh
+        // must not pull the cursor away from a detail page opened on top.
+        bool ownsFocus = true;
+        if (brls::View* f = brls::Application::getCurrentFocus()) {
+            ownsFocus = false;
+            for (brls::View* cur = f; cur; cur = cur->hasParent() ? cur->getParent() : nullptr) {
+                if (cur == this) { ownsFocus = true; break; }
+            }
+        }
+
         std::vector<InstalledTitle> titles = installed_->titles();
         dataSource_->setTitles(std::move(titles), searchQuery_);
         recycler_->reloadData();
@@ -721,7 +800,13 @@ private:
         size_t count = dataSource_->count();
         const bool empty = (count == 0);
         if (empty) {
-            if (showUpdatesOnly_) {
+            if (showUpdatesOnly_ && UpdateVerifier::instance().pending() > 0) {
+                emptyState_->setContent(
+                    "Comprobando actualizaciones...",
+                    "Se están revisando los torrents del catálogo (" + std::to_string(UpdateVerifier::instance().pending()) +
+                    " pendientes). La primera vez puede tardar unos minutos.",
+                    "Refrescar", [this] { refresh(); });
+            } else if (showUpdatesOnly_) {
                 emptyState_->setContent(
                     "No hay actualizaciones disponibles",
                     "Todos tus juegos instalados están al día con el catálogo.",
@@ -736,7 +821,7 @@ private:
             recycler_->setFocusable(false);
             emptyState_->setVisibility(brls::Visibility::VISIBLE);
             emptyState_->setFocusable(true);
-            if (emptyState_->getDefaultFocus()) {
+            if (ownsFocus && emptyState_->getDefaultFocus()) {
                 brls::Application::giveFocus(emptyState_->getDefaultFocus());
             }
         } else {
@@ -745,16 +830,11 @@ private:
             recycler_->setVisibility(brls::Visibility::VISIBLE);
             recycler_->setFocusable(true);
             recycler_->selectRowAt(brls::IndexPath(0, 0), false);
-            brls::Application::giveFocus(recycler_);
+            if (ownsFocus)
+                brls::Application::giveFocus(recycler_);
         }
 
-        if (showUpdatesOnly_) {
-            status_->setText(std::to_string(count) +
-                (count == 1 ? " actualización disponible" : " actualizaciones disponibles"));
-        } else {
-            status_->setText(std::to_string(count) +
-                (count == 1 ? " aplicación instalada" : " aplicaciones instaladas"));
-        }
+        updateStatusText(count);
         updateSortLabel();
     }
 
@@ -767,6 +847,7 @@ private:
             return;
         }
         refreshing_ = true;
+        catalogIndex_.invalidate();
         status_->setText("Refreshing installed applications...");
         auto alive = alive_;
         InstalledTitleService* installed = installed_;
@@ -782,11 +863,66 @@ private:
                     brls::Application::notify(error);
                     return;
                 }
+                if (showUpdatesOnly_) startUpdateScan();
                 reload();
             });
         });
     }
 
+    // Inspect the catalog torrents of games that might have an update (official
+    // version newer than installed) to confirm they really hold a newer package.
+    void startUpdateScan() {
+        if (!catalog_ || !installed_) return;
+        catalogIndex_.build(catalog_->entries(), metadata_);
+        std::vector<UpdateVerifier::Job> jobs;
+        for (const auto& t : installed_->titles()) {
+            for (const CatalogEntry* e : catalogIndex_.torrentsToScan(t)) {
+                UpdateVerifier::Job j;
+                j.infoHash = CatalogUpdateIndex::lowerHash(e->infoHash);
+                j.magnet = e->magnetUri;
+                j.infoDict = e->infoDict;
+                j.appId = t.applicationId;
+                jobs.push_back(std::move(j));
+            }
+        }
+        if (jobs.empty()) return;
+        auto alive = alive_;
+        UpdateVerifier::instance().enqueue(std::move(jobs), manager_->rootPath() + "/downloads",
+            [this, alive] {
+                if (!alive->load()) return;
+                onScanProgress();
+            });
+    }
+
+    void onScanProgress() {
+        size_t positives = 0;
+        for (const auto& t : installed_->titles())
+            if (catalogIndex_.hasUpdateFor(t)) ++positives;
+        const bool done = UpdateVerifier::instance().pending() == 0;
+        if (showUpdatesOnly_ && (positives != lastPositives_ || done)) {
+            lastPositives_ = positives;
+            reload();
+        } else {
+            lastPositives_ = positives;
+            if (showUpdatesOnly_) updateStatusText(dataSource_->count());
+        }
+    }
+
+    void updateStatusText(size_t count) {
+        if (showUpdatesOnly_) {
+            std::string text = std::to_string(count) +
+                (count == 1 ? " actualización disponible" : " actualizaciones disponibles");
+            size_t pending = UpdateVerifier::instance().pending();
+            if (pending > 0)
+                text += "  -  comprobando " + std::to_string(pending) + " torrents del catálogo...";
+            status_->setText(text);
+        } else {
+            status_->setText(std::to_string(count) +
+                (count == 1 ? " aplicación instalada" : " aplicaciones instaladas"));
+        }
+    }
+
+    size_t lastPositives_ = 0;
     InstalledTitleService* installed_;
     DownloadManager* manager_;
     GameMetadataService* metadata_;
@@ -803,6 +939,7 @@ private:
     EmptyStateView* emptyState_ = nullptr;
     bool refreshing_ = false;
     int columns_ = 6;
+    std::shared_ptr<int> focusColumn_ = std::make_shared<int>(0);
     std::string searchQuery_ = "";
     bool showUpdatesOnly_ = false;
 };

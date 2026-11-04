@@ -6,7 +6,7 @@ ifeq ($(strip $(DEVKITPRO)),)
 $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
 endif
 
-TOPDIR ?= $(CURDIR)
+TOPDIR ?= .
 include $(DEVKITPRO)/libnx/switch_rules
 
 #---------------------------------------------------------------------------------
@@ -36,10 +36,15 @@ SOURCES		:=	vendor/qrcodegen vendor/dht vendor/libnx-ext/libnx-ext/source vendor
 DATA		:=	data
 INCLUDES	:=	vendor source vendor/libnx-ext/libnx-ext/include vendor/libnx-ext/libnx-ipcext/include include include/minini include/yati/nx/nxdumptool include/libhaze vendor/borealis/library/include vendor/borealis/library/include/borealis/extern vendor/borealis/library/include/borealis/extern/nanovg vendor/borealis/library/lib/extern/nanovg vendor/borealis/library/lib/extern/fmt/include vendor/borealis/library/lib/extern/yoga vendor/borealis/library/lib/extern/tweeny/include
 ROMFS		:=	romfs
+LIBDIRS		:=	$(PORTLIBS) $(LIBNX)
 
-APP_TITLE	:=	The Goonies App
+INCLUDE		:=	$(foreach dir,$(INCLUDES),-I$(TOPDIR)/$(dir)) \
+				$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
+				-I.
+
+APP_TITLE	:=	The Goonies App 3.0
 APP_AUTHOR	:=	GoodmanBCN
-APP_VERSION	:=	v2.1.24-BETA
+APP_VERSION	:=	v3.0.1
 DEFINES		:=	-DTHEGOONIES_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------
@@ -62,24 +67,20 @@ LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) -Wl,--gc-sections -s -W
 LIBS	:=	$(TOPDIR)/vendor/borealis/library/libborealis.a $(TOPDIR)/vendor/borealis/library/lib/extern/fmt/libfmt.a $(TOPDIR)/vendor/borealis/library/lib/extern/yoga/yoga/libyogacore.a $(TOPDIR)/vendor/borealis/library/libtinyxml2.a `pkg-config --libs --static sdl2 SDL2_image SDL2_ttf SDL2_gfx SDL2_mixer` -lmbedtls -lmbedcrypto -lmbedx509 -lzstd -lusbhsfs -lntfs-3g -llwext4 -lcurl -lminizip -lz -ldeko3d -lminiupnpc -lnx -lm
 
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(LIBNX)
-
-#---------------------------------------------------------------------------------
-ifneq ($(BUILD),$(notdir $(CURDIR)))
+ifeq ($(TOPDIR),..)
 #---------------------------------------------------------------------------------
 
-export OUTPUT	:=	$(CURDIR)/$(BUILD)/$(TARGET)
-export TOPDIR	:=	$(CURDIR)
+export OUTPUT	:=	$(TARGET)
 
-export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-			$(foreach dir,$(DATA),$(CURDIR)/$(dir))
+export VPATH	:=	$(foreach dir,$(SOURCES),../$(dir)) \
+			$(foreach dir,$(DATA),../$(dir))
 
-export DEPSDIR	:=	$(CURDIR)/$(BUILD)
+export DEPSDIR	:=	.
 
-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
-CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
-SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
+CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard ../$(dir)/*.c)))
+CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard ../$(dir)/*.cpp)))
+SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard ../$(dir)/*.s)))
+BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard ../$(dir)/*.*)))
 
 ifeq ($(strip $(CPPFILES)),)
 	export LD	:=	$(CC)
@@ -92,54 +93,52 @@ export OFILES_SRC	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 export OFILES 	:=	$(OFILES_BIN) $(OFILES_SRC)
 export HFILES_BIN	:=	$(addsuffix .h,$(subst .,_,$(BINFILES)))
 
-export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
-			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
-			-I$(CURDIR)/$(BUILD)
-
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-export APP_ICON := $(TOPDIR)/icon.jpg
+export APP_ICON := ../icon.jpg
 
-export NROFLAGS += --icon=$(APP_ICON) --nacp=$(CURDIR)/$(BUILD)/$(TARGET).nacp
+export NROFLAGS += --icon=$(APP_ICON) --nacp=$(TARGET).nacp
 
 ifneq ($(ROMFS),)
-	export NROFLAGS += --romfsdir=$(CURDIR)/$(ROMFS)
+	export NROFLAGS += --romfsdir=../$(ROMFS)
 endif
 
-.PHONY: $(BUILD) clean all
-
-#---------------------------------------------------------------------------------
-all: $(BUILD)
-
-$(BUILD):
-	@[ -d $@ ] || mkdir -p $@
-	@$(MAKE) --no-print-directory -C $(BUILD) -f "$(CURDIR)/Makefile"
-
-#---------------------------------------------------------------------------------
-clean:
-	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nacp $(TARGET).elf
-
-#---------------------------------------------------------------------------------
-else
 .PHONY:	all
 
 DEPENDS	:=	$(OFILES:.o=.d)
 
 all	:	$(OUTPUT).pfs0 $(OUTPUT).nro
+	@cp -f $(OUTPUT).nro ../$(TARGET).nro
+	@echo "Built $(TARGET).nro successfully!"
 
 $(OUTPUT).pfs0	:	$(OUTPUT).nso
 $(OUTPUT).nso	:	$(OUTPUT).elf
 $(OUTPUT).nro	:	$(OUTPUT).elf $(OUTPUT).nacp
 $(OUTPUT).elf	:	$(OFILES)
 
-$(OFILES_SRC)	: $(HFILES_BIN) $(TOPDIR)/Makefile
+$(OFILES_SRC)	: $(HFILES_BIN) ../Makefile
 
 %.bin.o	%_bin.h :	%.bin
 	@echo $(notdir $<)
 	@$(bin2o)
 
 -include $(DEPENDS)
+
+#---------------------------------------------------------------------------------
+else
+#---------------------------------------------------------------------------------
+
+.PHONY: $(BUILD) clean all
+
+all: $(BUILD)
+
+$(BUILD):
+	@[ -d $@ ] || mkdir -p $@
+	@$(MAKE) --no-print-directory -C $(BUILD) -f ../Makefile TOPDIR=..
+
+clean:
+	@echo clean ...
+	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nacp $(TARGET).elf
 
 endif
 #---------------------------------------------------------------------------------

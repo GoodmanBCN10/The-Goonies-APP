@@ -84,17 +84,21 @@ void HomebrewGridItem::clear() {
 void HomebrewGridItem::onFocusGained() {
     brls::Box::onFocusGained();
     nameLabel_->setAnimated(true);
+    nameLabel_->setTextColor(theme::gold());
     authorLabel_->setAnimated(true);
+    if (onFocus_) onFocus_();
 }
 
 void HomebrewGridItem::onFocusLost() {
     brls::Box::onFocusLost();
     nameLabel_->setAnimated(false);
+    nameLabel_->setTextColor(theme::textPrimary());
     authorLabel_->setAnimated(false);
 }
 
 // --- HomebrewGridRow ---
-HomebrewGridRow::HomebrewGridRow(int numColumns) : numColumns_(numColumns) {
+HomebrewGridRow::HomebrewGridRow(int numColumns, std::shared_ptr<int> focusColumn)
+    : focusColumn_(std::move(focusColumn)), numColumns_(numColumns) {
     setFocusable(false);
     setHeight(230);
     setAxis(brls::Axis::ROW);
@@ -105,9 +109,33 @@ HomebrewGridRow::HomebrewGridRow(int numColumns) : numColumns_(numColumns) {
     for (int i = 0; i < numColumns; i++) {
         auto* item = new HomebrewGridItem();
         item->setGrow(1);
+        std::shared_ptr<int> colPtr = focusColumn_;
+        item->setOnFocus([colPtr, i]() {
+            if (colPtr) *colPtr = i;
+        });
         items_.push_back(item);
         addView(item);
     }
+}
+
+brls::View* HomebrewGridRow::getDefaultFocus() {
+    int targetCol = (focusColumn_ ? *focusColumn_ : 0);
+    if (targetCol >= 0 && targetCol < (int)items_.size()) {
+        if (items_[targetCol] && items_[targetCol]->isFocusable() && items_[targetCol]->getVisibility() == brls::Visibility::VISIBLE) {
+            return items_[targetCol];
+        }
+        for (int i = targetCol - 1; i >= 0; i--) {
+            if (items_[i] && items_[i]->isFocusable() && items_[i]->getVisibility() == brls::Visibility::VISIBLE) {
+                return items_[i];
+            }
+        }
+    }
+    for (auto* item : items_) {
+        if (item && item->isFocusable() && item->getVisibility() == brls::Visibility::VISIBLE) {
+            return item;
+        }
+    }
+    return nullptr;
 }
 
 void HomebrewGridRow::populate(const std::vector<HomebrewTitle>& titles, int startIndex, std::function<void(const HomebrewTitle&)> onClick) {
@@ -251,6 +279,7 @@ float ForwardersDataSource::heightForRow(brls::RecyclerFrame* recycler, brls::In
 ForwardersView::ForwardersView(const std::string& currentPath)
     : brls::Box(brls::Axis::COLUMN), currentPath_(currentPath) {
     
+    this->setBackgroundColor(nvgRGB(18, 19, 24));
     this->setAlignItems(brls::AlignItems::STRETCH);
 
     brls::Box* header = new brls::Box(brls::Axis::ROW);
@@ -261,7 +290,7 @@ ForwardersView::ForwardersView(const std::string& currentPath)
     brls::Label* title = new brls::Label();
     title->setText(t("Aplicaciones Homebrew", "Homebrew Applications", "Aplicativos de homebrew"));
     title->setFontSize(28);
-    title->setTextColor(theme::accent());
+    title->setTextColor(theme::gold());
     header->addView(title);
     
     this->addView(header);
@@ -283,7 +312,7 @@ ForwardersView::ForwardersView(const std::string& currentPath)
     dataSource_->setGridView(true, 6);
     recycler_->setDataSource(dataSource_);
     
-    recycler_->registerCell("GridRow", []() { return new HomebrewGridRow(6); });
+    recycler_->registerCell("GridRow", [this]() { return new HomebrewGridRow(6, focusColumn_); });
     recycler_->registerCell("HomebrewCell", []() { return new HomebrewCell(); });
     recycler_->registerCell("Message", []() { return new TextMessageCell(); });
     

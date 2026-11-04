@@ -22,6 +22,8 @@ extern "C" {
 #include <utility>
 #include <vector>
 #include <fstream>
+#include <sys/statvfs.h>
+#include "usbhsfs.h"
 #include <borealis/extern/nlohmann/json.hpp>
 
 namespace goonies::install {
@@ -78,7 +80,8 @@ NcmStorageId ncmStorageId(InstallStorageTarget target) {
 }
 
 const char* targetName(InstallStorageTarget target) {
-    return target == InstallStorageTarget::Nand ? "nand" : "sd";
+    if (target == InstallStorageTarget::Nand) return "nand";
+    return "sd";
 }
 
 bool makeDirectories(const std::string& path) {
@@ -386,6 +389,7 @@ class SwitchInstallBackend final : public InstallBackend {
 public:
     SwitchInstallBackend(std::string root, InstallStorageTarget target)
         : root_(std::move(root)),
+          target_(target),
           storageId_(ncmStorageId(target)),
           targetName_(targetName(target)) {}
 
@@ -403,6 +407,7 @@ public:
             error_ = "Unable to create installation workspace.";
             return false;
         }
+
         Result rc = ncmOpenContentStorage(&storage_, storageId_);
         if (R_SUCCEEDED(rc))
             rc = ncmOpenContentMetaDatabase(&database_, storageId_);
@@ -722,6 +727,7 @@ public:
             if (!readPackagedMeta(metaNcaPath, meta, error_))
                 return false;
         }
+
         log_msg("[install] CNMT parsed title=%016llx version=%u contents=%u\n",
                 static_cast<unsigned long long>(meta.header.id),
                 meta.header.version, meta.header.content_count);
@@ -733,17 +739,115 @@ public:
             NcmContentInstallType_Full,
             {}
         };
-        bool exists = false;
-        Result rc = ncmContentMetaDatabaseHas(&database_, &exists, &key);
-        if (R_FAILED(rc)) {
-            errorResult("Unable to query installed title metadata", rc);
-            return false;
-        }
-        if (exists) {
-            alreadyInstalled = true;
-            log_msg("[install] Title already registered in database; removing existing record to overwrite/reinstall\n");
-            ncmContentMetaDatabaseRemove(&database_, &key);
-            ncmContentMetaDatabaseCommit(&database_);
+
+        Result rc = 0;
+
+        uint64_t appId = baseApplicationId(
+            meta.header.id,
+            static_cast<NcmContentMetaType>(meta.header.type));
+
+        // Clean up obsolete existing versions of this content (e.g. older updates) across storages
+        NcmStorageId storagesToCheck[] = {
+            storageId_,
+            (storageId_ == NcmStorageId_SdCard) ? NcmStorageId_BuiltInUser : NcmStorageId_SdCard
+        };
+
+        for (NcmStorageId sid : storagesToCheck) {
+            NcmContentStorage cs;
+            NcmContentMetaDatabase db;
+            bool isCurrent = (sid == storageId_);
+            NcmContentStorage* pCs = isCurrent ? &storage_ : &cs;
+            NcmContentMetaDatabase* pDb = isCurrent ? &database_ : &db;
+
+            bool opened = isCurrent;
+            if (!isCurrent) {
+                if (R_SUCCEEDED(ncmOpenContentStorage(&cs, sid)) &&
+                    R_SUCCEEDED(ncmOpenContentMetaDatabase(&db, sid))) {
+                    opened = true;
+                }
+            }
+
+            if (opened) {
+                s32 total = 0, written = 0;
+                std::vector<NcmContentMetaKey> keys(16);
+                Result rcList = ncmContentMetaDatabaseList(pDb, &total, &written, keys.data(),
+                                                          static_cast<s32>(keys.size()),
+                                                          static_cast<NcmContentMetaType>(meta.header.type),
+                                                          meta.header.id, meta.header.id, meta.header.id,
+                                                          NcmContentInstallType_Full);
+                if (R_SUCCEEDED(rcList) && total > written) {
+                    keys.resize(static_cast<size_t>(total));
+                    rcList = ncmContentMetaDatabaseList(pDb, &total, &written, keys.data(),
+                                                        static_cast<s32>(keys.size()),
+                                                        static_cast<NcmContentMetaType>(meta.header.type),
+                                                        meta.header.id, meta.header.id, meta.header.id,
+                                                        NcmContentInstallType_Full);
+                }
+
+                if (R_SUCCEEDED(rcList)) {
+                    for (s32 i = 0; i < written; ++i) {
+                        const auto& existingKey = keys[i];
+                        // Strict safety check: MUST match the exact Title ID and Content Type
+                        if (existingKey.id != meta.header.id || existingKey.type != meta.header.type)
+                            continue;
+
+                        if (existingKey.version == meta.header.version) {
+                            alreadyInstalled = true;
+                        }
+
+                        log_msg("[install] Found existing meta key: id=%016llx version=%u type=%u on storage=%u\n",
+                                static_cast<unsigned long long>(existingKey.id),
+                                existingKey.version, existingKey.type, static_cast<unsigned>(sid));
+
+                        NcmContentMetaHeader oldHeader {};
+                        u64 outSize = 0;
+                        if (R_SUCCEEDED(ncmContentMetaDatabaseGet(pDb, &existingKey, &outSize,
+                                                                 &oldHeader, sizeof(oldHeader))) &&
+                            outSize == sizeof(oldHeader) && oldHeader.content_count > 0) {
+                            std::vector<NcmContentInfo> oldInfos(oldHeader.content_count);
+                            s32 writtenInfos = 0;
+                            if (R_SUCCEEDED(ncmContentMetaDatabaseListContentInfo(pDb, &writtenInfos,
+                                                                                 oldInfos.data(),
+                                                                                 oldInfos.size(),
+                                                                                 &existingKey, 0))) {
+                                for (s32 j = 0; j < writtenInfos; ++j) {
+                                    const auto& oldInfo = oldInfos[j];
+                                    bool reused = false;
+                                    if (metaContent && std::memcmp(metaContent->id.c, oldInfo.content_id.c, sizeof(oldInfo.content_id.c)) == 0) {
+                                        reused = true;
+                                    }
+                                    if (!reused) {
+                                        for (const auto& c : contents_) {
+                                            if (std::memcmp(c.id.c, oldInfo.content_id.c, sizeof(c.id.c)) == 0) {
+                                                reused = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if (!reused) {
+                                        log_msg("[install] Deleting obsolete NCA from storage: %s\n",
+                                                hexBytes(oldInfo.content_id.c, sizeof(oldInfo.content_id.c)).c_str());
+                                        bool hasNca = false;
+                                        if (R_SUCCEEDED(ncmContentStorageHas(pCs, &hasNca, &oldInfo.content_id)) && hasNca) {
+                                            ncmContentStorageDelete(pCs, &oldInfo.content_id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        log_msg("[install] Removing obsolete meta record from db: id=%016llx version=%u\n",
+                                static_cast<unsigned long long>(existingKey.id), existingKey.version);
+                        ncmContentMetaDatabaseRemove(pDb, &existingKey);
+                        ncmContentMetaDatabaseCommit(pDb);
+                    }
+                }
+
+                if (!isCurrent) {
+                    ncmContentMetaDatabaseClose(&db);
+                    ncmContentStorageClose(&cs);
+                }
+            }
         }
 
         for (const auto& packaged : meta.contents) {
@@ -859,7 +963,7 @@ public:
         metaCommitted_ = true;
         committedKey_ = key;
 
-        uint64_t appId = baseApplicationId(
+        appId = baseApplicationId(
             meta.header.id,
             static_cast<NcmContentMetaType>(meta.header.type));
         std::vector<NsExtContentStorageMetaKey> records;
@@ -1373,6 +1477,7 @@ private:
     }
 
     std::string root_;
+    InstallStorageTarget target_ = InstallStorageTarget::SdCard;
     NcmStorageId storageId_;
     const char* targetName_;
     std::string taskId_;

@@ -40,27 +40,39 @@ public:
         setFocusable(true);
         setAxis(brls::Axis::ROW);
         setAlignItems(brls::AlignItems::CENTER);
-        setPadding(12, 20, 12, 20);
-        setHeight(82);
+        setPadding(10, 18, 10, 18);
+        setHeight(84);
+        setCornerRadius(12.0f);
+        setHighlightCornerRadius(12.0f);
+        setHideHighlightBorder(true);
+        setHideHighlightBackground(true);
+
+        markBox_ = new brls::Box();
+        markBox_->setWidth(136);
+        markBox_->setHeight(42);
+        markBox_->setCornerRadius(8.0f);
+        markBox_->setAlignItems(brls::AlignItems::CENTER);
+        markBox_->setJustifyContent(brls::JustifyContent::CENTER);
+        markBox_->setMarginRight(14);
+        markBox_->setFocusable(false);
 
         mark_ = new brls::Label();
-        mark_->setWidth(34);
-        mark_->setFontSize(21);
-        mark_->setTextColor(theme::accent());
-        mark_->setMarginRight(10);
-        addView(mark_);
+        mark_->setFontSize(13);
+        markBox_->addView(mark_);
+        addView(markBox_);
 
         auto* body = new brls::Box(brls::Axis::COLUMN);
         body->setGrow(1);
         body->setJustifyContent(brls::JustifyContent::CENTER);
+        body->setFocusable(false);
 
         title_ = new brls::Label();
         title_->setSingleLine(true);
-        title_->setFontSize(18);
+        title_->setFontSize(17);
         body->addView(title_);
 
         meta_ = new brls::Label();
-        meta_->setFontSize(14);
+        meta_->setFontSize(13);
         meta_->setMarginTop(4);
         meta_->setTextColor(theme::textTertiary());
         body->addView(meta_);
@@ -69,29 +81,98 @@ public:
     }
 
     void setEntry(const TorrentSelectionEntry& entry) {
-        mark_->setText(entry.action == FileAction::Install ? "[I]" :
-                       entry.action == FileAction::Download ? "[D]" : "[ ]");
+        action_ = entry.action;
         title_->setText(entry.path);
-        std::string meta = formatBytes(entry.length);
-        meta += "   ";
-        meta += entry.package ? (entry.kindText.empty() ? "NSP/NSZ package" : entry.kindText) : "Other file";
-        if (entry.installed) {
-            meta += "   (Instalado)";
-        }
-        meta += "   ";
-        meta += actionLabel(entry.action);
-        meta_->setText(meta);
-        if (entry.installed) {
-            title_->setTextColor(theme::textTertiary());
+
+        if (entry.action == FileAction::Install) {
+            markBox_->setBackgroundColor(nvgRGBA(16, 185, 129, 50));
+            markBox_->setBorderThickness(1.5f);
+            markBox_->setBorderColor(nvgRGBA(16, 185, 129, 220));
+            mark_->setText(t("✓  INSTALAR", "✓  INSTALL", "✓  INSTALAR"));
+            mark_->setTextColor(nvgRGB(16, 225, 140));
+            title_->setTextColor(nvgRGB(255, 255, 255));
+        } else if (entry.action == FileAction::Download) {
+            markBox_->setBackgroundColor(nvgRGBA(0, 210, 247, 45));
+            markBox_->setBorderThickness(1.5f);
+            markBox_->setBorderColor(nvgRGBA(0, 210, 247, 220));
+            mark_->setText(t("↓  DESCARGAR", "↓  DOWNLOAD", "↓  BAIXAR"));
+            mark_->setTextColor(theme::neonCyan());
+            title_->setTextColor(nvgRGB(255, 255, 255));
         } else {
-            title_->setTextColor(theme::textPrimary());
+            markBox_->setBackgroundColor(nvgRGBA(255, 255, 255, 8));
+            markBox_->setBorderThickness(1.0f);
+            markBox_->setBorderColor(nvgRGBA(255, 255, 255, 20));
+            mark_->setText(t("✕  OMITIR", "✕  SKIP", "✕  OMITIR"));
+            mark_->setTextColor(nvgRGB(140, 145, 160));
+            title_->setTextColor(nvgRGB(150, 155, 168));
         }
+
+        std::string meta = formatBytes(entry.length) + "   ·   ";
+        if (entry.package) {
+            meta += entry.kindText.empty() ? "NSP/NSZ" : entry.kindText;
+        } else {
+            meta += t("Archivo extra", "Extra file", "Arquivo extra");
+        }
+        if (entry.installed) {
+            meta += t("   ·   [ YA INSTALADO ]", "   ·   [ ALREADY INSTALLED ]", "   ·   [ JA INSTALADO ]");
+        }
+        meta_->setText(meta);
+        meta_->setTextColor(entry.installed ? theme::gold() : theme::textTertiary());
+    }
+
+    void draw(NVGcontext* vg, float x, float y, float width, float height,
+              brls::Style style, brls::FrameContext* ctx) override {
+        bool focused = isFocused();
+        float r = 12.0f;
+
+        if (focused) {
+            NVGcolor glowColor = (action_ == FileAction::Install) ? nvgRGB(16, 185, 129) : theme::neonCyan();
+            NVGpaint glow = nvgBoxGradient(vg, x, y, width, height, r, 12.0f,
+                                           nvgRGBAf(glowColor.r, glowColor.g, glowColor.b, 0.40f),
+                                           nvgRGBA(0, 0, 0, 0));
+            nvgBeginPath(vg);
+            nvgRect(vg, x - 8, y - 8, width + 16, height + 16);
+            nvgFillPaint(vg, glow);
+            nvgFill(vg);
+        }
+
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, r);
+        if (action_ == FileAction::Install) {
+            nvgFillColor(vg, focused ? nvgRGBA(16, 185, 129, 45) : nvgRGBA(16, 185, 129, 24));
+        } else if (action_ == FileAction::Download) {
+            nvgFillColor(vg, focused ? nvgRGBA(0, 210, 247, 45) : nvgRGBA(0, 210, 247, 24));
+        } else {
+            nvgFillColor(vg, focused ? nvgRGBA(30, 34, 46, 240) : nvgRGBA(18, 21, 29, 220));
+        }
+        nvgFill(vg);
+
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, r);
+        if (focused) {
+            nvgStrokeWidth(vg, 2.5f);
+            nvgStrokeColor(vg, (action_ == FileAction::Install) ? nvgRGB(16, 225, 140) : theme::neonCyan());
+        } else {
+            nvgStrokeWidth(vg, 1.0f);
+            if (action_ == FileAction::Install) {
+                nvgStrokeColor(vg, nvgRGBA(16, 185, 129, 120));
+            } else if (action_ == FileAction::Download) {
+                nvgStrokeColor(vg, nvgRGBA(0, 210, 247, 120));
+            } else {
+                nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 12));
+            }
+        }
+        nvgStroke(vg);
+
+        brls::RecyclerCell::draw(vg, x, y, width, height, style, ctx);
     }
 
 private:
+    brls::Box* markBox_;
     brls::Label* mark_;
     brls::Label* title_;
     brls::Label* meta_;
+    FileAction action_ = FileAction::Download;
 };
 
 class TorrentSelectionActivity;
@@ -196,7 +277,7 @@ public:
 
         title_ = new brls::Label();
         title_->setFontSize(26);
-        title_->setText("Choose torrent files");
+        title_->setText(t("Selecciona archivos a descargar", "Select files to download", "Selecionar arquivos para baixar"));
         content->addView(title_);
 
         summary_ = new brls::Label();
@@ -204,13 +285,15 @@ public:
         summary_->setMarginTop(8);
         summary_->setMarginBottom(14);
         summary_->setTextColor(theme::textSecondary());
-        summary_->setText("A toggles a file. Selection follows Settings.");
+        summary_->setText(t("Pulsa (A) para alternar accion: [✓ Instalar] -> [↓ Descargar] -> [✕ Omitir]",
+                            "Press (A) to toggle: [✓ Install] -> [↓ Download] -> [✕ Skip]",
+                            "Pressione (A) para alternar: [✓ Instalar] -> [↓ Baixar] -> [✕ Omitir]"));
         content->addView(summary_);
 
         recycler_ = new brls::RecyclerFrame();
         recycler_->setGrow(1);
         recycler_->setPadding(6, 0, 6, 0);
-        recycler_->estimatedRowHeight = 82;
+        recycler_->estimatedRowHeight = 84;
         recycler_->registerCell("FileSelect",
                                [] { return new TorrentSelectionCell(); });
         dataSource_ = new TorrentSelectionDataSource(this);
@@ -225,11 +308,12 @@ public:
 
         selectAll_ = new brls::Button();
         selectAll_->setStyle(&brls::BUTTONSTYLE_DEFAULT);
-        selectAll_->setFontSize(18);
-        selectAll_->setHeight(52);
+        selectAll_->setFontSize(16);
+        selectAll_->setHeight(50);
+        selectAll_->setCornerRadius(10.0f);
         selectAll_->setMarginRight(10);
         selectAll_->setGrow(1);
-        selectAll_->setText("Select all");
+        selectAll_->setText(t("Seleccionar todo", "Select all", "Selecionar tudo"));
         selectAll_->registerClickAction([this](brls::View*) {
             setAllSelected(true);
             return true;
@@ -238,10 +322,11 @@ public:
 
         clearAll_ = new brls::Button();
         clearAll_->setStyle(&brls::BUTTONSTYLE_DEFAULT);
-        clearAll_->setFontSize(18);
-        clearAll_->setHeight(52);
+        clearAll_->setFontSize(16);
+        clearAll_->setHeight(50);
+        clearAll_->setCornerRadius(10.0f);
         clearAll_->setGrow(1);
-        clearAll_->setText("Clear");
+        clearAll_->setText(t("Deseleccionar todo", "Clear all", "Limpar tudo"));
         clearAll_->registerClickAction([this](brls::View*) {
             setAllSelected(false);
             return true;
@@ -252,9 +337,10 @@ public:
 
         installSelected_ = new brls::Button();
         installSelected_->setStyle(&brls::BUTTONSTYLE_PRIMARY);
-        installSelected_->setFontSize(21);
-        installSelected_->setHeight(60);
-        installSelected_->setText("Continue");
+        installSelected_->setFontSize(18);
+        installSelected_->setHeight(56);
+        installSelected_->setCornerRadius(12.0f);
+        installSelected_->setText(t("Confirmar y continuar", "Continue", "Confirmar e continuar"));
         installSelected_->registerClickAction([this](brls::View*) {
             confirmSelection();
             return true;
@@ -263,7 +349,7 @@ public:
 
         content->addView(buttons);
         frame_ = new brls::AppletFrame(content);
-        frame_->setTitle(preview_.name.empty() ? "Select files"
+        frame_->setTitle(preview_.name.empty() ? t("Selecciona archivos a descargar", "Select files to download", "Selecionar arquivos para baixar")
                                               : preview_.name);
 
         populateEntries();
@@ -280,15 +366,15 @@ public:
     }
 
     void onContentAvailable() override {
-        registerAction("Select all", brls::BUTTON_X, [this](brls::View*) {
+        registerAction(t("Seleccionar todo", "Select all", "Selecionar tudo"), brls::BUTTON_X, [this](brls::View*) {
             setAllSelected(true);
             return true;
         });
-        registerAction("Clear", brls::BUTTON_Y, [this](brls::View*) {
+        registerAction(t("Deseleccionar todo", "Clear all", "Limpar tudo"), brls::BUTTON_Y, [this](brls::View*) {
             setAllSelected(false);
             return true;
         });
-        registerAction("Continue", brls::BUTTON_RB,
+        registerAction(t("Continuar", "Continue", "Continuar"), brls::BUTTON_RB,
                        [this](brls::View*) {
                            confirmSelection();
                            return true;
@@ -355,24 +441,25 @@ private:
             goonies::queryStorageSpace(manager_->rootPath());
         const auto check = goonies::assessInstallSpace(estimate, storage);
         std::string text = std::to_string(selected) + " / " +
-                           std::to_string(preview_.files.size()) +
-                           " files   " + formatBytes(estimate.requiredBytes);
+                           std::to_string(preview_.files.size()) + " " +
+                           t("archivos", "files", "arquivos") + "   (" +
+                           formatBytes(estimate.requiredBytes) + ")";
         text += storage.available
-            ? "   SD free: " + formatBytes(storage.freeBytes)
-            : "   SD free: unavailable";
+            ? std::string(t("   SD libre: ", "   SD free: ", "   SD livre: ")) + formatBytes(storage.freeBytes)
+            : std::string(t("   SD libre: no disponible", "   SD free: unavailable", "   SD livre: indisponivel"));
         if (installs > 0) {
-            text += "   Install: " + std::to_string(installs);
+            text += std::string(t("   Instalar: ", "   Install: ", "   Instalar: ")) + std::to_string(installs);
             if (downloads > 0)
-                text += "   Download: " + std::to_string(downloads);
+                text += std::string(t("   Descargar: ", "   Download: ", "   Baixar: ")) + std::to_string(downloads);
         } else {
-            text += "   Download-only selection";
+            text += std::string(t("   (Solo descarga)", "   (Download-only)", "   (Apenas download)"));
         }
         if (estimate.certainty ==
             SpaceEstimateCertainty::CompressedUnknown) {
-            text += "   NSZ may expand";
+            text += t("   (NSZ comprimido)", "   (NSZ may expand)", "   (NSZ pode expandir)");
         }
         if (check.status == InstallSpaceCheckStatus::Insufficient)
-            text += "   Need " + formatBytes(check.shortfallBytes) + " more";
+            text += std::string(t("   Faltan ", "   Need ", "   Faltam ")) + formatBytes(check.shortfallBytes);
         summary_->setText(text);
         installSelected_->setState(selected == 0 || estimate.overflow ||
                                     check.status ==
@@ -384,12 +471,12 @@ private:
     void confirmSelection() {
         std::vector<uint8_t> actions = dataSource_->fileActions();
         if (actions.empty() && preview_.files.empty()) {
-            brls::Application::notify("No files found in this torrent.");
+            brls::Application::notify(t("No se encontraron archivos en este torrent.", "No files found in this torrent.", "Nenhum arquivo encontrado."));
             return;
         }
         size_t selected = dataSource_->selectedCount();
         if (selected == 0) {
-            brls::Application::notify("Select at least one file.");
+            brls::Application::notify(t("Selecciona al menos un archivo para continuar.", "Select at least one file.", "Selecione pelo menos um arquivo."));
             return;
         }
 
@@ -403,7 +490,7 @@ private:
         if (goonies::assessInstallSpace(estimate, storage).status ==
             InstallSpaceCheckStatus::Insufficient) {
             refreshSummary();
-            brls::Application::notify("Not enough free space on SD.");
+            brls::Application::notify(t("Espacio insuficiente en la tarjeta microSD.", "Not enough free space on SD.", "Espaco insuficiente no microSD."));
             return;
         }
         std::string id;
@@ -416,8 +503,8 @@ private:
         ::unlink(path_.c_str());
         finished_ = true;
         brls::Application::notify(mode == TransferMode::StreamInstall
-            ? "Added. Installing to SD..."
-            : "Added to downloads.");
+            ? t("Anadido. Instalando en la microSD...", "Added. Installing to SD...", "Adicionado. Instalando no microSD...")
+            : t("Anadido a la cola de descargas.", "Added to downloads.", "Adicionado a fila de downloads."));
         brls::Application::popActivity();
     }
 

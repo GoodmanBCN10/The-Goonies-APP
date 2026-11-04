@@ -12,33 +12,137 @@
 
 namespace goonies::ui {
 
-// UI_PLAN O8 — download details as eShop-style cards (Progress / Speed /
-// Network) with on-screen Pause/Verify/Remove buttons instead of blind X/Y
-// hotkeys. Big progress bar + ETA (S1), speed graph kept, network stats
-// grouped. All colors/fonts on O1 tokens.
+class DetailCardBox : public brls::Box {
+public:
+    DetailCardBox() : brls::Box(brls::Axis::COLUMN) {
+        setCornerRadius(14.0f);
+        setPadding(18, 24, 18, 24);
+        setMarginBottom(16);
+    }
+
+    void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) override {
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, 14.0f);
+        nvgFillColor(vg, nvgRGBA(22, 25, 34, 235));
+        nvgFill(vg);
+
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, 14.0f);
+        nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 12));
+        nvgStrokeWidth(vg, 1.0f);
+        nvgStroke(vg);
+
+        brls::Box::draw(vg, x, y, width, height, style, ctx);
+    }
+};
+
 class DetailsActivity : public brls::Activity {
 public:
     DetailsActivity(std::string taskId, DownloadManager* manager)
         : taskId_(std::move(taskId)), manager_(manager) {
         auto* content = new brls::Box(brls::Axis::COLUMN);
-        content->setPadding(24, 40, 24, 40);
+        content->setPadding(20, 36, 24, 36);
         content->setAlignItems(brls::AlignItems::STRETCH);
 
-        status_ = new brls::Label();
-        status_->setFontSize(theme::kFontHeading);
-        status_->setMarginBottom(16);
-        content->addView(status_);
+        // 1. TOP CARD: 100% FULL-WIDTH PROGRESS COMMAND HUD
+        auto* hudCard = new DetailCardBox();
+        hudCard->setMarginBottom(16);
+        
+        auto* hudTop = new brls::Box(brls::Axis::ROW);
+        hudTop->setJustifyContent(brls::JustifyContent::SPACE_BETWEEN);
+        hudTop->setAlignItems(brls::AlignItems::CENTER);
+        hudTop->setMarginBottom(12);
 
-        // Action buttons replace the old X/Y hotkeys.
+        titleLabel_ = new brls::Label();
+        titleLabel_->setFontSize(24);
+        titleLabel_->setTextColor(nvgRGB(255, 255, 255));
+        titleLabel_->setSingleLine(true);
+        titleLabel_->setWidth(850);
+        hudTop->addView(titleLabel_);
+
+        statusPill_ = new brls::Box(brls::Axis::ROW);
+        statusPill_->setAlignItems(brls::AlignItems::CENTER);
+        statusPill_->setPadding(4, 14, 4, 14);
+        statusPill_->setCornerRadius(8.0f);
+        statusPill_->setBackgroundColor(nvgRGBA(0, 210, 247, 40));
+
+        status_ = new brls::Label();
+        status_->setFontSize(13);
+        status_->setTextColor(nvgRGB(0, 210, 247));
+        statusPill_->addView(status_);
+        hudTop->addView(statusPill_);
+
+        hudCard->addView(hudTop);
+
+        // Stats Row above progress bar: Big % and details
+        auto* statsRow = new brls::Box(brls::Axis::ROW);
+        statsRow->setAlignItems(brls::AlignItems::CENTER);
+        statsRow->setMarginBottom(8);
+
+        bigPercentLabel_ = new brls::Label();
+        bigPercentLabel_->setFontSize(36);
+        bigPercentLabel_->setTextColor(theme::neonCyan());
+        bigPercentLabel_->setSingleLine(true);
+        bigPercentLabel_->setAutoAnimate(false);
+        bigPercentLabel_->setWidth(140);
+        bigPercentLabel_->setMarginRight(16);
+        statsRow->addView(bigPercentLabel_);
+
+        progress_ = new brls::Label();
+        progress_->setFontSize(15);
+        progress_->setTextColor(theme::textSecondary());
+        progress_->setSingleLine(true);
+        progress_->setAutoAnimate(false);
+        progress_->setMarginRight(24);
+        statsRow->addView(progress_);
+
+        eta_ = new brls::Label();
+        eta_->setFontSize(14);
+        eta_->setTextColor(theme::textTertiary());
+        eta_->setSingleLine(true);
+        eta_->setAutoAnimate(false);
+        statsRow->addView(eta_);
+
+        hudCard->addView(statsRow);
+
+        // 100% FULL-WIDTH PROGRESS BAR
+        progressBar_ = new ProgressBar();
+        progressBar_->setHeight(16);
+        progressBar_->setCornerRadius(8.0f);
+        progressBar_->setMarginBottom(12);
+        hudCard->addView(progressBar_);
+
+        // Subline: Package info
+        auto* pkgRow = new brls::Box(brls::Axis::ROW);
+        pkgRow->setAlignItems(brls::AlignItems::CENTER);
+        pkgRow->setMarginBottom(12);
+
+        package_ = new brls::Label();
+        package_->setFontSize(13);
+        package_->setTextColor(theme::neonCyan());
+        package_->setMarginRight(12);
+        pkgRow->addView(package_);
+
+        currentPackage_ = new brls::Label();
+        currentPackage_->setFontSize(13);
+        currentPackage_->setTextColor(theme::textSecondary());
+        currentPackage_->setSingleLine(true);
+        currentPackage_->setAutoAnimate(false);
+        pkgRow->addView(currentPackage_);
+
+        hudCard->addView(pkgRow);
+
+        // Action buttons inside the top HUD
         auto* actions = new brls::Box(brls::Axis::ROW);
-        actions->setMarginBottom(20);
-        pauseButton_ = addActionButton(actions, "Pause",
+        actions->setAlignItems(brls::AlignItems::CENTER);
+        pauseButton_ = addActionButton(actions, "Pausar",
                                        &brls::BUTTONSTYLE_PRIMARY);
-        verifyButton_ = addActionButton(actions, "Verify",
+        verifyButton_ = addActionButton(actions, "Verificar",
                                         &brls::BUTTONSTYLE_DEFAULT);
-        removeButton_ = addActionButton(actions, "Remove",
+        removeButton_ = addActionButton(actions, "Eliminar",
                                         &brls::BUTTONSTYLE_DEFAULT);
-        content->addView(actions);
+        hudCard->addView(actions);
+
         pauseButton_->registerClickAction([this](brls::View*) {
             onPauseResume();
             return true;
@@ -53,39 +157,42 @@ public:
             return true;
         });
 
-        auto* progressCard = addCard(content, "Progress");
-        progressBar_ = new ProgressBar();
-        progressBar_->setHeight(14);
-        progressBar_->setMarginBottom(12);
-        progressCard->addView(progressBar_);
-        progress_ = addLine(progressCard, theme::kFontBody);
-        package_ = addLine(progressCard, theme::kFontSmall);
-        package_->setTextColor(theme::textSecondary());
-        currentPackage_ = addLine(progressCard, theme::kFontSmall);
-        currentPackage_->setSingleLine(true);
-        currentPackage_->setAutoAnimate(false);
-        eta_ = addLine(progressCard, theme::kFontSmall);
-        eta_->setTextColor(theme::textSecondary());
+        content->addView(hudCard);
 
-        auto* speedCard = addCard(content, "Speed");
+        // 2. BOTTOM SECTION: TELEMETRY & NETWORK/STORAGE (UNDERNEATH)
+        auto* bottomRow = new brls::Box(brls::Axis::ROW);
+        bottomRow->setJustifyContent(brls::JustifyContent::SPACE_BETWEEN);
+
+        // Left Underneath: Speed Monitor Card
+        auto* speedCard = addCard(bottomRow, t("MONITOR DE VELOCIDAD", "SPEED MONITOR", "MONITOR DE VELOCIDADE"));
+        speedCard->setWidth(580);
+        speedCard->setMarginRight(16);
+
         auto* speedLegend = new brls::Box(brls::Axis::ROW);
         speedLegend->setAlignItems(brls::AlignItems::CENTER);
         speedLegend->setMarginBottom(8);
-        downloadSpeed_ = addSpeedLegend(speedLegend, theme::accent(), nullptr);
-        installSpeed_ = addSpeedLegend(speedLegend, theme::success(),
+        downloadSpeed_ = addSpeedLegend(speedLegend, theme::neonCyan(), nullptr);
+        installSpeed_ = addSpeedLegend(speedLegend, theme::neonGreen(),
                                        &installSpeedItem_);
         speedCard->addView(speedLegend);
         speedGraph_ = new SpeedGraphView();
         speedCard->addView(speedGraph_);
 
-        auto* networkCard = addCard(content, "Network");
-        peers_ = addLine(networkCard, theme::kFontBody);
-        pieces_ = addLine(networkCard, theme::kFontBody);
+        // Right Underneath: Network & Storage Card
+        auto* networkCard = addCard(bottomRow, t("RED & ALMACENAMIENTO", "NETWORK & STORAGE", "REDE & ARMAZENAMENTO"));
+        networkCard->setWidth(580);
 
-        path_ = addLine(content, theme::kFontCaption);
+        peers_ = addLine(networkCard, 14);
+        pieces_ = addLine(networkCard, 14);
+
+        path_ = addLine(networkCard, 13);
         path_->setTextColor(theme::textTertiary());
-        error_ = addLine(content, theme::kFontSmall);
+        path_->setMarginTop(8);
+
+        error_ = addLine(networkCard, 13);
         error_->setTextColor(theme::error());
+
+        content->addView(bottomRow);
 
         auto* scroll = new brls::ScrollingFrame();
         scroll->setGrow(1);
@@ -119,15 +226,11 @@ private:
     }
 
     static brls::Box* addCard(brls::Box* parent, const std::string& title) {
-        auto* card = new brls::Box(brls::Axis::COLUMN);
-        card->setBackgroundColor(theme::surface());
-        card->setCornerRadius(theme::kRadiusMedium);
-        card->setPadding(16, 20, 16, 20);
-        card->setMarginBottom(16);
+        auto* card = new DetailCardBox();
         auto* heading = new brls::Label();
-        heading->setFontSize(theme::kFontCaption);
-        heading->setTextColor(theme::textSecondary());
-        heading->setMarginBottom(10);
+        heading->setFontSize(13);
+        heading->setTextColor(nvgRGB(0, 210, 247));
+        heading->setMarginBottom(12);
         heading->setText(title);
         card->addView(heading);
         parent->addView(card);
@@ -164,7 +267,8 @@ private:
         auto* button = new brls::Button();
         button->setStyle(style);
         button->setFontSize(theme::kFontSmall);
-        button->setHeight(52);
+        button->setHeight(48);
+        button->setCornerRadius(10.0f);
         button->setGrow(1);
         button->setMarginRight(12);
         button->setText(text);
@@ -198,23 +302,32 @@ private:
             brls::Application::popActivity();
             return;
         }
-        frame_->setTitle(task->name);
-        status_->setText(std::string("Status: ") +
-                         goonies::statusName(task->status));
-        status_->setTextColor(statusColor(task->status));
+        frame_->setTitle(t("Detalle de Descarga", "Download Details", "Detalhes do Download"));
+        titleLabel_->setText(task->name);
+        status_->setText(goonies::statusName(task->status));
+
+        NVGcolor col = statusColor(task->status);
+        status_->setTextColor(col);
+        statusPill_->setBackgroundColor(nvgRGBA(col.r * 255, col.g * 255, col.b * 255, 45));
 
         bool installing = task->status == DownloadStatus::Installing ||
                           task->status == DownloadStatus::Committing;
         float progress = installing ? installProgressOf(*task)
                                     : progressOf(*task);
+        if (progress < 0.0f) progress = 0.0f;
+        if (progress > 1.0f) progress = 1.0f;
         progressBar_->setProgress(progress);
+
+        char pctBuf[16];
+        snprintf(pctBuf, sizeof(pctBuf), "%.1f%%", progress * 100.0f);
+        bigPercentLabel_->setText(pctBuf);
+        bigPercentLabel_->setTextColor(col);
+
         if (task->status == DownloadStatus::Installing && task->isPort) {
-            progress_->setText(std::to_string(percentOf(progress)) + "%  ·  " +
-                               std::to_string(task->packagesInstalled) + " / " +
-                               std::to_string(task->packageCount) + " archivos");
+            progress_->setText(std::to_string(task->packagesInstalled) + " / " +
+                               std::to_string(task->packageCount) + " " + t("archivos", "files", "arquivos"));
         } else {
-            progress_->setText(std::to_string(percentOf(progress)) + "%  ·  " +
-                               formatBytes(task->completedBytes) + " / " +
+            progress_->setText(formatBytes(task->completedBytes) + " / " +
                                formatBytes(task->totalBytes));
         }
 
@@ -223,19 +336,19 @@ private:
             task->totalBytes > task->completedBytes)
             eta = formatEta(task->totalBytes - task->completedBytes,
                             task->speedBytesPerSecond);
-        eta_->setText(eta.empty() ? "" : "ETA " + eta);
+        eta_->setText(eta.empty() ? "" : std::string(t("Tiempo estimado (ETA): ", "Estimated time (ETA): ", "Tempo estimado (ETA): ")) + eta);
 
         if (task->mode == TransferMode::StreamInstall && task->packageCount) {
             const bool hasCurrent = !task->currentPackage.empty() &&
                                     task->packagesInstalled < task->packageCount;
             if (hasCurrent) {
                 package_->setText(
-                    "Package " + std::to_string(task->packagesInstalled + 1) +
-                    " of " + std::to_string(task->packageCount));
+                    std::string(t("Paquete ", "Package ", "Pacote ")) + std::to_string(task->packagesInstalled + 1) +
+                    t(" de ", " of ", " de ") + std::to_string(task->packageCount));
             } else {
                 package_->setText(
-                    "Packages installed: " +
-                    std::to_string(task->packagesInstalled) + " of " +
+                    std::string(t("Paquetes instalados: ", "Installed packages: ", "Pacotes instalados: ")) +
+                    std::to_string(task->packagesInstalled) + t(" de ", " of ", " de ") +
                     std::to_string(task->packageCount));
             }
             currentPackage_->setText(task->currentPackage);
@@ -246,27 +359,24 @@ private:
 
         recordSpeedSample(*task);
         downloadSpeed_->setText(
-            "Download: " + formatSpeed(task->speedBytesPerSecond));
+            std::string(t("Descarga: ", "Download: ", "Download: ")) + formatSpeed(task->speedBytesPerSecond));
         if (task->mode == TransferMode::StreamInstall) {
             installSpeedItem_->setVisibility(brls::Visibility::VISIBLE);
             installSpeed_->setText(
-                "Install: " + formatSpeed(installSpeedSmoothed_));
+                std::string(t("Instalación: ", "Install: ", "Instalação: ")) + formatSpeed(installSpeedSmoothed_));
         } else {
             installSpeedItem_->setVisibility(brls::Visibility::GONE);
         }
-        peers_->setText("Peers: " + std::to_string(task->peers) +
-                        "   DHT: " + std::to_string(task->dhtGood) + " good / " +
-                        std::to_string(task->dhtDubious) + " dubious");
-        pieces_->setText("Pieces: " + std::to_string(task->piecesDone) + " / " +
-                         std::to_string(task->piecesTotal) +
-                         "   Checked: " +
-                         std::to_string(task->piecesVerified));
-        path_->setText("Output: " + task->dataPath);
+        peers_->setText(std::string(t("Conexiones (Peers): ", "Peers: ", "Conexões: ")) + std::to_string(task->peers) +
+                        "   DHT: " + std::to_string(task->dhtGood) + t(" activos", " active", " ativos"));
+        pieces_->setText(std::string(t("Bloques verificados: ", "Verified pieces: ", "Blocos verificados: ")) + std::to_string(task->piecesDone) + " / " +
+                         std::to_string(task->piecesTotal));
+        path_->setText(std::string(t("Destino: ", "Target: ", "Destino: ")) + task->dataPath);
         if (task->status == DownloadStatus::Checking) {
             error_->setText(task->error);
             error_->setTextColor(theme::accent());
         } else {
-            error_->setText(task->error.empty() ? "" : "Error: " + task->error);
+            error_->setText(task->error.empty() ? "" : std::string(t("Error: ", "Error: ", "Erro: ")) + task->error);
             error_->setTextColor(theme::error());
         }
 
@@ -282,7 +392,7 @@ private:
                       task.status == DownloadStatus::Installing ||
                       task.status == DownloadStatus::Committing ||
                       task.status == DownloadStatus::Verifying;
-        pauseButton_->setText(paused ? "Resume" : "Pause");
+        pauseButton_->setText(paused ? t("Reanudar", "Resume", "Retomar") : t("Pausar", "Pause", "Pausar"));
         setButtonAvailable(pauseButton_, paused || active);
 
         bool canVerify = task.status == DownloadStatus::Paused ||
@@ -339,29 +449,32 @@ private:
 
     void openRemoveDialog() {
         auto* dialog = new brls::Dialog(
-            "Remove this download from The Goonies APP?");
-        dialog->addButton("Keep downloaded data", [this] {
+            t("¿Deseas eliminar esta descarga de la cola?", "Delete this download from queue?", "Deseja excluir este download da fila?"));
+        dialog->addButton(t("Conservar datos descargados", "Keep downloaded data", "Manter dados baixados"), [this] {
             std::string error;
             if (!manager_->remove(taskId_, false, error))
                 brls::Application::notify(error);
             else
                 brls::Application::popActivity();
         });
-        dialog->addButton("Delete downloaded data", [this] {
+        dialog->addButton(t("Eliminar todos los datos", "Delete all data", "Excluir todos os dados"), [this] {
             std::string error;
             if (!manager_->remove(taskId_, true, error))
                 brls::Application::notify(error);
             else
                 brls::Application::popActivity();
         });
-        dialog->addButton("Cancel", [] {});
+        dialog->addButton(t("Cancelar", "Cancel", "Cancelar"), [] {});
         dialog->open();
     }
 
     std::string taskId_;
     DownloadManager* manager_;
     brls::AppletFrame* frame_;
-    brls::Label* status_;
+    brls::Label* titleLabel_ = nullptr;
+    brls::Box* statusPill_ = nullptr;
+    brls::Label* status_ = nullptr;
+    brls::Label* bigPercentLabel_ = nullptr;
     brls::Button* pauseButton_;
     brls::Button* verifyButton_;
     brls::Button* removeButton_;

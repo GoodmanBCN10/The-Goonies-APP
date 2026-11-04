@@ -255,26 +255,27 @@ bool trustedAssetUrl(const std::string& url) {
 }
 
 bool parseVersion(const std::string& text, std::array<uint64_t, 3>& version) {
+    version.fill(0);
     std::string value = text;
-    if (!value.empty() && value.front() == 'v')
+    if (!value.empty() && (value.front() == 'v' || value.front() == 'V'))
         value.erase(value.begin());
     size_t start = 0;
-    for (size_t index = 0; index < version.size(); ++index) {
+    size_t index = 0;
+    while (start < value.size() && index < version.size()) {
         size_t end = value.find('.', start);
-        if ((index + 1 == version.size()) != (end == std::string::npos))
-            return false;
-        const std::string part = value.substr(start, end - start);
-        if (part.empty() || !std::all_of(part.begin(), part.end(),
-            [](unsigned char c) { return std::isdigit(c); }))
+        const std::string part = (end == std::string::npos) ? value.substr(start) : value.substr(start, end - start);
+        if (part.empty() || !std::all_of(part.begin(), part.end(), [](unsigned char c) { return std::isdigit(c); }))
             return false;
         try {
-            version[index] = std::stoull(part);
+            version[index++] = std::stoull(part);
         } catch (...) {
             return false;
         }
+        if (end == std::string::npos)
+            break;
         start = end + 1;
     }
-    return true;
+    return index >= 2;
 }
 
 bool parseChecksum(const std::string& text, std::string& checksum) {

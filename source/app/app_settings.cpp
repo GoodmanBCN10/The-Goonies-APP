@@ -127,6 +127,11 @@ bool parseSettings(const std::string& text, AppSettingsData& values,
     if (!readBool(root, "enable_bgm", values.enableBackgroundMusic, error))
         return false;
 
+    if (!readBool(root, "enable_sfx", values.enableSoundEffects, error)) {
+        values.enableSoundEffects = true;
+        error.clear();
+    }
+
     if (catalog == "all")
         values.catalogFilter = CatalogFilter::All;
     else if (catalog == "games")
@@ -175,6 +180,7 @@ std::string serializeSettings(const AppSettingsData& values) {
     root["download_provider"] = values.downloadProvider;
     root["enable_usb_30"] = values.enableUsb30;
     root["enable_bgm"] = values.enableBackgroundMusic;
+    root["enable_sfx"] = values.enableSoundEffects;
     return root.dump(2) + "\n";
 }
 
@@ -194,7 +200,8 @@ bool AppSettingsData::operator==(const AppSettingsData& other) const {
            language == other.language &&
            downloadProvider == other.downloadProvider &&
            enableUsb30 == other.enableUsb30 &&
-           enableBackgroundMusic == other.enableBackgroundMusic;
+           enableBackgroundMusic == other.enableBackgroundMusic &&
+           enableSoundEffects == other.enableSoundEffects;
 }
 
 bool dailyRefreshDue(uint64_t nowMs, uint64_t lastRefreshMs) {

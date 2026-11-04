@@ -16,6 +16,8 @@
 #include "app/install_space.hpp"
 #include "app/installed_title_service.hpp"
 #include "app/magnet_resolver.hpp"
+#include "app/nx_versions_service.hpp"
+#include "app/update_dismiss_store.hpp"
 #include "ui/catalog/catalog_helpers.hpp"
 #include "ui/common/async_image.hpp"
 #include "ui/common/ui_helpers.hpp"
@@ -104,11 +106,15 @@ public:
         // install button + size/status); the right column scrolls on its own.
         auto* content = new brls::Box(brls::Axis::ROW);
         content->setPadding(24, 40, 24, 40);
+        content->setBackgroundColor(theme::color("brls/background"));
         buildLeftColumn(content);
         buildRightColumn(content);
+        content->setDefaultFocusedIndex(0);
 
         frame_ = new brls::AppletFrame(content);
+        frame_->setBackgroundColor(theme::color("brls/background"));
         frame_->setTitle(presentation_.title);
+        frame_->setDefaultFocusedIndex(1);
     }
 
     ~GameDetailActivity() override {
@@ -124,10 +130,12 @@ public:
             brls::sync([onClose = std::move(onClose_)] { onClose(); });
     }
 
+    bool isTranslucent() override { return false; }
+
     brls::View* createContentView() override { return frame_; }
 
     void onContentAvailable() override {
-        registerAction("Cancel", brls::BUTTON_Y, [this](brls::View*) {
+        registerAction(t("Cancelar", "Cancel", "Cancelar"), brls::BUTTON_Y, [this](brls::View*) {
             if (busy_)
                 cancelled_->store(true);
             return true;
@@ -135,40 +143,92 @@ public:
         refreshButtons();
         timer_.setCallback([this] { refreshButtons(); });
         timer_.start(500);
-        brls::Button* focus = primary_;
-        if (focus)
-            brls::Application::giveFocus(focus);
+        if (primary_) {
+            brls::Application::giveFocus(primary_);
+        }
+        brls::sync([this]() {
+            if (primary_)
+                brls::Application::giveFocus(primary_);
+        });
     }
 
 private:
-    static constexpr float kLeftColumnWidth = 320.0f;
+    static constexpr float kLeftColumnWidth = 330.0f;
 
     // Left column: cover, full-width Install/Options, size, status (F3).
     void buildLeftColumn(brls::Box* content) {
         auto* left = new brls::Box(brls::Axis::COLUMN);
         left->setWidth(kLeftColumnWidth);
-        left->setMarginRight(32);
+        left->setMarginRight(28);
+        left->setPadding(16, 16, 16, 16);
+        left->setCornerRadius(16.0f);
+        left->setBackgroundColor(nvgRGBA(18, 22, 32, 240));
+        left->setBorderThickness(1.0f);
+        left->setBorderColor(nvgRGBA(255, 255, 255, 12));
+        left->setFocusable(false);
+        left->setHideHighlightBorder(true);
+        left->setHideHighlightBackground(true);
 
         if (!presentation_.coverUrl.empty()) {
             auto* cover = new AsyncRgbaImage();
-            cover->setWidth(kLeftColumnWidth);
-            cover->setHeight(260);
-            cover->setCornerRadius(theme::kRadiusLarge);
+            cover->setWidth(kLeftColumnWidth - 32);
+            cover->setHeight(240);
+            cover->setCornerRadius(12.0f);
             cover->setScalingType(brls::ImageScalingType::FIT);
-            // FIT letterboxes; with clip on, borealis fills the whole view
-            // rect with the pattern and the margin samples clamped edge texels
-            // (stretched bands). Clip off draws only the fitted image rect.
             cover->setClipsToBounds(false);
+            cover->setFocusable(false);
+            cover->setHideHighlightBorder(true);
+            cover->setHideHighlightBackground(true);
             loadImageInto(cover, metadata_, presentation_.coverUrl);
             left->addView(cover);
         }
 
+        // Status pill under cover (Installed badge / size badge)
+        auto* badgeRow = new brls::Box(brls::Axis::ROW);
+        badgeRow->setMarginTop(12);
+        badgeRow->setAlignItems(brls::AlignItems::CENTER);
+        badgeRow->setJustifyContent(brls::JustifyContent::SPACE_BETWEEN);
+
+        if (installed_ && installed_->contains(titleId_)) {
+            auto* instPill = new brls::Box();
+            instPill->setPadding(4, 10, 4, 10);
+            instPill->setCornerRadius(6.0f);
+            instPill->setBackgroundColor(nvgRGBA(16, 185, 129, 45));
+            instPill->setBorderThickness(1.0f);
+            instPill->setBorderColor(nvgRGBA(16, 185, 129, 140));
+
+            auto* instLbl = new brls::Label();
+            instLbl->setFontSize(12);
+            instLbl->setTextColor(nvgRGB(16, 220, 140));
+            instLbl->setText(t("✓ INSTALADO", "✓ INSTALLED", "✓ INSTALADO"));
+            instPill->addView(instLbl);
+            badgeRow->addView(instPill);
+        }
+
+        auto* sizePill = new brls::Box();
+        sizePill->setPadding(4, 10, 4, 10);
+        sizePill->setCornerRadius(6.0f);
+        sizePill->setBackgroundColor(nvgRGBA(0, 210, 247, 30));
+        sizePill->setBorderThickness(1.0f);
+        sizePill->setBorderColor(nvgRGBA(0, 210, 247, 90));
+
+        auto* sizeLbl = new brls::Label();
+        sizeLbl->setFontSize(12);
+        sizeLbl->setTextColor(theme::neonCyan());
+        sizeLbl->setText(entry_.size ? formatBytes(entry_.size) : std::string("Unknown"));
+        sizePill->addView(sizeLbl);
+        badgeRow->addView(sizePill);
+
+        left->addView(badgeRow);
+
         primary_ = new InstallButton();
         primary_->setStyle(&brls::BUTTONSTYLE_PRIMARY);
-        primary_->setFontSize(theme::kFontBody);
-        primary_->setHeight(64);
-        primary_->setMarginTop(16);
-        primary_->setText("Install");
+        primary_->setFontSize(16);
+        primary_->setHeight(58);
+        primary_->setCornerRadius(12.0f);
+        primary_->setMarginTop(14);
+        primary_->setText(t("Instalar Juego", "Install Game", "Instalar Jogo"));
+        primary_->setFocusable(true);
         primary_->registerClickAction([this](brls::View*) {
             onPrimary();
             return true;
@@ -177,32 +237,37 @@ private:
 
         secondary_ = new brls::Button();
         secondary_->setStyle(&brls::BUTTONSTYLE_DEFAULT);
-        secondary_->setFontSize(theme::kFontSmall);
-        secondary_->setHeight(56);
-        secondary_->setMarginTop(12);
-        secondary_->setText("Options");
+        secondary_->setFontSize(14);
+        secondary_->setHeight(52);
+        secondary_->setCornerRadius(12.0f);
+        secondary_->setMarginTop(10);
+        secondary_->setText(t("Selecciona archivos a descargar", "Select files to download", "Selecionar arquivos para baixar"));
+        secondary_->setFocusable(true);
         secondary_->registerClickAction([this](brls::View*) {
             onSecondary();
             return true;
         });
         left->addView(secondary_);
 
-        auto* size = new brls::Label();
-        size->setFontSize(theme::kFontCaption);
-        size->setMarginTop(16);
-        size->setTextColor(theme::textTertiary());
-        size->setText("Download size: " +
-                      (entry_.size ? formatBytes(entry_.size)
-                                   : std::string("Unknown")));
-        left->addView(size);
+        // Locked vertical navigation between Install and Options
+        primary_->setCustomNavigationRoute(brls::FocusDirection::DOWN, secondary_);
+        primary_->setCustomNavigationRoute(brls::FocusDirection::UP, primary_);
+        primary_->setCustomNavigationRoute(brls::FocusDirection::LEFT, primary_);
+
+        secondary_->setCustomNavigationRoute(brls::FocusDirection::UP, primary_);
+        secondary_->setCustomNavigationRoute(brls::FocusDirection::DOWN, secondary_);
+        secondary_->setCustomNavigationRoute(brls::FocusDirection::LEFT, secondary_);
 
         statusLabel_ = new brls::Label();
-        statusLabel_->setFontSize(theme::kFontCaption);
-        statusLabel_->setMarginTop(8);
-        statusLabel_->setTextColor(theme::accent());
-        statusLabel_->setText("Install adds this game to your console.");
+        statusLabel_->setFontSize(12);
+        statusLabel_->setMarginTop(12);
+        statusLabel_->setTextColor(theme::neonCyan());
+        statusLabel_->setText(t("Instalar anade este juego a tu consola.",
+                                "Install adds this game to your console.",
+                                "Instalar adiciona este jogo ao seu console."));
         left->addView(statusLabel_);
 
+        left->setDefaultFocusedIndex(presentation_.coverUrl.empty() ? 0 : 1);
         content->addView(left);
     }
 
@@ -211,6 +276,9 @@ private:
     void buildRightColumn(brls::Box* content) {
         auto* right = new brls::Box(brls::Axis::COLUMN);
         right->setPadding(0, 12, 24, 0);
+        right->setFocusable(false);
+        right->setHideHighlightBorder(true);
+        right->setHideHighlightBackground(true);
 
         buildFactsTable(right);
 
@@ -226,11 +294,17 @@ private:
 
             std::string viewerTitle = presentation_.title;
             auto* rail = new brls::Box(brls::Axis::ROW);
-            rail->setHeight(180);
-            for (size_t i = 0; i < screenshots.size(); ++i) {
+            rail->setHeight(150);
+            rail->setFocusable(false);
+            rail->setHideHighlightBorder(true);
+            rail->setHideHighlightBackground(true);
+
+            // Fit thumbnails cleanly within right column without nesting broken scrolling frames
+            size_t maxShots = std::min(screenshots.size(), static_cast<size_t>(3));
+            for (size_t i = 0; i < maxShots; ++i) {
                 auto* image = new AsyncRgbaImage();
-                image->setWidth(300);
-                image->setHeight(170);
+                image->setWidth(250);
+                image->setHeight(140);
                 image->setMarginRight(12);
                 image->setCornerRadius(theme::kRadiusSmall);
                 image->setFocusable(true);
@@ -244,13 +318,11 @@ private:
                                                          i, viewerTitle));
                         return true;
                     });
+                image->setCustomNavigationRoute(brls::FocusDirection::LEFT, primary_);
                 loadImageInto(image, metadata_, screenshots[i]);
                 rail->addView(image);
             }
-            auto* gallery = new brls::HScrollingFrame();
-            gallery->setHeight(190);
-            gallery->setContentView(rail);
-            right->addView(gallery);
+            right->addView(rail);
         }
 
         buildDescription(right);
@@ -284,6 +356,9 @@ private:
         right->addView(release);
 
         auto* scroll = new brls::ScrollingFrame();
+        scroll->setFocusable(false);
+        scroll->setHideHighlightBorder(true);
+        scroll->setHideHighlightBackground(true);
         scroll->setGrow(1);
         scroll->setContentView(right);
         content->addView(scroll);
@@ -292,15 +367,30 @@ private:
     // S4: facts as label/value rows instead of one glued string.
     void buildFactsTable(brls::Box* right) {
         auto* table = new brls::Box(brls::Axis::COLUMN);
-        table->setMarginTop(8);
-        addFactRow(table, "Developer", presentation_.developer);
-        addFactRow(table, "Publisher", presentation_.publisher);
-        addFactRow(table, "Release", presentation_.releaseDate);
-        addFactRow(table, "Genre", presentation_.genre);
-        addFactRow(table, "Size",
+        table->setPadding(14, 18, 14, 18);
+        table->setCornerRadius(14.0f);
+        table->setBackgroundColor(nvgRGBA(18, 22, 32, 235));
+        table->setBorderThickness(1.0f);
+        table->setBorderColor(nvgRGBA(255, 255, 255, 12));
+        table->setFocusable(false);
+        table->setHideHighlightBorder(true);
+        table->setHideHighlightBackground(true);
+
+        auto* heading = new brls::Label();
+        heading->setFontSize(13);
+        heading->setTextColor(theme::neonCyan());
+        heading->setText(t("FICHA TECNICA", "GAME DETAILS", "DETALHES DO JOGO"));
+        heading->setMarginBottom(10);
+        table->addView(heading);
+
+        addFactRow(table, t("Desarrollador", "Developer", "Desenvolvedor"), presentation_.developer);
+        addFactRow(table, t("Distribuidor", "Publisher", "Distribuidor"), presentation_.publisher);
+        addFactRow(table, t("Lanzamiento", "Release", "Lancamento"), presentation_.releaseDate);
+        addFactRow(table, t("Genero", "Genre", "Genero"), presentation_.genre);
+        addFactRow(table, t("Tamano", "Size", "Tamanho"),
                    entry_.size ? formatBytes(entry_.size)
                                : std::string("Unknown"));
-        addFactRow(table, "Title ID", titleId_);
+        addFactRow(table, t("ID de Titulo", "Title ID", "ID do Titulo"), titleId_);
         right->addView(table);
     }
 
@@ -309,15 +399,18 @@ private:
         if (value.empty())
             return;
         auto* row = new brls::Box(brls::Axis::ROW);
-        row->setMarginTop(8);
+        row->setMarginTop(6);
+        row->setFocusable(false);
+        row->setHideHighlightBorder(true);
+        row->setHideHighlightBackground(true);
         auto* key = new brls::Label();
-        key->setFontSize(theme::kFontCaption);
+        key->setFontSize(14);
         key->setTextColor(theme::textTertiary());
         key->setWidth(160);
         key->setText(name);
         row->addView(key);
         auto* val = new brls::Label();
-        val->setFontSize(theme::kFontCaption);
+        val->setFontSize(14);
         val->setTextColor(theme::textSecondary());
         val->setGrow(1);
         val->setText(value);
@@ -332,24 +425,40 @@ private:
             auto* missing = new brls::Label();
             missing->setFontSize(theme::kFontSmall);
             missing->setMarginTop(24);
-            missing->setText("No description available. Install still works "
-                             "from the catalog release.");
+            missing->setText(t("Sin descripcion disponible.", "No description available.", "Sem descricao disponivel."));
             right->addView(missing);
             return;
         }
+
+        auto* descCard = new brls::Box(brls::Axis::COLUMN);
+        descCard->setMarginTop(18);
+        descCard->setPadding(14, 18, 14, 18);
+        descCard->setCornerRadius(14.0f);
+        descCard->setBackgroundColor(nvgRGBA(18, 22, 32, 235));
+        descCard->setBorderThickness(1.0f);
+        descCard->setBorderColor(nvgRGBA(255, 255, 255, 12));
+        descCard->setFocusable(false);
+
+        auto* heading = new brls::Label();
+        heading->setFontSize(13);
+        heading->setTextColor(theme::neonCyan());
+        heading->setText(t("SINOPSIS", "DESCRIPTION", "SINOPSE"));
+        heading->setMarginBottom(10);
+        descCard->addView(heading);
+
         auto* desc = new brls::Label();
-        desc->setFontSize(theme::kFontSmall);
-        desc->setMarginTop(24);
+        desc->setFontSize(14);
         bool truncated = text.size() > 900;
         desc->setText(truncated ? shortDescription(text) : text);
-        right->addView(desc);
+        descCard->addView(desc);
         if (truncated) {
             auto* more = new brls::Button();
             more->setStyle(&brls::BUTTONSTYLE_BORDERLESS);
-            more->setFontSize(theme::kFontSmall);
-            more->setTextColor(theme::accent());
-            more->setMarginTop(4);
-            more->setText("Show more");
+            more->setFontSize(14);
+            more->setTextColor(theme::neonCyan());
+            more->setMarginTop(6);
+            more->setText(t("Mostrar mas...", "Show more...", "Mostrar mais..."));
+            more->setCustomNavigationRoute(brls::FocusDirection::LEFT, primary_);
             more->registerClickAction([this, desc, more,
                                        text = std::move(text)](brls::View*) {
                 desc->setText(text);
@@ -358,8 +467,9 @@ private:
                     brls::Application::giveFocus(primary_);
                 return true;
             });
-            right->addView(more);
+            descCard->addView(more);
         }
+        right->addView(descCard);
     }
 
     // Find the managed task for this game, if any.
@@ -374,38 +484,38 @@ private:
 
     static std::string installButtonLabel(const DownloadTask& task) {
         switch (task.status) {
-            case DownloadStatus::Queued: return "In queue";
+            case DownloadStatus::Queued: return t("En cola", "In queue", "Na fila");
             case DownloadStatus::Checking:
             case DownloadStatus::Downloading: {
-                return "Downloading " +
+                return std::string(t("Descargando ", "Downloading ", "Baixando ")) +
                        std::to_string(percentOf(progressOf(task))) + "%";
             }
             case DownloadStatus::Installing:
             case DownloadStatus::Committing: {
-                return "Installing " +
+                return std::string(t("Instalando ", "Installing ", "Instalando ")) +
                        std::to_string(percentOf(installProgressOf(task))) + "%";
             }
             case DownloadStatus::Verifying:
-                return "Verifying " +
+                return std::string(t("Verificando ", "Verifying ", "Verificando ")) +
                        std::to_string(percentOf(progressOf(task))) + "%";
             case DownloadStatus::Paused: {
                 int pct = percentOf(progressOf(task));
-                return pct > 0 ? "Paused " + std::to_string(pct) + "%"
-                               : "Paused";
+                return pct > 0 ? std::string(t("Pausado ", "Paused ", "Pausado ")) + std::to_string(pct) + "%"
+                               : t("Pausado", "Paused", "Pausado");
             }
             case DownloadStatus::Completed:
-                return "Downloaded 100%";
+                return t("Descargado 100%", "Downloaded 100%", "Baixado 100%");
             case DownloadStatus::Installed:
-                return "Installed 100%";
+                return t("Instalado 100%", "Installed 100%", "Instalado 100%");
             case DownloadStatus::Error: {
                 int pct = percentOf(progressOf(task));
-                return pct > 0 ? "Error " + std::to_string(pct) + "%"
-                               : "Error";
+                return pct > 0 ? std::string(t("Error ", "Error ", "Erro ")) + std::to_string(pct) + "%"
+                               : t("Error", "Error", "Erro");
             }
             case DownloadStatus::Removing:
-                return "Removing";
+                return t("Eliminando", "Removing", "Removendo");
         }
-        return "Install";
+        return t("Instalar Juego", "Install Game", "Instalar Jogo");
     }
 
     // Fill fraction the status button paints while a task is live: install
@@ -439,31 +549,35 @@ private:
             bool actionable = task->status == DownloadStatus::Paused ||
                               task->status == DownloadStatus::Error;
             if (actionable) {
-                primary_->setText("Resume");
+                primary_->setText(t("Reanudar", "Resume", "Retomar"));
                 primary_->setProgress(-1.0f);
             } else {
                 primary_->setText(installButtonLabel(*task));
                 primary_->setProgress(progressForButton(*task));
             }
             primary_->setState(brls::ButtonState::ENABLED);
-            secondary_->setText("View download");
+            secondary_->setText(t("Ver descarga", "View download", "Ver download"));
             secondary_->setState(brls::ButtonState::ENABLED);
             if (task->status == DownloadStatus::Error && !task->error.empty())
                 statusLabel_->setText(task->error);
         } else {
-            primary_->setText("Install");
+            primary_->setText(t("Instalar Juego", "Install Game", "Instalar Jogo"));
             primary_->setProgress(-1.0f);
             primary_->setState(brls::ButtonState::ENABLED);
-            secondary_->setText("Options");
+            secondary_->setText(t("Selecciona archivos a descargar", "Select files to download", "Selecionar arquivos para baixar"));
             secondary_->setState(brls::ButtonState::ENABLED);
             if (!operationMessage_.empty())
                 statusLabel_->setText(operationMessage_);
             else if (installed_ && installed_->contains(titleId_))
                 statusLabel_->setText(
-                    "Installed on this console. You can still install updates or DLC.");
+                    t("Instalado en tu consola. Puedes instalar actualizaciones o DLC.",
+                      "Installed on this console. You can still install updates or DLC.",
+                      "Instalado no seu console. Voce pode instalar atualizacoes ou DLCs."));
             else
                 statusLabel_->setText(
-                    "Install adds this game to your console.");
+                    t("Instalar anade este juego a tu consola.",
+                      "Install adds this game to your console.",
+                      "Instalar adiciona este jogo ao seu console."));
         }
     }
 
@@ -509,8 +623,8 @@ private:
         cancelled_->store(false);
         primary_->setState(brls::ButtonState::DISABLED);
         secondary_->setState(brls::ButtonState::DISABLED);
-        primary_->setText("Resolving...");
-        statusLabel_->setText("Finding peers...   (Y to cancel)");
+        primary_->setText(t("Resolviendo...", "Resolving...", "Resolvendo..."));
+        statusLabel_->setText(t("Buscando fuentes...   (Y para cancelar)", "Finding peers...   (Y to cancel)", "Buscando fontes...   (Y para cancelar)"));
 
         auto alive = alive_;
         auto cancelled = cancelled_;
@@ -686,6 +800,13 @@ private:
                     auto itTitle = installed_->find(titleId_);
                     if (itTitle) installedVer = itTitle->internalVersion;
                 }
+                // Remember that this torrent holds nothing newer than what is
+                // installed, so the game stops being listed as "update available".
+                {
+                    uint32_t official = NxVersionsService::instance().getLatestVersion(titleId_);
+                    if (official == 0) official = installedVer;
+                    UpdateDismissStore::instance().dismiss(titleId_, official);
+                }
                 std::string msg = "Este torrent no contiene ninguna actualizacion nueva.\n\n"
                                   "El contenido del torrent ya esta instalado en tu consola";
                 if (installedVer > 0) {
@@ -713,18 +834,23 @@ private:
                                     id, err, initialPeers, settings_->get().downloadProvider)) {
             log_msg("[catalog] imported torrent %s\n", id.c_str());
             if (extras > 0) {
-                statusLabel_->setText("Installing game files. Extra files "
-                                      "skipped — use Options to include them.");
+                statusLabel_->setText(t("Instalando juego. Archivos extra omitidos — usa Selecciona archivos para incluirlos.",
+                                        "Installing game files. Extra files skipped — use Select files to include them.",
+                                        "Instalando jogo. Arquivos extras ignorados."));
                 brls::Application::notify(
-                    "Installing game files. Extra files skipped.");
+                    t("Instalando juego. Archivos extra omitidos.",
+                      "Installing game files. Extra files skipped.",
+                      "Instalando jogo. Arquivos extras ignorados."));
             } else {
-                statusLabel_->setText("Added. Installing to SD...");
+                statusLabel_->setText(t("Anadido. Instalando en la microSD...",
+                                        "Added. Installing to microSD...",
+                                        "Adicionado. Instalando no microSD..."));
             }
             if (onChange_)
                 onChange_();
         } else if (catalogLower(err).find("already in the download manager") !=
                    std::string::npos) {
-            statusLabel_->setText("Already in downloads.");
+            statusLabel_->setText(t("Ya esta en descargas.", "Already in downloads.", "Ja esta nos downloads."));
             if (onChange_)
                 onChange_();
         } else {

@@ -39,7 +39,7 @@ ForwarderDetailsView::ForwarderDetailsView(const HomebrewTitle& title)
     nameLabel_ = new brls::Label();
     nameLabel_->setText(title.name);
     nameLabel_->setFontSize(42);
-    nameLabel_->setTextColor(theme::accent());
+    nameLabel_->setTextColor(theme::gold());
     rightColumn->addView(nameLabel_);
     
     authorLabel_ = new brls::Label();

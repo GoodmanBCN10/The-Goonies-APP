@@ -5,6 +5,17 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
+#include <time.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
 
 /* ---- helpers ---- */
 static void url_encode_hash(char *out, size_t outsz, const uint8_t *hash, size_t len) {
@@ -201,83 +212,153 @@ static uint32_t http_announce(const char *url,
 #define UDP_CONNECT  0
 #define UDP_ANNOUNCE 1
 
+static void put32(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)(v >> 24); p[1] = (uint8_t)(v >> 16); p[2] = (uint8_t)(v >> 8); p[3] = (uint8_t)v;
+}
+static void put64(uint8_t *p, uint64_t v) {
+    put32(p, (uint32_t)(v >> 32));
+    put32(p + 4, (uint32_t)v);
+}
+static uint32_t get32(const uint8_t *p) {
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3];
+}
+
+static int request_reply(int sock, const uint8_t *req, size_t reqlen,
+                         uint8_t *resp, size_t respcap, ssize_t *resplen,
+                         uint32_t expect_txid, uint8_t expect_action,
+                         const tracker_cancel_t *cancel) {
+    for (int attempt = 0; attempt < 3; attempt++) {
+        if (tracker_cancelled(cancel)) return -1;
+        if (send(sock, (const char*)req, reqlen, 0) < 0) return -1;
+
+        for (int wait_slice = 0; wait_slice < 6; wait_slice++) {
+            if (tracker_cancelled(cancel)) return -1;
+            ssize_t n = recv(sock, (char*)resp, respcap, 0);
+            if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) continue;
+                break;
+            }
+            if (n < 16) continue;
+
+            uint32_t action = get32(resp);
+            uint32_t txid = get32(resp + 4);
+            if (txid != expect_txid) continue;
+            if (action == 3) return -2; // ACTION_ERROR
+            if (action != expect_action) continue;
+
+            *resplen = n;
+            return 0;
+        }
+    }
+    return -1;
+}
+
 static uint32_t udp_announce(const char *host, uint16_t tport,
                              const uint8_t *info_hash,
                              const uint8_t *peer_id,
                              uint16_t listen_port,
                              int64_t downloaded __attribute__((unused)),
-                             int64_t left __attribute__((unused)),
-                             uint8_t *compact_out, uint32_t max_peers) {
-    struct sockaddr_in addr;
-    if (!net_resolve(host, tport, &addr)) return 0;
+                             int64_t left,
+                             uint8_t *compact_out, uint32_t max_peers,
+                             const tracker_cancel_t *cancel) {
+    if (tracker_cancelled(cancel)) return 0;
 
-    socket_t fd = net_udp_socket(0);
-    if (fd == INVALID_SOCK) return 0;
-
-    /* Connect phase */
-    uint8_t con_req[16];
-    uint64_t magic = UDP_MAGIC;
-    con_req[0]=(magic>>56)&0xFF; con_req[1]=(magic>>48)&0xFF;
-    con_req[2]=(magic>>40)&0xFF; con_req[3]=(magic>>32)&0xFF;
-    con_req[4]=(magic>>24)&0xFF; con_req[5]=(magic>>16)&0xFF;
-    con_req[6]=(magic>> 8)&0xFF; con_req[7]=(magic    )&0xFF;
-    /* action=connect */
-    con_req[8]=con_req[9]=con_req[10]=0; con_req[11]=UDP_CONNECT;
-    /* transaction_id */
-    uint32_t txid = (uint32_t)now_ms();
-    con_req[12]=(txid>>24)&0xFF; con_req[13]=(txid>>16)&0xFF;
-    con_req[14]=(txid>> 8)&0xFF; con_req[15]=(txid    )&0xFF;
-
-    sendto(fd, con_req, 16, 0, (struct sockaddr*)&addr, sizeof(addr));
-
-    /* Wait for connect response */
-    struct pollfd pfd = { fd, POLLIN, 0 };
-    if (poll(&pfd, 1, 5000) <= 0) { net_close(fd); return 0; }
-
-    uint8_t con_resp[16];
-    socklen_t alen = sizeof(addr);
-    if (recvfrom(fd, con_resp, 16, 0, (struct sockaddr*)&addr, &alen) < 16) {
-        net_close(fd); return 0;
+    char portstr[16];
+    snprintf(portstr, sizeof(portstr), "%u", (unsigned)tport);
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    struct addrinfo *res = NULL;
+    if (getaddrinfo(host, portstr, &hints, &res) != 0 || !res) {
+        return 0;
     }
-    uint64_t conn_id = ((uint64_t)con_resp[8]<<56)|((uint64_t)con_resp[9]<<48)|
-                       ((uint64_t)con_resp[10]<<40)|((uint64_t)con_resp[11]<<32)|
-                       ((uint64_t)con_resp[12]<<24)|((uint64_t)con_resp[13]<<16)|
-                       ((uint64_t)con_resp[14]<< 8)|((uint64_t)con_resp[15]);
+    if (tracker_cancelled(cancel)) {
+        freeaddrinfo(res);
+        return 0;
+    }
 
-    /* Announce phase */
-    uint8_t ann[98];
-    memset(ann, 0, sizeof(ann));
-    ann[0]=(conn_id>>56)&0xFF; ann[1]=(conn_id>>48)&0xFF;
-    ann[2]=(conn_id>>40)&0xFF; ann[3]=(conn_id>>32)&0xFF;
-    ann[4]=(conn_id>>24)&0xFF; ann[5]=(conn_id>>16)&0xFF;
-    ann[6]=(conn_id>> 8)&0xFF; ann[7]=(conn_id    )&0xFF;
-    ann[8]=ann[9]=ann[10]=0; ann[11]=UDP_ANNOUNCE;
-    txid++;
-    ann[12]=(txid>>24)&0xFF; ann[13]=(txid>>16)&0xFF;
-    ann[14]=(txid>> 8)&0xFF; ann[15]=(txid    )&0xFF;
-    memcpy(ann+16, info_hash, 20);
-    memcpy(ann+36, peer_id,   20);
-    /* downloaded / left / uploaded: 8 bytes each */
-    /* event=2 (started) at offset 80 */
-    ann[83] = 2; /* event started */
-    /* num_want: -1 = 200 */
-    ann[92]=0xFF; ann[93]=0xFF; ann[94]=0xFF; ann[95]=0xFF;
-    ann[96]=(listen_port>>8)&0xFF; ann[97]=listen_port&0xFF;
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+#ifdef __SWITCH__
+    if (sock < 0 && errno == 105) {
+        svcSleepThread(50000000ULL);
+        sock = socket(AF_INET, SOCK_DGRAM, 0);
+    }
+#endif
+    if (sock < 0) {
+        freeaddrinfo(res);
+        return 0;
+    }
+#ifdef __SWITCH__
+    int rcvbuf = 16 * 1024;
+    int sndbuf = 8 * 1024;
+    setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf));
+    setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf));
+#endif
+    struct timeval tv;
+    tv.tv_sec = 0;
+    tv.tv_usec = 500000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 
-    sendto(fd, ann, 98, 0, (struct sockaddr*)&addr, sizeof(addr));
+    if (connect(sock, res->ai_addr, res->ai_addrlen) < 0) {
+        freeaddrinfo(res);
+        close(sock);
+        return 0;
+    }
+    freeaddrinfo(res);
 
-    /* Wait for announce response */
-    if (poll(&pfd, 1, 5000) <= 0) { net_close(fd); return 0; }
+    srand((unsigned)time(NULL) ^ (unsigned)(uintptr_t)&sock);
 
-    uint8_t resp[1500];
-    ssize_t rlen = recvfrom(fd, resp, sizeof(resp), 0, NULL, NULL);
-    net_close(fd);
+    // --- Step 1: connect ---
+    uint8_t creq[16];
+    uint32_t ctxid = (uint32_t)rand();
+    put64(creq, UDP_MAGIC);
+    put32(creq + 8, UDP_CONNECT);
+    put32(creq + 12, ctxid);
 
-    if (rlen < 20) return 0;
-    uint32_t count = (uint32_t)((rlen - 20) / 6);
-    if (count > max_peers) count = max_peers;
-    memcpy(compact_out, resp + 20, count * 6);
-    log_msg("[tracker] UDP %s:%u: %u peers\n", host, tport, count);
+    uint8_t cresp[64];
+    ssize_t clen = 0;
+    int rc = request_reply(sock, creq, sizeof(creq), cresp, sizeof(cresp), &clen,
+                           ctxid, UDP_CONNECT, cancel);
+    if (rc != 0) {
+        close(sock);
+        return 0;
+    }
+    uint64_t connection_id = ((uint64_t)get32(cresp + 8) << 32) | get32(cresp + 12);
+
+    // --- Step 2: announce ---
+    uint8_t areq[98];
+    uint32_t atxid = (uint32_t)rand();
+    put64(areq + 0, connection_id);
+    put32(areq + 8, UDP_ANNOUNCE);
+    put32(areq + 12, atxid);
+    memcpy(areq + 16, info_hash, 20);
+    memcpy(areq + 36, peer_id, 20);
+    put64(areq + 56, 0);
+    put64(areq + 64, (uint64_t)left);
+    put64(areq + 72, 0);
+    put32(areq + 80, 2); // event: started
+    put32(areq + 84, 0);
+    put32(areq + 88, (uint32_t)rand());
+    put32(areq + 92, (uint32_t)max_peers);
+    areq[96] = (uint8_t)(listen_port >> 8);
+    areq[97] = (uint8_t)(listen_port & 0xff);
+
+    uint8_t aresp[20 + 6 * 512];
+    ssize_t alen = 0;
+    rc = request_reply(sock, areq, sizeof(areq), aresp, sizeof(aresp), &alen,
+                       atxid, UDP_ANNOUNCE, cancel);
+    close(sock);
+    if (rc != 0) {
+        return 0;
+    }
+
+    uint32_t count = 0;
+    for (ssize_t off = 20; off + 6 <= alen && count < max_peers; off += 6) {
+        memcpy(compact_out + count * 6, aresp + off, 6);
+        count++;
+    }
+    log_msg("[tracker] UDP %s:%u: %u peers\n", host, (unsigned)tport, count);
     return count;
 }
 
@@ -325,7 +406,7 @@ uint32_t tracker_announce_url_ex_cancel(
         if (sscanf(url + 6, "%127[^:/]:%hu", host, &port) < 1)
             return 0;
         count = udp_announce(host, port, info_hash, peer_id, listen_port,
-                             downloaded, left, compact_out, max_peers);
+                             downloaded, left, compact_out, max_peers, &cancel);
         if (result)
             result->peers = count;
         return count;

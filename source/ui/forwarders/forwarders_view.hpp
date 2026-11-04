@@ -12,8 +12,10 @@ public:
     void clear();
     void onFocusGained() override;
     void onFocusLost() override;
+    void setOnFocus(std::function<void()> cb) { onFocus_ = std::move(cb); }
 
 private:
+    std::function<void()> onFocus_;
     brls::Box* cover_ = nullptr;
     brls::Image* icon_ = nullptr;
     brls::Label* nameLabel_ = nullptr;
@@ -24,11 +26,13 @@ private:
 
 class HomebrewGridRow : public brls::RecyclerCell {
 public:
-    HomebrewGridRow(int numColumns);
+    HomebrewGridRow(int numColumns, std::shared_ptr<int> focusColumn = nullptr);
     void populate(const std::vector<HomebrewTitle>& titles, int startIndex, std::function<void(const HomebrewTitle&)> onClick);
+    brls::View* getDefaultFocus() override;
     static brls::RecyclerCell* create(int numColumns) { return new HomebrewGridRow(numColumns); }
 
 private:
+    std::shared_ptr<int> focusColumn_;
     int numColumns_;
     std::vector<HomebrewGridItem*> items_;
 };
@@ -74,6 +78,7 @@ private:
     std::string currentPath_;
     brls::RecyclerFrame* recycler_;
     ForwardersDataSource* dataSource_;
+    std::shared_ptr<int> focusColumn_ = std::make_shared<int>(0);
 };
 
 } // namespace goonies::ui

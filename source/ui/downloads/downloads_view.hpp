@@ -21,74 +21,129 @@ namespace goonies::ui {
 
 class PanelBox : public brls::Box {
 public:
-    PanelBox() : brls::Box(brls::Axis::COLUMN) {}
+    PanelBox() : brls::Box(brls::Axis::COLUMN) {
+        setCornerRadius(14.0f);
+    }
 
     void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) override {
         nvgBeginPath(vg);
-        nvgRoundedRect(vg, x, y, width, height, 15.0f);
-        nvgFillColor(vg, nvgRGBA(255, 255, 255, 25)); // Semi-transparent white
+        nvgRoundedRect(vg, x, y, width, height, 14.0f);
+        nvgFillColor(vg, nvgRGBA(20, 23, 32, 235));
         nvgFill(vg);
+
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, 14.0f);
+        nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 12));
+        nvgStrokeWidth(vg, 1.0f);
+        nvgStroke(vg);
+
         brls::Box::draw(vg, x, y, width, height, style, ctx);
     }
+};
+
+class ActiveInstallBox : public brls::Box {
+public:
+    ActiveInstallBox() : brls::Box(brls::Axis::COLUMN) {
+        setCornerRadius(14.0f);
+    }
+
+    void setActive(bool active) { active_ = active; }
+
+    void draw(NVGcontext* vg, float x, float y, float width, float height, brls::Style style, brls::FrameContext* ctx) override {
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, 14.0f);
+        if (active_) {
+            nvgFillColor(vg, nvgRGBA(22, 28, 44, 250));
+            nvgFill(vg);
+
+            // Subtle Joy-Con Cyan glow outline on active download
+            nvgBeginPath(vg);
+            nvgRoundedRect(vg, x, y, width, height, 14.0f);
+            nvgStrokeColor(vg, nvgRGBA(0, 210, 247, 120));
+            nvgStrokeWidth(vg, 1.5f);
+            nvgStroke(vg);
+        } else {
+            nvgFillColor(vg, nvgRGBA(20, 23, 32, 210));
+            nvgFill(vg);
+
+            nvgBeginPath(vg);
+            nvgRoundedRect(vg, x, y, width, height, 14.0f);
+            nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 12));
+            nvgStrokeWidth(vg, 1.0f);
+            nvgStroke(vg);
+        }
+
+        brls::Box::draw(vg, x, y, width, height, style, ctx);
+    }
+
+private:
+    bool active_ = false;
 };
 
 class MainView : public brls::Box {
 public:
     MainView(DownloadManager* manager, GameMetadataService* metadata, AppSettings* settings)
         : brls::Box(brls::Axis::COLUMN), manager_(manager), metadata_(metadata), settings_(settings) {
+        this->setBackgroundColor(nvgRGB(15, 17, 23));
         this->setAlignItems(brls::AlignItems::STRETCH);
 
         brls::Box* centerBox = new brls::Box(brls::Axis::COLUMN);
         centerBox->setAlignItems(brls::AlignItems::STRETCH);
-        centerBox->setPadding(40, 80, 40, 80);
+        centerBox->setPadding(35, 70, 35, 70);
         centerBox->setGrow(1.0f);
 
         brls::Label* titleLabel = new brls::Label();
         titleLabel->setText("Cola de Descargas");
-        titleLabel->setFontSize(45);
-        titleLabel->setTextColor(brls::Application::getTheme().getColor("brls/accent"));
-        titleLabel->setMarginBottom(10);
+        titleLabel->setFontSize(38);
+        titleLabel->setTextColor(nvgRGB(245, 245, 250));
+        titleLabel->setMarginBottom(8);
         centerBox->addView(titleLabel);
 
         summary_ = new brls::Label();
         summary_->setFontSize(15);
-        summary_->setMarginBottom(20);
-        summary_->setTextColor(brls::Application::getTheme().getColor("brls/text_disabled"));
+        summary_->setMarginBottom(16);
+        summary_->setTextColor(nvgRGB(160, 165, 180));
         summary_->setVisibility(brls::Visibility::GONE);
         centerBox->addView(summary_);
 
-        activeInstallBox_ = new PanelBox();
-        activeInstallBox_->setPadding(20, 20, 20, 20);
-        activeInstallBox_->setMarginBottom(20);
+        activeInstallBox_ = new ActiveInstallBox();
+        activeInstallBox_->setPadding(18, 22, 18, 22);
+        activeInstallBox_->setMarginBottom(18);
         
         brls::Box* activeTopRow = new brls::Box(brls::Axis::ROW);
+        activeTopRow->setWidthPercentage(100.0f);
         activeTopRow->setJustifyContent(brls::JustifyContent::SPACE_BETWEEN);
+        activeTopRow->setAlignItems(brls::AlignItems::CENTER);
         activeTopRow->setMarginBottom(10);
         
         activeFilenameLabel_ = new brls::Label();
         activeFilenameLabel_->setText("No hay descargas activas");
-        activeFilenameLabel_->setFontSize(22);
+        activeFilenameLabel_->setFontSize(21);
         activeFilenameLabel_->setTextColor(nvgRGB(255, 255, 255));
+        activeFilenameLabel_->setSingleLine(true);
+        activeFilenameLabel_->setGrow(1.0f);
+        activeFilenameLabel_->setMarginRight(20);
         activeTopRow->addView(activeFilenameLabel_);
         
         speedLabel_ = new brls::Label();
         speedLabel_->setText("");
-        speedLabel_->setFontSize(22);
-        speedLabel_->setTextColor(brls::Application::getTheme().getColor("brls/accent"));
+        speedLabel_->setFontSize(20);
+        speedLabel_->setTextColor(nvgRGB(0, 210, 247));
         activeTopRow->addView(speedLabel_);
         
         activeInstallBox_->addView(activeTopRow);
         
         progressBar_ = new ProgressBar();
-        progressBar_->setHeight(15);
+        progressBar_->setHeight(10);
+        progressBar_->setCornerRadius(5.0f);
         progressBar_->setProgress(0.0f);
         progressBar_->setMarginBottom(10);
         activeInstallBox_->addView(progressBar_);
         
         progressTextLabel_ = new brls::Label();
         progressTextLabel_->setText("");
-        progressTextLabel_->setFontSize(18);
-        progressTextLabel_->setTextColor(nvgRGB(200, 200, 200));
+        progressTextLabel_->setFontSize(15);
+        progressTextLabel_->setTextColor(nvgRGB(180, 185, 200));
         activeInstallBox_->addView(progressTextLabel_);
         
         centerBox->addView(activeInstallBox_);
@@ -305,26 +360,35 @@ private:
             }
         }
         if (activeTask) {
+            activeInstallBox_->setActive(true);
             activeFilenameLabel_->setText(activeTask->name);
             if (activeTask->status == DownloadStatus::Downloading) {
                 speedLabel_->setText(formatSpeed(activeTask->speedBytesPerSecond));
+            } else if (activeTask->status == DownloadStatus::Installing || activeTask->status == DownloadStatus::Committing) {
+                speedLabel_->setText("INSTALANDO");
             } else {
-                speedLabel_->setText("");
+                speedLabel_->setText(taskStatusText(*activeTask));
             }
             float progress = (activeTask->status == DownloadStatus::Installing || activeTask->status == DownloadStatus::Committing) ? installProgressOf(*activeTask) : progressOf(*activeTask);
             progressBar_->setProgress(progress);
 
             std::string meta = formatBytes(activeTask->completedBytes) + " / " + formatBytes(activeTask->totalBytes);
             if (activeTask->status == DownloadStatus::Installing || activeTask->status == DownloadStatus::Committing) {
-                meta = "Package " + std::to_string(activeTask->packagesInstalled + 1) + " / " + std::to_string(activeTask->packageCount);
+                meta = "Paquete " + std::to_string(activeTask->packagesInstalled + 1) + " de " + std::to_string(activeTask->packageCount);
             }
-            meta += " (" + std::to_string(int(progress * 100)) + "%)";
+            char pctBuf[32];
+            snprintf(pctBuf, sizeof(pctBuf), " (%.1f%%)", progress * 100.0f);
+            meta += pctBuf;
+            if (activeTask->status == DownloadStatus::Downloading && activeTask->totalBytes > activeTask->completedBytes && activeTask->speedBytesPerSecond > 0) {
+                meta += "  ·  ETA: " + formatEta(activeTask->totalBytes - activeTask->completedBytes, activeTask->speedBytesPerSecond);
+            }
             progressTextLabel_->setText(meta);
         } else {
+            activeInstallBox_->setActive(false);
             activeFilenameLabel_->setText("No hay descargas activas");
             speedLabel_->setText("");
             progressBar_->setProgress(0.0f);
-            progressTextLabel_->setText("");
+            progressTextLabel_->setText("Selecciona un juego del catálogo para comenzar la descarga");
         }
 
         historyTitleLabel_->setText("En cola (" + std::to_string(next.size()) + ")");
@@ -408,7 +472,7 @@ private:
 
     brls::Label* summary_ = nullptr;
 
-    PanelBox* activeInstallBox_ = nullptr;
+    ActiveInstallBox* activeInstallBox_ = nullptr;
     brls::Label* activeFilenameLabel_ = nullptr;
     brls::Label* speedLabel_ = nullptr;
     ProgressBar* progressBar_ = nullptr;

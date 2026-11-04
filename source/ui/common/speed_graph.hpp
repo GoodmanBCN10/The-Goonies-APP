@@ -14,8 +14,8 @@ namespace goonies::ui {
 class SpeedGraphView : public brls::View {
 public:
     SpeedGraphView() {
-        setHeight(82);
-        setMarginBottom(13);
+        setHeight(92);
+        setMarginBottom(12);
     }
 
     void setSamples(std::vector<uint64_t> download,
@@ -29,12 +29,19 @@ public:
         if (width <= 1 || height <= 1)
             return;
 
+        // Modern background container
         nvgBeginPath(vg);
-        nvgRoundedRect(vg, x, y, width, height, 6);
-        nvgFillColor(vg, theme::graphBg());
+        nvgRoundedRect(vg, x, y, width, height, 10.0f);
+        nvgFillColor(vg, nvgRGBA(16, 18, 25, 240));
         nvgFill(vg);
 
-        const float pad = 8.0f;
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, 10.0f);
+        nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 15));
+        nvgStrokeWidth(vg, 1.0f);
+        nvgStroke(vg);
+
+        const float pad = 10.0f;
         const float left = x + pad;
         const float right = x + width - pad;
         const float top = y + pad;
@@ -42,8 +49,9 @@ public:
         const float plotWidth = std::max(1.0f, right - left);
         const float plotHeight = std::max(1.0f, bottom - top);
 
+        // Subtle grid lines
         nvgStrokeWidth(vg, 1.0f);
-        nvgStrokeColor(vg, theme::graphGrid());
+        nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 12));
         for (int i = 1; i <= 3; i++) {
             float gy = top + plotHeight * static_cast<float>(i) / 4.0f;
             nvgBeginPath(vg);
@@ -58,6 +66,7 @@ public:
         for (uint64_t speed : install_)
             maxSpeed = std::max(maxSpeed, speed);
 
+        // Series with gradient under-fill
         drawSeries(vg, download_, maxSpeed, left, top, plotWidth, plotHeight,
                    theme::accent(), 2.5f);
         drawSeries(vg, install_, maxSpeed, left, top, plotWidth, plotHeight,
@@ -83,12 +92,38 @@ private:
         if (samples.size() == 1) {
             nvgBeginPath(vg);
             nvgCircle(vg, left, yFor(samples.front(), maxSpeed, top, plotHeight),
-                      2.5f);
+                      3.0f);
             nvgFillColor(vg, color);
             nvgFill(vg);
             return;
         }
 
+        float botY = top + plotHeight;
+
+        // 1. Draw gradient fill area under the line
+        nvgBeginPath(vg);
+        for (size_t i = 0; i < samples.size(); i++) {
+            float px = left + plotWidth * static_cast<float>(i) /
+                                static_cast<float>(samples.size() - 1);
+            float py = yFor(samples[i], maxSpeed, top, plotHeight);
+            if (i == 0)
+                nvgMoveTo(vg, px, py);
+            else
+                nvgLineTo(vg, px, py);
+        }
+        float lastX = left + plotWidth;
+        float firstX = left;
+        nvgLineTo(vg, lastX, botY);
+        nvgLineTo(vg, firstX, botY);
+        nvgClosePath(vg);
+
+        NVGpaint areaPaint = nvgLinearGradient(vg, left, top, left, botY,
+                                               nvgRGBA(color.r * 255, color.g * 255, color.b * 255, 60),
+                                               nvgRGBA(color.r * 255, color.g * 255, color.b * 255, 0));
+        nvgFillPaint(vg, areaPaint);
+        nvgFill(vg);
+
+        // 2. Draw stroke line
         nvgBeginPath(vg);
         for (size_t i = 0; i < samples.size(); i++) {
             float px = left + plotWidth * static_cast<float>(i) /

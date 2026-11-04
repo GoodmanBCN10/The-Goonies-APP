@@ -323,6 +323,13 @@ bool InstalledTitleService::refresh(std::string& error) {
                     } else if (R_SUCCEEDED(ncmContentMetaDatabaseGetLatestContentMetaKey(&db, &key, record.application_id))) {
                         v = key.version;
                     }
+                    s32 patchTotal = 0, patchWritten = 0;
+                    NcmContentMetaKey patchKey;
+                    if (R_SUCCEEDED(ncmContentMetaDatabaseList(&db, &patchTotal, &patchWritten, &patchKey, 1,
+                                                               NcmContentMetaType_Patch, update_id, 0, UINT64_MAX,
+                                                               NcmContentInstallType_Full)) && patchTotal > 0) {
+                        if (patchKey.version > v) v = patchKey.version;
+                    }
                     ncmContentMetaDatabaseClose(&db);
                 }
                 return v;

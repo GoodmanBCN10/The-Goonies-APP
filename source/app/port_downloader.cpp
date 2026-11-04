@@ -1,4 +1,4 @@
-﻿#include <switch.h>
+#include <switch.h>
 #include <curl/curl.h>
 #include <minizip/unzip.h>
 #include <string>
@@ -185,6 +185,13 @@ bool processPortTask(const std::string& id, const std::string& url, const std::s
             }
             
             std::string extractPath = std::string("sdmc:/") + filename_inzip;
+            bool isAppendChunk = false;
+            const std::string appendSuffix = ".__append__";
+            if (extractPath.size() > appendSuffix.size() &&
+                extractPath.compare(extractPath.size() - appendSuffix.size(), appendSuffix.size(), appendSuffix) == 0) {
+                extractPath.resize(extractPath.size() - appendSuffix.size());
+                isAppendChunk = true;
+            }
             
             if (extractPath.back() == '/') {
                 std::filesystem::create_directories(extractPath);
@@ -193,7 +200,7 @@ bool processPortTask(const std::string& id, const std::string& url, const std::s
                 std::filesystem::create_directories(p.parent_path());
                 
                 if (unzOpenCurrentFile(uf) == UNZ_OK) {
-                    FILE* out = fopen(extractPath.c_str(), "wb");
+                    FILE* out = fopen(extractPath.c_str(), isAppendChunk ? "ab" : "wb");
                     if (out) {
                         std::vector<char> outBuf(128 * 1024);
                         setvbuf(out, outBuf.data(), _IOFBF, outBuf.size());

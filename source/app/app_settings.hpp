@@ -41,6 +41,7 @@ struct AppSettingsData {
     int downloadProvider = 0; // 0=Torrent, 1=Real-Debrid
     bool enableUsb30 = false;
     bool enableBackgroundMusic = true;
+    bool enableSoundEffects = true;
 
     bool operator==(const AppSettingsData& other) const;
     bool operator!=(const AppSettingsData& other) const {

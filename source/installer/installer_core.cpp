@@ -27,7 +27,7 @@ Core::~Core() {
     AbortInstallation();
 }
 
-bool Core::StartInstallation(const std::string& filename) {
+bool Core::StartInstallation(const std::string& filename, goonies::install::InstallStorageTarget target) {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_current_filename = filename;
     m_mtp_bytes_written = 0;
@@ -54,7 +54,6 @@ bool Core::StartInstallation(const std::string& filename) {
     
     m_is_xci = false;
     
-    goonies::install::InstallStorageTarget target = goonies::install::InstallStorageTarget::SdCard;
     m_backend = goonies::install::createInstallBackend("sdmc:/switch/thegoonies", target);
     
     if (!m_backend->beginPackage("local_install", filename)) {

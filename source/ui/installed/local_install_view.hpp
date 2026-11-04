@@ -20,7 +20,7 @@ struct LocalHistoryItem {
 
 class LocalInstallView : public brls::Box {
 public:
-    explicit LocalInstallView(const std::vector<std::string>& queue);
+    explicit LocalInstallView(const std::vector<std::string>& queue, goonies::install::InstallStorageTarget target = goonies::install::InstallStorageTarget::SdCard);
     ~LocalInstallView() override;
 
 private:
@@ -30,6 +30,7 @@ private:
     void readThreadFunc();
 
     std::vector<LocalHistoryItem> queue_;
+    goonies::install::InstallStorageTarget target_ = goonies::install::InstallStorageTarget::SdCard;
     int currentIndex_ = 0;
 
     std::atomic<bool> readThreadActive_{false};

@@ -30,6 +30,115 @@ namespace goonies::ui {
 
 class CatalogView;
 
+class ModernSidebarButton : public brls::Box {
+public:
+    ModernSidebarButton(const std::string& text, NVGcolor accentColor,
+                        std::function<void()> onClick)
+        : brls::Box(brls::Axis::ROW),
+          accentColor_(accentColor),
+          onClick_(std::move(onClick)) {
+        
+        this->setFocusable(true);
+        this->setCornerRadius(18.0f);
+        this->setHighlightCornerRadius(18.0f);
+        this->setHideHighlightBorder(true);
+        this->setHideHighlightBackground(true);
+        this->setHeight(36);
+        this->setMarginRight(8);
+        this->setPadding(0, 16, 0, 16);
+        this->setAlignItems(brls::AlignItems::CENTER);
+        this->setJustifyContent(brls::JustifyContent::CENTER);
+
+        label_ = new brls::Label();
+        label_->setText(text);
+        label_->setFontSize(14);
+        label_->setTextColor(goonies::ui::theme::textSecondary());
+        this->addView(label_);
+
+        this->registerClickAction([this](brls::View*) {
+            if (onClick_) onClick_();
+            return true;
+        });
+    }
+
+    void setActive(bool active) {
+        if (active_ != active) {
+            active_ = active;
+            this->invalidate();
+        }
+    }
+
+    bool isActive() const { return active_; }
+
+    void setText(const std::string& text) {
+        if (label_) label_->setText(text);
+    }
+
+    void setAccentColor(NVGcolor c) {
+        accentColor_ = c;
+        this->invalidate();
+    }
+
+    void draw(NVGcontext* vg, float x, float y, float width, float height,
+              brls::Style style, brls::FrameContext* ctx) override {
+        bool focused = this->isFocused();
+        float r = 18.0f;
+
+        if (focused) {
+            NVGpaint glow = nvgBoxGradient(vg, x, y, width, height, r, 10.0f,
+                                           nvgRGBAf(accentColor_.r, accentColor_.g, accentColor_.b, 0.45f),
+                                           nvgRGBA(0, 0, 0, 0));
+            nvgBeginPath(vg);
+            nvgRect(vg, x - 6, y - 6, width + 12, height + 12);
+            nvgFillPaint(vg, glow);
+            nvgFill(vg);
+        }
+
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, r);
+        if (focused) {
+            nvgFillColor(vg, goonies::ui::theme::cardBgFocus());
+        } else if (active_) {
+            nvgFillColor(vg, nvgRGBAf(accentColor_.r, accentColor_.g, accentColor_.b, 0.25f));
+        } else {
+            nvgFillColor(vg, nvgRGBA(255, 255, 255, 12));
+        }
+        nvgFill(vg);
+
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x, y, width, height, r);
+        if (focused) {
+            nvgStrokeWidth(vg, 2.0f);
+            nvgStrokeColor(vg, accentColor_);
+        } else if (active_) {
+            nvgStrokeWidth(vg, 1.5f);
+            nvgStrokeColor(vg, nvgRGBAf(accentColor_.r, accentColor_.g, accentColor_.b, 0.85f));
+        } else {
+            nvgStrokeWidth(vg, 1.0f);
+            nvgStrokeColor(vg, nvgRGBA(255, 255, 255, 20));
+        }
+        nvgStroke(vg);
+
+        if (label_) {
+            if (focused) {
+                label_->setTextColor(accentColor_);
+            } else if (active_) {
+                label_->setTextColor(nvgRGB(255, 255, 255));
+            } else {
+                label_->setTextColor(goonies::ui::theme::textSecondary());
+            }
+        }
+
+        brls::Box::draw(vg, x, y, width, height, style, ctx);
+    }
+
+private:
+    NVGcolor accentColor_;
+    bool active_ = false;
+    std::function<void()> onClick_;
+    brls::Label* label_ = nullptr;
+};
+
 // One horizontal shelf above the grid (UI_PLAN F5): title, entry indices,
 // optional "See all" action (null = no link).
 struct CatalogShelf {
@@ -202,9 +311,10 @@ public:
           openDownloads_(std::move(openDownloads)),
           alive_(std::make_shared<std::atomic<bool>>(true)),
           cancelled_(std::make_shared<std::atomic<bool>>(false)) {
+        this->setBackgroundColor(nvgRGB(18, 19, 24));
         recycler_ = new brls::RecyclerFrame();
         recycler_->setGrow(1);
-        recycler_->setPadding(6, 32, 6, 32);
+        recycler_->setPadding(6, 24, 6, 24);
         recycler_->estimatedRowHeight = grid::kRowHeight;
         recycler_->registerCell("GridRow", [column = focusColumn_] {
             return new GridRowCell(column);
@@ -223,121 +333,137 @@ public:
         // X/Y hotkeys still work; the chips make the current state visible
         // and touch-reachable. Single row: with the search field collapsed
         // to a 40px icon everything fits at 1280 without clipping.
-        // --- NUEVO DISENO SIDEBAR (Menu Lateral) ---
-        brls::Box* mainContent = new brls::Box(brls::Axis::ROW);
-        mainContent->setGrow(1.0f);
-        
-        brls::Box* sidebar = new brls::Box(brls::Axis::COLUMN);
-        sidebar->setWidth(300);
-        sidebar->setPadding(20, 20, 20, 20);
-        // Color ligeramente distinto para el sidebar
-        sidebar->setBackgroundColor(nvgRGB(30, 30, 30)); 
-        sidebar->setShrink(0.0f);
-        
-        sidebar->addView(makeSidebarTitle("Ordenar"));
-        sortLatest_ = makeSidebarButton("Novedades", [this] { setSort(SortMode::Latest); });
-        sortPopular_ = makeSidebarButton("Populares", [this] { setSort(SortMode::Popular); });
-        sortAlpha_ = makeSidebarButton("A-Z", [this] { setSort(SortMode::Alphabetical); });
-        sortSize_ = makeSidebarButton("Tamano", [this] { setSort(SortMode::Largest); });
-        sidebar->addView(sortLatest_);
-        sidebar->addView(sortPopular_);
-        sidebar->addView(sortAlpha_);
-        sidebar->addView(sortSize_);
-        
-        sidebar->addView(makeSidebarTitle("Categoria"));
-        filterAll_ = makeSidebarButton("Todo", [this] { setFilter(CatalogFilter::All); });
-        filterGames_ = makeSidebarButton("Juegos", [this] { setFilter(CatalogFilter::Games); });
-        filterPorts_ = makeSidebarButton("Ports The Goonies", [this] { setFilter(CatalogFilter::Ports); });
-          
-          sidebar->addView(filterAll_);
-          sidebar->addView(filterGames_);
-        sidebar->addView(filterPorts_);
-        
+        // --- MODERN FULL-WIDTH HEADER & CATEGORY RIBBON ---
+        auto* topBar = new brls::Box(brls::Axis::COLUMN);
+        topBar->setPadding(12, 32, 8, 32);
+        topBar->setBackgroundColor(nvgRGBA(18, 20, 28, 245));
+        topBar->setShrink(0.0f);
+        topBar->setFocusable(false);
+
+        // Row 1: Category Selector Pills + Action Tools
+        auto* navRow = new brls::Box(brls::Axis::ROW);
+        navRow->setHeight(42);
+        navRow->setAlignItems(brls::AlignItems::CENTER);
+        navRow->setMarginBottom(8);
+        navRow->setFocusable(false);
+
+        filterAll_ = makeSidebarButton(t("🎮 Todos", "🎮 All", "🎮 Todos"), theme::neonCyan(), [this] { setFilter(CatalogFilter::All); });
+        filterGames_ = makeSidebarButton(t("🕹️ Juegos", "🕹️ Games", "🕹️ Jogos"), theme::neonCyan(), [this] { setFilter(CatalogFilter::Games); });
+        filterPorts_ = makeSidebarButton("🏴‍☠️ Ports The Goonies", theme::neonCyan(), [this] { setFilter(CatalogFilter::Ports); });
+
+        navRow->addView(filterAll_);
+        navRow->addView(filterGames_);
+        navRow->addView(filterPorts_);
+
         if (!settings_) {
             filterAll_->setVisibility(brls::Visibility::GONE);
             filterGames_->setVisibility(brls::Visibility::GONE);
         }
-        
-        auto* sidebarSpacer = new brls::Box();
-        sidebarSpacer->setGrow(1.0f);
-        sidebar->addView(sidebarSpacer);
-        
+
+        auto* navSpacer = new brls::Box();
+        navSpacer->setGrow(1.0f);
+        navSpacer->setFocusable(false);
+        navRow->addView(navSpacer);
+
+        // Counter pill badge
+        auto* countPill = new brls::Box();
+        countPill->setPadding(4, 14, 4, 14);
+        countPill->setCornerRadius(14);
+        countPill->setBackgroundColor(nvgRGBA(255, 255, 255, 10));
+        countPill->setBorderThickness(1);
+        countPill->setBorderColor(nvgRGBA(255, 255, 255, 18));
+        countPill->setMarginRight(10);
+        countPill->setAlignItems(brls::AlignItems::CENTER);
+        countPill->setJustifyContent(brls::JustifyContent::CENTER);
+
         count_ = new brls::Label();
-        count_->setFontSize(theme::kFontCaption);
-        count_->setTextColor(theme::textTertiary());
-        count_->setMarginBottom(16);
-        sidebar->addView(count_);
-        
-        auto* openDownloadsBtn = new brls::Button();
-        openDownloadsBtn->setStyle(&brls::BUTTONSTYLE_PRIMARY);
-        openDownloadsBtn->setText(t("Cola Descargas", "Downloads Queue", "Fila de downloads"));
-        openDownloadsBtn->setHeight(48);
-        openDownloadsBtn->setMarginBottom(16);
-        openDownloadsBtn->registerClickAction([this](brls::View*) {
-            if (openDownloads_) openDownloads_();
-            return true;
-        });
-        sidebar->addView(openDownloadsBtn);
-        
-        // El panel derecho contiene la barra de busqueda superior y el catalogo
-        rightPane_ = new brls::Box(brls::Axis::COLUMN);
-        brls::Box* rightPane = rightPane_;
-        rightPane->setGrow(1.0f);
-        
-        header_ = new brls::Box(brls::Axis::ROW);
-        header_->setHeight(50);
-        header_->setShrink(0.0f);
-        header_->setMarginTop(10);
-        header_->setMarginBottom(10);
-        header_->setMarginLeft(34);
-        header_->setMarginRight(34);
-        header_->setFocusable(false);
-        
-        auto* headerSpacer = new brls::Box();
-        headerSpacer->setGrow(1.0f);
-        headerSpacer->setFocusable(false);
-        header_->addView(headerSpacer);
-        
-        clearSearch_ = makeSidebarButton(t("Limpiar Busqueda", "Clear", "Limpar"), [this] {
-            if (query_.empty() && !shelfDrilldown_)
-                return;
-            query_.clear();
-            shelfDrilldown_ = false;
-            rebuildEntries();
-        });
-        clearSearch_->setWidth(200);
-        header_->addView(clearSearch_);
-        
+        count_->setFontSize(13);
+        count_->setTextColor(theme::neonCyan());
+        countPill->addView(count_);
+        navRow->addView(countPill);
+
+        auto* openDownloadsBtn = new ModernSidebarButton(
+            t("📥 Descargas", "📥 Downloads", "📥 Downloads"),
+            theme::gold(),
+            [this] {
+                if (openDownloads_) openDownloads_();
+            }
+        );
+        openDownloadsBtn->setHeight(36);
+        openDownloadsBtn->setMarginRight(10);
+        navRow->addView(openDownloadsBtn);
+
+        clearSearch_ = new ModernSidebarButton(
+            t("✕ Limpiar", "✕ Clear", "✕ Limpar"),
+            theme::neonPink(),
+            [this] {
+                if (query_.empty() && !shelfDrilldown_)
+                    return;
+                query_.clear();
+                shelfDrilldown_ = false;
+                rebuildEntries();
+            }
+        );
+        clearSearch_->setHeight(36);
+        clearSearch_->setMarginRight(8);
+        navRow->addView(clearSearch_);
+
         searchField_ = new SearchIconButton();
         searchField_->setStyle(&brls::BUTTONSTYLE_DEFAULT);
-        searchField_->setWidth(40);
-        searchField_->setHeight(40);
-        searchField_->setMarginLeft(8);
+        searchField_->setWidth(38);
+        searchField_->setHeight(38);
+        searchField_->setCornerRadius(19.0f);
         searchField_->setText("");
         searchField_->registerClickAction([this](brls::View*) {
             openSearchKeyboard();
             return true;
         });
-        header_->addView(searchField_);
-        
+        navRow->addView(searchField_);
+
+        topBar->addView(navRow);
+
+        // Row 2: Sort Mode Capsule Ribbon
+        auto* sortRow = new brls::Box(brls::Axis::ROW);
+        sortRow->setHeight(38);
+        sortRow->setAlignItems(brls::AlignItems::CENTER);
+        sortRow->setFocusable(false);
+
+        sortRow->addView(makeSidebarTitle(t("ORDENAR:", "SORT:", "ORDENAR:"), theme::neonCyan()));
+
+        sortLatest_ = makeSidebarButton(t("⚡ Novedades", "⚡ Latest", "⚡ Novidades"), theme::neonCyan(), [this] { setSort(SortMode::Latest); });
+        sortPopular_ = makeSidebarButton(t("⭐ Populares", "⭐ Popular", "⭐ Populares"), theme::neonCyan(), [this] { setSort(SortMode::Popular); });
+        sortAlpha_ = makeSidebarButton(t("🔤 A - Z", "🔤 A - Z", "🔤 A - Z"), theme::neonCyan(), [this] { setSort(SortMode::Alphabetical); });
+        sortSize_ = makeSidebarButton(t("💾 Tamaño", "💾 Size", "💾 Tamanho"), theme::neonCyan(), [this] { setSort(SortMode::Largest); });
+
+        sortRow->addView(sortLatest_);
+        sortRow->addView(sortPopular_);
+        sortRow->addView(sortAlpha_);
+        sortRow->addView(sortSize_);
+
+        topBar->addView(sortRow);
+
+        header_ = topBar;
+        addView(header_);
+
         status_ = new brls::Label();
-        status_->setFontSize(15);
-        status_->setMarginTop(10);
-        status_->setMarginLeft(34);
+        status_->setFontSize(14);
+        status_->setMarginTop(6);
+        status_->setMarginLeft(32);
         status_->setMarginBottom(2);
         status_->setTextColor(theme::textTertiary());
         status_->setVisibility(brls::Visibility::GONE);
+        addView(status_);
 
         batchControls_ = new brls::Box(brls::Axis::ROW);
         batchControls_->setMarginTop(8);
-        batchControls_->setMarginLeft(34);
-        batchControls_->setMarginRight(34);
+        batchControls_->setMarginLeft(32);
+        batchControls_->setMarginRight(32);
         batchControls_->setVisibility(brls::Visibility::GONE);
         
         auto* selectVisible = new brls::Button();
         selectVisible->setStyle(&brls::BUTTONSTYLE_DEFAULT);
         selectVisible->setGrow(1);
-        selectVisible->setHeight(44);
+        selectVisible->setHeight(40);
         selectVisible->setMarginRight(8);
         selectVisible->setText(t("Selecc. visible", "Select visible", "Selecione visible"));
         selectVisible->registerClickAction([this](brls::View*) {
@@ -349,7 +475,7 @@ public:
         auto* clearSelection = new brls::Button();
         clearSelection->setStyle(&brls::BUTTONSTYLE_DEFAULT);
         clearSelection->setGrow(1);
-        clearSelection->setHeight(44);
+        clearSelection->setHeight(40);
         clearSelection->setMarginRight(8);
         clearSelection->setText(t("Limpiar", "Clear", "Limpar"));
         clearSelection->registerClickAction([this](brls::View*) {
@@ -362,23 +488,16 @@ public:
         prepareBatch_ = new brls::Button();
         prepareBatch_->setStyle(&brls::BUTTONSTYLE_PRIMARY);
         prepareBatch_->setGrow(1);
-        prepareBatch_->setHeight(44);
+        prepareBatch_->setHeight(40);
         prepareBatch_->setText(t("Preparar", "Prepare", "Preparar"));
         prepareBatch_->registerClickAction([this](brls::View*) {
             prepareSelectedEntries();
             return true;
         });
         batchControls_->addView(prepareBatch_);
+        addView(batchControls_);
 
-        rightPane->addView(header_);
-        rightPane->addView(status_);
-        rightPane->addView(batchControls_);
-        rightPane->addView(recycler_);
-        
-        mainContent->addView(sidebar);
-        mainContent->addView(rightPane);
-        
-        addView(mainContent);
+        addView(recycler_);
         rebuildEntries();
 
         registerAction("Search", brls::BUTTON_X, [this](brls::View*) {
@@ -588,8 +707,7 @@ private:
         if (emptyState_)
             return emptyState_;
         emptyState_ = new EmptyStateView();
-        if (rightPane_) rightPane_->addView(emptyState_);
-        else addView(emptyState_);
+        this->addView(emptyState_);
         return emptyState_;
     }
 
@@ -784,14 +902,31 @@ private:
                 continue;
             visible.push_back(entry);
         }
-        if (sort_ == SortMode::Alphabetical) {
+        if (currentFilter == CatalogFilter::Ports) {
             std::stable_sort(visible.begin(), visible.end(),
                 [](const CatalogEntry& left, const CatalogEntry& right) {
+                    return left.topicId > right.topicId;
+                });
+        } else if (sort_ == SortMode::Alphabetical) {
+            std::stable_sort(visible.begin(), visible.end(),
+                [currentFilter](const CatalogEntry& left, const CatalogEntry& right) {
+                    if (currentFilter == CatalogFilter::All && left.isPort != right.isPort) {
+                        return left.isPort;
+                    }
+                    if (left.isPort && right.isPort) {
+                        return left.topicId > right.topicId;
+                    }
                     return caseInsensitiveCompare(left.title, right.title);
                 });
         } else if (sort_ == SortMode::Largest) {
             std::stable_sort(visible.begin(), visible.end(),
-                [](const CatalogEntry& left, const CatalogEntry& right) {
+                [currentFilter](const CatalogEntry& left, const CatalogEntry& right) {
+                    if (currentFilter == CatalogFilter::All && left.isPort != right.isPort) {
+                        return left.isPort;
+                    }
+                    if (left.isPort && right.isPort) {
+                        return left.topicId > right.topicId;
+                    }
                     return left.size > right.size;
                 });
         } else if (sort_ == SortMode::Popular) {
@@ -804,9 +939,22 @@ private:
             for (int index : order)
                 sorted.push_back(std::move(visible[static_cast<size_t>(index)]));
             visible = std::move(sorted);
+            if (currentFilter == CatalogFilter::All) {
+                std::stable_sort(visible.begin(), visible.end(),
+                    [](const CatalogEntry& left, const CatalogEntry& right) {
+                        if (left.isPort != right.isPort)
+                            return left.isPort;
+                        if (left.isPort && right.isPort)
+                            return left.topicId > right.topicId;
+                        return false;
+                    });
+            }
         } else {
             std::stable_sort(visible.begin(), visible.end(),
-                [](const CatalogEntry& left, const CatalogEntry& right) {
+                [currentFilter](const CatalogEntry& left, const CatalogEntry& right) {
+                    if (currentFilter == CatalogFilter::All && left.isPort != right.isPort) {
+                        return left.isPort;
+                    }
                     return left.topicId > right.topicId;
                 });
         }
@@ -970,34 +1118,43 @@ private:
         count_->setText(countText_);
     }
 
-    static void styleChip(brls::Button* chip, bool active) {
-        chip->setStyle(active ? &brls::BUTTONSTYLE_PRIMARY
-                              : &brls::BUTTONSTYLE_BORDERLESS);
+    static void styleChip(ModernSidebarButton* chip, bool active) {
+        if (chip) chip->setActive(active);
     }
 
-    brls::Button* makeSidebarButton(const std::string& text,
-                           std::function<void()> onClick) {
-        auto* btn = new brls::Button();
-        btn->setStyle(&brls::BUTTONSTYLE_BORDERLESS);
-        btn->setHeight(48);
-        btn->setMarginBottom(8);
-        btn->setText(text);
-        btn->registerClickAction([onClick](brls::View*) {
-            if (onClick) onClick();
-            return true;
-        });
-        return btn;
+    static void styleChip(brls::Button* chip, bool active) {
+        if (chip) chip->setStyle(active ? &brls::BUTTONSTYLE_PRIMARY
+                                        : &brls::BUTTONSTYLE_BORDERLESS);
+    }
+
+    ModernSidebarButton* makeSidebarButton(const std::string& text,
+                                           NVGcolor accentColor,
+                                           std::function<void()> onClick) {
+        return new ModernSidebarButton(text, accentColor, std::move(onClick));
     }
     
-    // Helper to add titles to the sidebar
-    brls::Label* makeSidebarTitle(const std::string& text) {
+    // Helper to add modern section title
+    brls::Box* makeSidebarTitle(const std::string& text, NVGcolor accentColor = theme::neonCyan()) {
+        auto* box = new brls::Box(brls::Axis::ROW);
+        box->setAlignItems(brls::AlignItems::CENTER);
+        box->setMarginRight(12);
+        box->setFocusable(false);
+
+        auto* bar = new brls::Box();
+        bar->setWidth(3);
+        bar->setHeight(14);
+        bar->setCornerRadius(1.5f);
+        bar->setBackgroundColor(accentColor);
+        bar->setMarginRight(8);
+        box->addView(bar);
+
         auto* label = new brls::Label();
         label->setText(text);
-        label->setFontSize(22);
-        label->setMarginBottom(16);
-        label->setMarginTop(16);
+        label->setFontSize(13);
         label->setTextColor(theme::textSecondary());
-        return label;
+        box->addView(label);
+
+        return box;
     }
 
     void setSort(SortMode mode) {
@@ -1393,15 +1550,15 @@ private:
     CatalogDataSource* dataSource_;
     brls::Box* header_ = nullptr;
     SearchIconButton* searchField_ = nullptr;
-    brls::Button* clearSearch_ = nullptr;
-    brls::Button* sortLatest_ = nullptr;
-    brls::Button* sortPopular_ = nullptr;
-    brls::Button* sortAlpha_ = nullptr;
-    brls::Button* sortSize_ = nullptr;
-    brls::Button* filterAll_ = nullptr;
-    brls::Button* filterGames_ = nullptr;
-    brls::Button* filterRetro_ = nullptr;
-    brls::Button* filterPorts_ = nullptr;
+    ModernSidebarButton* clearSearch_ = nullptr;
+    ModernSidebarButton* sortLatest_ = nullptr;
+    ModernSidebarButton* sortPopular_ = nullptr;
+    ModernSidebarButton* sortAlpha_ = nullptr;
+    ModernSidebarButton* sortSize_ = nullptr;
+    ModernSidebarButton* filterAll_ = nullptr;
+    ModernSidebarButton* filterGames_ = nullptr;
+    ModernSidebarButton* filterRetro_ = nullptr;
+    ModernSidebarButton* filterPorts_ = nullptr;
     brls::Label* count_ = nullptr;
     brls::Label* status_;
     brls::Box* batchControls_ = nullptr;

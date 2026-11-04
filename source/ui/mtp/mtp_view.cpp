@@ -29,6 +29,7 @@ public:
 };
 
 MTPView::MTPView() : brls::Box(brls::Axis::COLUMN) {
+    this->setBackgroundColor(nvgRGB(18, 19, 24));
     this->setFocusable(true);
     this->setAlignItems(brls::AlignItems::STRETCH);
 

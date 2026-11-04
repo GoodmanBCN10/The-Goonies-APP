@@ -41,6 +41,7 @@ public:
           catalog_(catalog), metadata_(metadata), installed_(installed), updater_(updater),
           alive_(std::make_shared<std::atomic<bool>>(true)) {
           
+        this->setBackgroundColor(nvgRGB(18, 19, 24));
         auto* content = new brls::Box(brls::Axis::COLUMN);
         content->setPadding(20, 34, 20, 34);
 
@@ -79,6 +80,19 @@ public:
         });
         bgmToggle->title->setFontSize(20);
         content->addView(bgmToggle);
+
+        auto* sfxToggle = new brls::BooleanCell();
+        sfxToggle->init(t("Sonido de las teclas", "Key click sounds", "Sons dos botões"), settings_->get().enableSoundEffects, [settings](bool value) {
+            auto vals = settings->get();
+            vals.enableSoundEffects = value;
+            std::string err;
+            settings->update(vals, err);
+            if (brls::Application::getAudioPlayer()) {
+                brls::Application::getAudioPlayer()->setEnabled(value);
+            }
+        });
+        sfxToggle->title->setFontSize(20);
+        content->addView(sfxToggle);
 
         // System Firmware Version
         SetSysFirmwareVersion fw;
@@ -252,12 +266,26 @@ public:
 
 private:
     static void addSection(brls::Box* content, const std::string& text) {
+        auto* box = new brls::Box(brls::Axis::ROW);
+        box->setAlignItems(brls::AlignItems::CENTER);
+        box->setMarginTop(18);
+        box->setMarginBottom(8);
+
+        auto* bar = new brls::Box();
+        bar->setWidth(4);
+        bar->setHeight(18);
+        bar->setCornerRadius(2);
+        bar->setBackgroundColor(theme::neonPink());
+        bar->setMarginRight(10);
+        box->addView(bar);
+
         auto* title = new brls::Label();
         title->setText(text);
-        title->setFontSize(20);
-        title->setMarginTop(14);
-        title->setMarginBottom(8);
-        content->addView(title);
+        title->setFontSize(21);
+        title->setTextColor(theme::neonPink());
+        box->addView(title);
+
+        content->addView(box);
     }
 
     static brls::DetailCell* actionCell(const std::string& title,

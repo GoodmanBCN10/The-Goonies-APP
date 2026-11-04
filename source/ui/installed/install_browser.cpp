@@ -3,6 +3,10 @@
 #include <borealis/views/bottom_bar.hpp>
 #include <fmt/core.h>
 #include <algorithm>
+#include <usbhsfs.h>
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
 #include "ui/installed/local_install_view.hpp"
 
 namespace goonies::ui {
@@ -94,6 +98,7 @@ void InstallDataSource::didSelectRowAt(brls::RecyclerFrame*, brls::IndexPath ind
 }
 
 InstallBrowserView::InstallBrowserView(const std::string& startPath) : brls::Box(brls::Axis::COLUMN), currentPath_(startPath) {
+    this->setBackgroundColor(nvgRGB(18, 19, 24));
     this->setAlignItems(brls::AlignItems::STRETCH);
 
     brls::Box* centerBox = new brls::Box(brls::Axis::COLUMN);
@@ -190,6 +195,13 @@ void InstallBrowserView::loadDirectory(const std::string& path) {
                 size_t dotPos = entry.name.find_last_of(".");
                 entry.directory = (dotPos == std::string::npos);
             }
+            if (!entry.directory) {
+                DIR* testDir = opendir(fullPath.c_str());
+                if (testDir) {
+                    entry.directory = true;
+                    closedir(testDir);
+                }
+            }
 
             if (!entry.directory) {
                 std::string ext = "";
@@ -198,7 +210,7 @@ void InstallBrowserView::loadDirectory(const std::string& path) {
                     ext = entry.name.substr(dotPos + 1);
                     std::transform(ext.begin(), ext.end(), ext.begin(), [](unsigned char c) { return std::tolower(c); });
                 }
-                if (ext != "nsp" && ext != "nsz" && ext != "xci") {
+                if (ext != "nsp" && ext != "nsz" && ext != "xci" && ext != "xcz") {
                     continue;
                 }
             }
@@ -277,8 +289,7 @@ void InstallBrowserView::startInstallQueue(const std::string& singleClickedPath)
     }
 
     // Push the installer view
-    brls::Application::pushActivity(new brls::Activity(new goonies::ui::LocalInstallView(queue)));
-    // brls::Application::notify(fmt::format("Iniciando instalacion de {} archivo(s)...", queue.size()));
+    brls::Application::pushActivity(new brls::Activity(new goonies::ui::LocalInstallView(queue, goonies::install::InstallStorageTarget::SdCard)));
 }
 
 } // namespace goonies::ui

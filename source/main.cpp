@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdexcept>
+#include <algorithm>
 #include <borealis.hpp>
 #include <SDL2/SDL_mixer.h>
 #include <string>
@@ -26,6 +27,7 @@ extern "C" {
 #include "mtp/haze_helper.hpp"
 #include "app/installed_title_service.hpp"
 #include "app/homebrew_service.hpp"
+#include "app/nx_versions_service.hpp"
 
 #include "ui/catalog/catalog_view.hpp"
 #include "linkuser.hpp"
@@ -306,7 +308,16 @@ int main(int argc, char* argv[]) {
             writeLog(std::string("Mix_OpenAudio failed: ") + Mix_GetError());
         } else {
             mixerInit = true;
-            writeLog("Mix_OpenAudio OK");
+            Mix_AllocateChannels(16);
+            writeLog("Mix_OpenAudio OK (16 channels)");
+        }
+
+        if (brls::Application::getAudioPlayer()) {
+            brls::Application::getAudioPlayer()->setEnabled(settings.get().enableSoundEffects);
+            brls::Application::getAudioPlayer()->load(brls::SOUND_FOCUS_CHANGE);
+            brls::Application::getAudioPlayer()->load(brls::SOUND_CLICK);
+            brls::Application::getAudioPlayer()->load(brls::SOUND_BACK);
+            writeLog("UI sound effects preloaded OK");
         }
         
         Mix_Music *bgmMusic = nullptr;
@@ -461,6 +472,10 @@ int main(int argc, char* argv[]) {
             installed_service->refresh(err);
             if (g_appExiting) return;
 
+            writeLog("Cargando versiones oficiales...");
+            goonies::NxVersionsService::instance().init();
+            if (g_appExiting) return;
+
             // Load shop catalog and metadata in background before pushing the Main Menu
             catalog_service->load(err);
             if (g_appExiting) return;
@@ -531,8 +546,36 @@ int main(int argc, char* argv[]) {
         std::unordered_map<std::string, goonies::DownloadStatus> lastTaskStatus;
         uint64_t lastDownloadScanMs = 0;
 
+        // Guard against "ghost" focus boxes: RecyclerFrame removes recycled
+        // cells from its content box without clearing their parent pointer, so
+        // a focused cell that got recycled keeps drawing its highlight at its
+        // stale position and swallows input. If the focused view is no longer
+        // reachable from its parent chain, hand focus to the top activity.
+        // Also treat focus as stale when it sits in a different activity than
+        // the one on top (e.g. a list view refreshing while a detail page is open).
+        auto focusIsDetached = [](brls::View* v, brls::View* topRoot) {
+            brls::View* root = v;
+            for (brls::View* cur = v; cur && cur->hasParent(); cur = cur->getParent()) {
+                auto& siblings = cur->getParent()->getChildren();
+                if (std::find(siblings.begin(), siblings.end(), cur) == siblings.end())
+                    return true;
+                root = cur->getParent();
+            }
+            return topRoot && root != topRoot;
+        };
+
         while (brls::Application::mainLoop()) {
             frameCount++;
+            if (brls::View* focus = brls::Application::getCurrentFocus();
+                focus && !brls::Application::isInputBlocks()) {
+                auto stack = brls::Application::getActivitiesStack();
+                if (!stack.empty() && stack.back() &&
+                    focusIsDetached(focus, stack.back()->getContentView())) {
+                    brls::View* target = stack.back()->getDefaultFocus();
+                    if (target && target != focus)
+                        brls::Application::giveFocus(target);
+                }
+            }
             if (frameCount % 60 == 1) {
                 writeLog("Main: pumping UI loop, frame " + std::to_string(frameCount));
             }
