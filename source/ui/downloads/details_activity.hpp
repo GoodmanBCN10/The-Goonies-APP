@@ -84,15 +84,18 @@ public:
         bigPercentLabel_->setTextColor(theme::neonCyan());
         bigPercentLabel_->setSingleLine(true);
         bigPercentLabel_->setAutoAnimate(false);
-        bigPercentLabel_->setWidth(140);
+        bigPercentLabel_->setWidth(130);
+        bigPercentLabel_->setShrink(0.0f);
         bigPercentLabel_->setMarginRight(16);
         statsRow->addView(bigPercentLabel_);
 
         progress_ = new brls::Label();
-        progress_->setFontSize(15);
-        progress_->setTextColor(theme::textSecondary());
+        progress_->setFontSize(16);
+        progress_->setTextColor(nvgRGB(255, 255, 255));
         progress_->setSingleLine(true);
         progress_->setAutoAnimate(false);
+        progress_->setWidth(350);
+        progress_->setShrink(0.0f);
         progress_->setMarginRight(24);
         statsRow->addView(progress_);
 
@@ -101,6 +104,7 @@ public:
         eta_->setTextColor(theme::textTertiary());
         eta_->setSingleLine(true);
         eta_->setAutoAnimate(false);
+        eta_->setGrow(1.0f);
         statsRow->addView(eta_);
 
         hudCard->addView(statsRow);
