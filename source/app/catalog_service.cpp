@@ -656,7 +656,7 @@ bool CatalogService::fetchLatest(std::vector<CatalogEntry>& parsed,
                 if (!item.is_object() || !item.contains("title") || !item.contains("directDownloadUrl")) continue;
                 CatalogEntry entry;
                 entry.isPort = true;
-                entry.topicId = 2000000000ULL + (root.size() - idx);
+                entry.topicId = 2000000000ULL + idx;
                 idx++;
                 entry.title = item["title"].get<std::string>();
                 entry.id = item.contains("name") ? item["name"].get<std::string>() : entry.title;
@@ -710,7 +710,7 @@ void CatalogService::loadPortsCache() {
                 if (!item.is_object() || !item.contains("title") || !item.contains("directDownloadUrl")) continue;
                 CatalogEntry entry;
                 entry.isPort = true;
-                entry.topicId = 2000000000ULL + (root.size() - idx);
+                entry.topicId = 2000000000ULL + idx;
                 idx++;
                 entry.title = item["title"].get<std::string>();
                 entry.id = item.contains("name") ? item["name"].get<std::string>() : entry.title;
