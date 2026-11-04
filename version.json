@@ -3,15 +3,15 @@
   "name": "The Goonies APP v3.0",
   "draft": false,
   "prerelease": false,
-  "body": "The Goonies APP v3.0\n\n- RediseÃ±o visual completo OLED Edition.\n- Sonidos de pulsaciÃ³n suaves con opciÃ³n on/off en Ajustes.\n- Transiciones instantÃ¡neas sin parpadeo.\n- OptimizaciÃ³n del motor de torrents y soporte de mÃºltiples trackers.",
+  "body": "The Goonies APP v3.0\n\n- Rediseño visual completo OLED Edition (fondo negro puro #121318, paleta por secciones sincronizada).\n- Sonidos nativos de interfaz de Nintendo Switch suaves y orgánicos con interruptor on/off en Ajustes.\n- Transiciones instantáneas sin parpadeo ni solapamientos entre menús.\n- Corrección de navegación vertical con cruceta (D-pad) en menú principal y cuadrículas de juegos instalados.\n- Optimización del motor de resolución de enlaces magnet y torrents (soporte de tramas grandes, ampliación de DHT/PEX y trackers globales).\n- Detección y descarga estable de actualizaciones y juegos del catálogo.",
   "assets": [
     {
       "name": "TheGooniesInstaller.nro",
-      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v3.0/TheGooniesInstaller.nro"
+      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v3.0.0/TheGooniesInstaller.nro"
     },
     {
       "name": "TheGooniesInstaller.nro.sha256",
-      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v3.0/TheGooniesInstaller.nro.sha256"
+      "browser_download_url": "https://github.com/GoodmanBCN10/The-Goonies-APP/releases/download/v3.0.0/TheGooniesInstaller.nro.sha256"
     }
   ]
 }
