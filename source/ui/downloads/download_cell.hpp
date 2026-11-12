@@ -117,7 +117,7 @@ public:
         std::string stText = taskStatusText(task);
         status_->setText(stText);
 
-        NVGcolor col = statusColor(task.status);
+        NVGcolor col = statusColor(task);
         status_->setTextColor(col);
         statusPill_->setBackgroundColor(nvgRGBA(col.r * 255, col.g * 255, col.b * 255, 45));
 
@@ -147,7 +147,9 @@ public:
                 meta += "  ·  ETA: " + formatEta(task.totalBytes - task.completedBytes, task.speedBytesPerSecond);
             }
         } else if (task.status == DownloadStatus::Queued) {
-            meta = "En espera en la cola...";
+            meta = task.slowSkipped
+                ? t("Pospuesta: descarga lenta (pulsa X para priorizar)", "Postponed: slow (press X to prioritize)", "Posposta: download lento (pressione X)")
+                : t("En espera en la cola... (X: Descargar a continuación)", "Waiting in queue... (X: Download next)", "Aguardando na fila... (X: Baixar a seguir)");
         } else if (task.status == DownloadStatus::Paused) {
             meta = "Descarga pausada";
         }

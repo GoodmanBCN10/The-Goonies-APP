@@ -27,6 +27,10 @@ namespace goonies {
 
 namespace {
 
+#ifndef THEGOONIES_VERSION
+#define THEGOONIES_VERSION "v3.0.2"
+#endif
+
 // Modern interactive row button for submenus with glowing focus borders
 class ModernMenuRow : public brls::Box {
 public:
@@ -480,7 +484,7 @@ MainMenu::MainMenu(goonies::DownloadManager* manager, goonies::CatalogService* c
     titleTextBox->addView(titleLabel);
 
     brls::Label* subtitleLabel = new brls::Label();
-    subtitleLabel->setText("v3.0");
+    subtitleLabel->setText(THEGOONIES_VERSION);
     subtitleLabel->setFontSize(15);
     subtitleLabel->setTextColor(theme::textSecondary());
     titleTextBox->addView(subtitleLabel);
@@ -691,18 +695,6 @@ MainMenu::MainMenu(goonies::DownloadManager* manager, goonies::CatalogService* c
         } else {
             brls::Application::quit();
         }
-        return true;
-    }, false);
-    
-    this->registerAction("Actualizar CFW", brls::BUTTON_Y, [this](brls::View* view) {
-        brls::Dialog* dialog = new brls::Dialog(t("El actualizador realiza una instalación limpia. Es recomendable hacer una copia de seguridad de las carpetas que quieras conservar (RetroArch, juegos, homebrew, etc.) antes de actualizar el CFW.\n\n¿Deseas continuar?",
-                                                  "The updater performs a clean installation. It is recommended to back up any folders you want to keep (RetroArch, games, homebrew, etc.) before updating the CFW.\n\nDo you want to continue?",
-                                                  "O atualizador realiza uma instalação limpa. Recomenda-se fazer backup de todas as pastas que deseja manter (RetroArch, jogos, homebrew, etc.) antes de atualizar o CFW.\n\nDeseja continuar?"));
-        dialog->addButton(t("Continuar", "Continue", "Continuar"), []() {
-            brls::Application::pushActivity(new brls::Activity(new goonies::ui::UpdaterView()));
-        });
-        dialog->addButton(t("Cancelar", "Cancel", "Cancelar"), []() {});
-        dialog->open();
         return true;
     }, false);
 

@@ -201,6 +201,36 @@ public:
         brls::Application::pushActivity(new FilePickerActivity(manager_));
     }
 
+    void promptPause(const std::string& taskId) {
+        bool hasOtherQueued = false;
+        for (const auto& t : manager_->snapshot()) {
+            if (t.id != taskId && t.status == DownloadStatus::Queued) {
+                hasOtherQueued = true;
+                break;
+            }
+        }
+        if (hasOtherQueued) {
+            auto* dialog = new brls::Dialog(t(
+                "¿Qué deseas hacer con la cola de descargas?",
+                "What would you like to do with the download queue?",
+                "O que deseja fazer com a fila de downloads?"));
+            dialog->addButton(t("Saltar a la siguiente", "Skip to next", "Pular para a próxima"), [this] {
+                std::string err;
+                manager_->skipActiveTask(err);
+                startRefreshing(true);
+            });
+            dialog->addButton(t("Pausar descarga", "Pause download", "Pausar download"), [this, taskId] {
+                manager_->pause(taskId);
+                startRefreshing(true);
+            });
+            dialog->addButton(t("Cancelar", "Cancel", "Cancelar"), [] {});
+            dialog->open();
+        } else {
+            manager_->pause(taskId);
+            startRefreshing(true);
+        }
+    }
+
     void openRowMenu(const std::string& taskId) {
         DownloadTask task;
         bool found = false;
@@ -219,7 +249,7 @@ public:
             runners->push_back(std::move(run));
         };
 
-        add("Details", [this, taskId] { openDetails(taskId); });
+        add(t("Detalles", "Details", "Detalhes"), [this, taskId] { openDetails(taskId); });
 
         bool active = task.status == DownloadStatus::Queued ||
                       task.status == DownloadStatus::Checking ||
@@ -227,13 +257,23 @@ public:
                       task.status == DownloadStatus::Installing ||
                       task.status == DownloadStatus::Committing ||
                       task.status == DownloadStatus::Verifying;
-        if (active) add("Pause", [this, taskId] { manager_->pause(taskId); startRefreshing(true); });
+        if (active) add(t("Pausar", "Pause", "Pausar"), [this, taskId] { promptPause(taskId); });
         if (task.status == DownloadStatus::Paused || task.status == DownloadStatus::Error)
-            add("Resume", [this, taskId] { manager_->resume(taskId); startRefreshing(true); });
+            add(t("Reanudar", "Resume", "Retomar"), [this, taskId] { manager_->resume(taskId); startRefreshing(true); });
         if (task.status == DownloadStatus::Completed)
-            add("Verify", [this, taskId] { manager_->verify(taskId); startRefreshing(true); });
+            add(t("Verificar", "Verify", "Verificar"), [this, taskId] { manager_->verify(taskId); startRefreshing(true); });
         
         if (task.status == DownloadStatus::Queued) {
+            add(t("Descargar a continuación (X)", "Download next (X)", "Baixar a seguir (X)"), [this, taskId] {
+                std::string error;
+                if (manager_->moveToFront(taskId, error)) {
+                    brls::Application::notify(t("Mover al principio de la cola", "Moved to front of queue", "Movido para o topo da fila"));
+                    startRefreshing(true);
+                } else if (!error.empty()) {
+                    brls::Application::notify(error);
+                }
+            });
+
             std::vector<std::string> queuedIds;
             for (const auto& candidate : manager_->snapshot())
                 if (candidate.status == DownloadStatus::Queued) queuedIds.push_back(candidate.id);
@@ -252,7 +292,7 @@ public:
                 }
             }
         }
-        add("Remove", [this, taskId] { openRemoveDialog(taskId); });
+        add(t("Eliminar", "Remove", "Remover"), [this, taskId] { openRemoveDialog(taskId); });
 
         auto* dropdown = new brls::Dropdown(
             task.name, labels, [runners](int selected) {
@@ -435,6 +475,18 @@ private:
                         openRowMenu(taskId);
                         return true;
                     });
+                    if (task.status == DownloadStatus::Queued) {
+                        cell->registerAction(t("Descargar a continuación", "Download next", "Baixar a seguir"), brls::BUTTON_X, [this, taskId](brls::View*) {
+                            std::string error;
+                            if (manager_->moveToFront(taskId, error)) {
+                                brls::Application::notify(t("Mover al principio de la cola", "Moved to front of queue", "Movido para o topo da fila"));
+                                startRefreshing(true);
+                            } else if (!error.empty()) {
+                                brls::Application::notify(error);
+                            }
+                            return true;
+                        });
+                    }
                     list_->addView(cell);
                     
                     if (ownsFocus && !focusRestored && (task.id == focusedTaskId || focusedTaskId.empty())) {

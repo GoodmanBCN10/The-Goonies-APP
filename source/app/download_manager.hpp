@@ -57,6 +57,11 @@ struct DownloadTask {
     std::string portId;
     std::string directDownloadUrl;
     
+    // Smart Queue: slow download detection and postponement
+    bool slowSkipped = false;
+    uint64_t slowWindowStartMs = 0;
+    uint64_t slowWindowStartBytes = 0;
+    
     uint64_t totalBytes = 0;
     uint64_t completedBytes = 0;
     uint64_t speedBytesPerSecond = 0;
@@ -149,6 +154,7 @@ public:
     
     bool pause(const std::string& taskId);
     bool resume(const std::string& taskId);
+    bool skipActiveTask(std::string& error);
     bool moveToFront(const std::string& taskId, std::string& error);
     bool moveTask(const std::string& taskId, bool up, std::string& error);
     bool retry(const std::string& taskId);
@@ -180,6 +186,7 @@ private:
     bool saveLocked(std::string& error) const;
     DownloadTask* findLocked(const std::string& id);
     const DownloadTask* findLocked(const std::string& id) const;
+    bool checkAndHandleSlowTaskLocked(DownloadTask* task);
     bool removeLocked(const std::string& id, bool deleteData,
                       std::string& error);
 

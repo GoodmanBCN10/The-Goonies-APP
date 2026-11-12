@@ -191,6 +191,9 @@ void UpdaterView::FetchLatestVersion() {
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
         curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 15L);
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 30L);
         
         CURLcode res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
@@ -237,8 +240,9 @@ void UpdaterView::FetchLatestVersion() {
                 }
             });
         } else {
-            brls::sync([this]() {
-                status_label->setText(t("Error de conexión al buscar actualizaciones.", "Connection error while checking for updates.", "Erro de conexão ao verificar atualizações."));
+            std::string err_desc = std::string(curl_easy_strerror(res)) + " (" + std::to_string(res) + ")";
+            brls::sync([this, err_desc]() {
+                status_label->setText(t("Error de conexión: ", "Connection error: ", "Erro de conexão: ") + err_desc);
             });
         }
     }
@@ -266,6 +270,8 @@ void UpdaterView::PerformUpdate() {
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
                 curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
                 curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+                curl_easy_setopt(curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+                curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 20L);
                 
                 curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
                 curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, ProgressCallback);

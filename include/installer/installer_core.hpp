@@ -18,7 +18,7 @@ public:
     Core();
     ~Core();
 
-    bool StartInstallation(const std::string& filename);
+    bool StartInstallation(const std::string& filename, goonies::install::InstallStorageTarget target = goonies::install::InstallStorageTarget::SdCard);
     bool WriteData(const void* data, size_t size);
     void FinishInstallation();
     void AbortInstallation();

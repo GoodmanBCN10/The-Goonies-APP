@@ -42,9 +42,9 @@ INCLUDE		:=	$(foreach dir,$(INCLUDES),-I$(TOPDIR)/$(dir)) \
 				$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 				-I.
 
-APP_TITLE	:=	The Goonies App 3.0
+APP_TITLE	:=	The Goonies App 3.0.2
 APP_AUTHOR	:=	GoodmanBCN
-APP_VERSION	:=	v3.0.1
+APP_VERSION	:=	v3.0.2
 DEFINES		:=	-DTHEGOONIES_VERSION=\"$(APP_VERSION)\"
 
 #---------------------------------------------------------------------------------

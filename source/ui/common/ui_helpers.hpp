@@ -172,6 +172,13 @@ inline NVGcolor statusColor(DownloadStatus status) {
     return theme::accent();
 }
 
+inline NVGcolor statusColor(const DownloadTask& task) {
+    if (task.status == DownloadStatus::Queued && task.slowSkipped) {
+        return theme::neonOrange();
+    }
+    return statusColor(task.status);
+}
+
 inline std::string taskStatusText(const DownloadTask& task) {
     auto withPercent = [](const std::string& label, int percent) {
         return label + " " + std::to_string(percent) + "%";
@@ -207,6 +214,10 @@ inline std::string taskStatusText(const DownloadTask& task) {
         case DownloadStatus::Installed:
             return "Installed";
         case DownloadStatus::Queued:
+            if (task.slowSkipped) {
+                return t("Pospuesta", "Postponed", "Adiada");
+            }
+            return goonies::statusName(task.status);
         case DownloadStatus::Removing:
             return goonies::statusName(task.status);
     }

@@ -1576,11 +1576,131 @@ bool DownloadManager::moveToFront(const std::string& taskId, std::string& error)
     auto target = std::find_if(tasks_.begin(), tasks_.end(), [&taskId](const DownloadTask& task) { return task.id == taskId; });
     if (target == tasks_.end()) { error = "Download task not found."; return false; }
     if (target->status != DownloadStatus::Queued) { error = "Only a queued download can be moved."; return false; }
+    target->slowSkipped = false;
+    target->slowWindowStartMs = 0;
+    target->slowWindowStartBytes = 0;
     auto first = std::find_if(tasks_.begin(), tasks_.end(), [](const DownloadTask& task) { return task.status == DownloadStatus::Queued; });
     if (first == target) return true;
     std::rotate(first, target, target + 1);
     std::string dummyErr;
     return saveLocked(dummyErr);
+}
+
+bool DownloadManager::skipActiveTask(std::string& error) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (activeTaskId_.empty()) {
+        error = "No hay descarga activa para saltar.";
+        return false;
+    }
+    DownloadTask* task = findLocked(activeTaskId_);
+    if (!task) {
+        error = "Descarga activa no encontrada.";
+        return false;
+    }
+    if (task->status == DownloadStatus::Installing || task->status == DownloadStatus::Committing) {
+        error = "No se puede saltar una descarga durante la instalacion.";
+        return false;
+    }
+    task->status = DownloadStatus::Queued;
+    task->speedBytesPerSecond = 0;
+    task->slowWindowStartMs = 0;
+    task->slowWindowStartBytes = 0;
+
+    auto it = std::find_if(tasks_.begin(), tasks_.end(), [this](const DownloadTask& t) {
+        return t.id == activeTaskId_;
+    });
+    if (it != tasks_.end()) {
+        auto lastQueued = tasks_.end();
+        for (auto cur = tasks_.begin(); cur != tasks_.end(); ++cur) {
+            if (cur->status == DownloadStatus::Queued && cur != it) {
+                lastQueued = cur;
+            }
+        }
+        if (lastQueued != tasks_.end() && it < lastQueued) {
+            std::rotate(it, it + 1, lastQueued + 1);
+        }
+    }
+
+    cancelActiveTask_.store(true);
+    condition_.notify_all();
+    std::string dummy;
+    saveLocked(dummy);
+    return true;
+}
+
+bool DownloadManager::checkAndHandleSlowTaskLocked(DownloadTask* task) {
+    if (!task) return false;
+    if (task->status == DownloadStatus::Installing || task->status == DownloadStatus::Committing)
+        return false;
+    if (task->packagesInstalled > 0)
+        return false;
+    if (task->totalBytes > 0 && (task->completedBytes * 2 >= task->totalBytes))
+        return false;
+
+    bool hasOtherQueued = false;
+    for (const auto& other : tasks_) {
+        if (other.id != task->id && other.status == DownloadStatus::Queued) {
+            hasOtherQueued = true;
+            break;
+        }
+    }
+    if (!hasOtherQueued)
+        return false;
+
+    uint64_t now = now_ms();
+    if (task->slowWindowStartMs == 0) {
+        task->slowWindowStartMs = now;
+        task->slowWindowStartBytes = task->completedBytes;
+        return false;
+    }
+
+    const uint64_t kSlowWindowMs = 300000;
+    if (now - task->slowWindowStartMs < kSlowWindowMs)
+        return false;
+
+    uint64_t elapsedSec = (now - task->slowWindowStartMs) / 1000;
+    uint64_t bytesInWindow = (task->completedBytes >= task->slowWindowStartBytes)
+        ? (task->completedBytes - task->slowWindowStartBytes) : 0;
+    uint64_t avgSpeedBps = elapsedSec > 0 ? (bytesInWindow / elapsedSec) : 0;
+    uint64_t remainingBytes = (task->totalBytes > task->completedBytes)
+        ? (task->totalBytes - task->completedBytes) : 0;
+    uint64_t etaSec = (avgSpeedBps > 0) ? (remainingBytes / avgSpeedBps) : 999999;
+
+    if (bytesInWindow < 256 * 1024 || avgSpeedBps < 50 * 1024 || etaSec > 7200) {
+        log_msg("[manager] SmartQueue: Auto-skipping slow task %s (avg: %lu B/s, in-window: %lu bytes, ETA: %lu s)\n",
+                task->id.c_str(), (unsigned long)avgSpeedBps, (unsigned long)bytesInWindow, (unsigned long)etaSec);
+
+        task->slowSkipped = true;
+        task->status = DownloadStatus::Queued;
+        task->speedBytesPerSecond = 0;
+        task->slowWindowStartMs = 0;
+        task->slowWindowStartBytes = 0;
+
+        auto it = std::find_if(tasks_.begin(), tasks_.end(), [task](const DownloadTask& t) {
+            return t.id == task->id;
+        });
+        if (it != tasks_.end()) {
+            auto lastQueued = tasks_.end();
+            for (auto cur = tasks_.begin(); cur != tasks_.end(); ++cur) {
+                if (cur->status == DownloadStatus::Queued && cur != it) {
+                    lastQueued = cur;
+                }
+            }
+            if (lastQueued != tasks_.end() && it < lastQueued) {
+                std::rotate(it, it + 1, lastQueued + 1);
+            }
+        }
+
+        cancelActiveTask_.store(true);
+        std::string dummy;
+        saveLocked(dummy);
+        condition_.notify_all();
+        return true;
+    }
+
+    task->slowWindowStartMs = now;
+    task->slowWindowStartBytes = task->completedBytes;
+    return false;
 }
 
 bool DownloadManager::moveTask(const std::string& taskId, bool up, std::string& error) {
@@ -1704,6 +1824,9 @@ bool DownloadManager::saveLocked(std::string& error) const {
             state << "7:port-id" << bstr(task.portId);
             state << "8:port-url" << bstr(task.directDownloadUrl);
         }
+        if (task.slowSkipped) {
+            state << "12:slow-skipped" << bint(1);
+        }
         state << "6:status" << bstr(persistedStatus(task.status));
         state << "5:total" << bint(task.totalBytes);
         state << "e";
@@ -1816,6 +1939,10 @@ void DownloadManager::load() {
                 task.isPort = true;
                 dictionaryString(item, "port-id", task.portId);
                 dictionaryString(item, "port-url", task.directDownloadUrl);
+            }
+            uint64_t slowSkippedVal = 0;
+            if (dictionaryInteger(item, "slow-skipped", slowSkippedVal) && slowSkippedVal) {
+                task.slowSkipped = true;
             }
         }
         
@@ -1934,6 +2061,8 @@ void DownloadManager::workerMain() {
             for (DownloadTask& task : tasks_) {
                 if (task.status == DownloadStatus::Queued) {
                     task.status = DownloadStatus::Checking;
+                    task.slowWindowStartMs = now_ms();
+                    task.slowWindowStartBytes = task.completedBytes;
                     activeId = task.id;
                     metainfoPath = task.metainfoPath;
                     dataPath = task.dataPath;
@@ -1989,9 +2118,9 @@ void DownloadManager::workerMain() {
                         bool deleteData = task->error == "delete-data";
                         std::string removeError;
                         removeLocked(activeId, deleteData, removeError);
-                    } else if (!cancelActiveTask_.load()) {
+                    } else if (!cancelActiveTask_.load() && task->status != DownloadStatus::Queued && task->status != DownloadStatus::Paused) {
                         task->status = DownloadStatus::Error;
-                        if (task->error.find("Error:") == std::string::npos) task->error = "Fallo en la descarga o extracciÃ³n.";
+                        if (task->error.find("Error:") == std::string::npos) task->error = "Fallo en la descarga o extracción.";
                     }
                     std::string ignored;
                     saveLocked(ignored);
@@ -2113,7 +2242,7 @@ void DownloadManager::workerMain() {
                         if (task->status == DownloadStatus::Removing) {
                             isRemoving = true;
                             deleteData = task->error == "delete-data";
-                        } else if (task->status != DownloadStatus::Paused) {
+                        } else if (task->status != DownloadStatus::Paused && task->status != DownloadStatus::Queued) {
                             if (!stopping_.load()) {
                                 task->status = DownloadStatus::Error;
                                 if (task->error.empty() || task->error == "Desbloqueando enlace premium..." || task->error.find("Descargando") != std::string::npos) {
@@ -2233,6 +2362,9 @@ void DownloadManager::workerMain() {
                                 task->speedBytesPerSecond = (downloaded * 1000) / elapsed;
                                 lastCalcTime = nowMs;
                                 lastCalcBytes = current;
+                            }
+                            if (task->status == DownloadStatus::Downloading) {
+                                checkAndHandleSlowTaskLocked(task);
                             }
                         }
                     }
@@ -2361,6 +2493,11 @@ void DownloadManager::workerMain() {
                             ctx.lastSpeedCalcTime = nowMs;
                             ctx.lastSpeedCalcBytes = static_cast<uint64_t>(now);
                         }
+                        if (task->status == DownloadStatus::Downloading) {
+                            if (checkAndHandleSlowTaskLocked(task)) {
+                                return false;
+                            }
+                        }
                         return true;
                     }
                     return false;
@@ -2422,7 +2559,7 @@ void DownloadManager::workerMain() {
                     if (task->status == DownloadStatus::Removing) {
                         isRemoving = true;
                         deleteData = task->error == "delete-data";
-                    } else if (task->status != DownloadStatus::Paused) {
+                    } else if (task->status != DownloadStatus::Paused && task->status != DownloadStatus::Queued) {
                         if (res != CURLE_OK || stopping_.load() || cancelActiveTask_.load()) {
                             task->status = DownloadStatus::Error;
                             if (task->error.empty() || task->error.find("Descargando") != std::string::npos || task->error == "Desbloqueando enlace premium...") {
@@ -2492,7 +2629,8 @@ void DownloadManager::workerMain() {
                 std::lock_guard<std::mutex> lock(mutex_);
                 DownloadTask* task = findLocked(activeId);
                 if (!task || task->status == DownloadStatus::Paused ||
-                    task->status == DownloadStatus::Removing)
+                    task->status == DownloadStatus::Removing ||
+                    task->status == DownloadStatus::Queued)
                     break;
             }
 
@@ -2524,12 +2662,18 @@ void DownloadManager::workerMain() {
                 task->piecesVerified = stat.num_pieces_verified;
                 if (task->status != DownloadStatus::Removing &&
                     task->status != DownloadStatus::Paused &&
+                    task->status != DownloadStatus::Queued &&
                     task->status != DownloadStatus::Installing &&
                     task->status != DownloadStatus::Committing) {
                     if (stat.verifying)
                         task->status = DownloadStatus::Verifying;
                     else
                         task->status = DownloadStatus::Downloading;
+                }
+                if (task->status == DownloadStatus::Downloading) {
+                    if (checkAndHandleSlowTaskLocked(task)) {
+                        break;
+                    }
                 }
                 if (running < 0) {
                     task->status = DownloadStatus::Error;

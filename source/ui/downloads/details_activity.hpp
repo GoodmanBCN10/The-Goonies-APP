@@ -84,9 +84,9 @@ public:
         bigPercentLabel_->setTextColor(theme::neonCyan());
         bigPercentLabel_->setSingleLine(true);
         bigPercentLabel_->setAutoAnimate(false);
-        bigPercentLabel_->setWidth(130);
+        bigPercentLabel_->setWidth(brls::View::AUTO);
         bigPercentLabel_->setShrink(0.0f);
-        bigPercentLabel_->setMarginRight(16);
+        bigPercentLabel_->setMarginRight(20);
         statsRow->addView(bigPercentLabel_);
 
         progress_ = new brls::Label();
@@ -94,7 +94,7 @@ public:
         progress_->setTextColor(nvgRGB(255, 255, 255));
         progress_->setSingleLine(true);
         progress_->setAutoAnimate(false);
-        progress_->setWidth(350);
+        progress_->setWidth(brls::View::AUTO);
         progress_->setShrink(0.0f);
         progress_->setMarginRight(24);
         statsRow->addView(progress_);
@@ -293,11 +293,38 @@ private:
         if (!task)
             return;
         if (task->status == DownloadStatus::Paused ||
-            task->status == DownloadStatus::Error)
+            task->status == DownloadStatus::Error) {
             manager_->resume(taskId_);
-        else
-            manager_->pause(taskId_);
-        refresh();
+            refresh();
+        } else {
+            bool hasOtherQueued = false;
+            for (const auto& t : manager_->snapshot()) {
+                if (t.id != taskId_ && t.status == DownloadStatus::Queued) {
+                    hasOtherQueued = true;
+                    break;
+                }
+            }
+            if (hasOtherQueued) {
+                auto* dialog = new brls::Dialog(t(
+                    "¿Qué deseas hacer con la cola de descargas?",
+                    "What would you like to do with the download queue?",
+                    "O que deseja fazer com a fila de downloads?"));
+                dialog->addButton(t("Saltar a la siguiente", "Skip to next", "Pular para a próxima"), [this] {
+                    std::string err;
+                    manager_->skipActiveTask(err);
+                    refresh();
+                });
+                dialog->addButton(t("Pausar descarga", "Pause download", "Pausar download"), [this] {
+                    manager_->pause(taskId_);
+                    refresh();
+                });
+                dialog->addButton(t("Cancelar", "Cancel", "Cancelar"), [] {});
+                dialog->open();
+            } else {
+                manager_->pause(taskId_);
+                refresh();
+            }
+        }
     }
 
     void refresh() {
@@ -308,9 +335,13 @@ private:
         }
         frame_->setTitle(t("Detalle de Descarga", "Download Details", "Detalhes do Download"));
         titleLabel_->setText(task->name);
-        status_->setText(goonies::statusName(task->status));
+        std::string st = goonies::statusName(task->status);
+        if (task->status == DownloadStatus::Queued && task->slowSkipped) {
+            st = t("Pospuesta (lenta)", "Postponed (slow)", "Posposta (lenta)");
+        }
+        status_->setText(st);
 
-        NVGcolor col = statusColor(task->status);
+        NVGcolor col = statusColor(*task);
         status_->setTextColor(col);
         statusPill_->setBackgroundColor(nvgRGBA(col.r * 255, col.g * 255, col.b * 255, 45));
 

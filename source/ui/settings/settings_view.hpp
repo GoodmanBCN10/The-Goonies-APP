@@ -108,13 +108,51 @@ public:
         fwLabel->setMarginTop(12);
         content->addView(fwLabel);
 
+        auto* updateOrderNote = new brls::Label();
+        updateOrderNote->setText(t(
+            "Importante: Actualiza siempre primero el CFW y luego el firmware de la consola.",
+            "Important: Always update the CFW first, then the console firmware.",
+            "Importante: Sempre atualize o CFW primeiro e depois o firmware do console."));
+        updateOrderNote->setFontSize(15);
+        updateOrderNote->setTextColor(theme::neonOrange());
+        updateOrderNote->setMarginTop(6);
+        updateOrderNote->setMarginBottom(10);
+        content->addView(updateOrderNote);
+
+        auto* cfwBtn = new brls::Button();
+        cfwBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
+        cfwBtn->setText(t("1. Actualizar CFW (Atmosphere / Hekate)", "1. Update CFW (Atmosphere / Hekate)", "1. Atualizar CFW (Atmosphere / Hekate)"));
+        cfwBtn->setMarginTop(4);
+        cfwBtn->setMarginBottom(6);
+        cfwBtn->registerClickAction([this](brls::View* view) {
+            brls::Dialog* dialog = new brls::Dialog(t(
+                "El actualizador realiza una instalación limpia de los archivos de CFW. Es recomendable hacer una copia de seguridad de las carpetas que quieras conservar (RetroArch, juegos, homebrew, etc.) antes de continuar.\n\n¿Deseas continuar?",
+                "The updater performs a clean installation of CFW files. It is recommended to back up any folders you want to keep (RetroArch, games, homebrew, etc.) before proceeding.\n\nDo you want to continue?",
+                "O atualizador realiza uma instalação limpa dos arquivos CFW. Recomenda-se fazer backup das pastas que deseja manter (RetroArch, jogos, homebrew, etc.) antes de continuar.\n\nDeseja continuar?"));
+            dialog->addButton(t("Continuar", "Continue", "Continuar"), []() {
+                brls::Application::pushActivity(new brls::Activity(goonies::ui::UpdaterView::create(goonies::ui::UpdateMode::CFW)));
+            });
+            dialog->addButton(t("Cancelar", "Cancel", "Cancelar"), []() {});
+            dialog->open();
+            return true;
+        });
+        content->addView(cfwBtn);
+
         auto* firmwareBtn = new brls::Button();
         firmwareBtn->setStyle(&brls::BUTTONSTYLE_BORDERED);
-        firmwareBtn->setText(t("Actualizar Firmware (Daybreak)", "Update Firmware (Daybreak)", "Atualizar Firmware (Daybreak)"));
-        firmwareBtn->setMarginTop(8);
+        firmwareBtn->setText(t("2. Actualizar Firmware (Daybreak)", "2. Update Firmware (Daybreak)", "2. Atualizar Firmware (Daybreak)"));
+        firmwareBtn->setMarginTop(4);
         firmwareBtn->setMarginBottom(8);
         firmwareBtn->registerClickAction([this](brls::View* view) {
-            brls::Application::pushActivity(new brls::Activity(goonies::ui::UpdaterView::create(goonies::ui::UpdateMode::Firmware)));
+            brls::Dialog* dialog = new brls::Dialog(t(
+                "Asegúrate de haber actualizado primero los archivos de CFW (Atmosphere, hekate, etc...) con la opción \"Actualizar CFW\".\n\n¿Deseas continuar con la descarga del firmware?",
+                "Make sure you have updated the CFW files (Atmosphere, hekate, etc...) first using the \"Update CFW\" option.\n\nDo you want to continue with the firmware download?",
+                "Certifique-se de ter atualizado primeiro os arquivos CFW (Atmosphere, hekate, etc...) com a opção \"Atualizar CFW\".\n\nDeseja continuar com o download do firmware?"));
+            dialog->addButton(t("Continuar", "Continue", "Continuar"), []() {
+                brls::Application::pushActivity(new brls::Activity(goonies::ui::UpdaterView::create(goonies::ui::UpdateMode::Firmware)));
+            });
+            dialog->addButton(t("Cancelar", "Cancel", "Cancelar"), []() {});
+            dialog->open();
             return true;
         });
         content->addView(firmwareBtn);
